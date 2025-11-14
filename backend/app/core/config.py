@@ -1,0 +1,39 @@
+import os
+from functools import lru_cache
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """Configuración general del backend."""
+    # BD
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql+psycopg2://tienda_user:super_seguro@db:5432/tienda_db",
+    )
+
+    # CORS
+    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    # Seguridad
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev_key_cambia_esto")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+    )
+
+    # Correo (Resend)
+    RESEND_API_KEY: str                      # obligatorio, viene del entorno
+    EMAIL_FROM_NAME: str = "Innersport Tienda"
+    EMAIL_FROM_ADDRESS: str = "onboarding@resend.dev"  # default ok
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
+    class Config:
+        env_file = ".env"          # esto se usa si hubiera un .env dentro de /app
+        env_file_encoding = "utf-8"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()

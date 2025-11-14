@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: tienda_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+     
+  redis:
+    image: redis:7
+    container_name: tienda_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tienda_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app     # hot reload
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+#  celery-worker:
+#    build:
+#      context: ./backend
+#      dockerfile: Dockerfile
+#    container_name: tienda_celery_worker
+#    restart: unless-stopped
+#    env_file:
+#      - .env
+#    depends_on:
+#      - backend
+#      - redis
+#    command: >
+#      celery -A app.core.celery_app worker -l info
+
+#  celery-beat:
+#    build:
+#      context: ./backend
+#      dockerfile: Dockerfile
+#    container_name: tienda_celery_beat
+#    restart: unless-stopped
+#    env_file:
+#      - .env
+#    depends_on:
+#      - backend
+#      - redis
+#    command: >
+#      celery -A app.core.celery_app beat -l info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tienda_frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: "npm run dev"
+
+volumes:
+  db_data:

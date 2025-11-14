@@ -1,0 +1,116 @@
+# =========================================
+# 🚀 PROYECTO: FastAPI + Alembic + Next.js
+# =========================================
+
+# -------------------------------
+# 🔵 PYTHON / FASTAPI / ALEMBIC
+# -------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.log
+.env        # Evitar subir información sensible
+.env.*      # Pero permitir variantes locales si se crean
+.venv/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Alembic cache
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# SQLite (si algún día lo usas local)
+*.db
+*.sqlite3
+
+# -------------------------------
+# 🔵 DOCKER
+# -------------------------------
+*.pid
+*.tar
+docker-compose.override.yml
+**/docker-data/**
+**/docker-volumes/**
+**/data/**
+**/tmp/**
+
+# Evitar subir volúmenes persistentes
+volumes/
+data/
+db_data/
+
+# -------------------------------
+# 🟣 NEXT.JS / NODE / FRONTEND
+# -------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js build output
+.next/
+out/
+
+# Env frontend
+*.env.local
+*.env.development
+*.env.production
+
+# Static generated exports
+dist/
+build/
+
+# -------------------------------
+# 🔶 SISTEMA OPERATIVO
+# -------------------------------
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+__MACOSX/
+
+# Linux
+*~
+
+# -------------------------------
+# 🛠 EDITORES (VS Code, etc.)
+# -------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# -------------------------------
+# 🔒 LOGS
+# -------------------------------
+logs/
+*.log
+*.out
+*.err
+
+# -------------------------------
+# 🧪 TESTING
+# -------------------------------
+.coverage
+htmlcov/
+pytest_cache/
+.tox/
+.mypy_cache/
+
+# -------------------------------
+# 🔧 MISC
+# -------------------------------
+*.bak
+*.tmp
+*.temp
