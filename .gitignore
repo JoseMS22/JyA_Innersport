@@ -114,3 +114,7 @@ pytest_cache/
 *.bak
 *.tmp
 *.temp
+
+
+# Ignorar completamente .env
+/.env
