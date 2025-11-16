@@ -1,6 +1,7 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 
 from app.db import Base
 
@@ -11,6 +12,9 @@ class Usuario(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     nombre = Column(String(120), nullable=False)
+    pendiente_eliminacion = Column(Boolean, default=False, nullable=False)
+    eliminacion_solicitada_at = Column(DateTime(timezone=True), nullable=True)
+    eliminacion_programada_at = Column(DateTime(timezone=True), nullable=True)
 
     # correo único
     correo = Column(String(100), nullable=False, unique=True, index=True)

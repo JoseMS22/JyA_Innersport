@@ -54,7 +54,9 @@ export default function HomePage() {
         {/* Migas de pan */}
         <div className="text-xs text-gray-500 mb-4">
           Inicio <span className="mx-1">›</span>{" "}
-          <span className="text-gray-800 font-medium">Colección Innersport</span>
+          <span className="text-gray-800 font-medium">
+            Colección Innersport
+          </span>
         </div>
 
         {/* Hero tipo banner: dos columnas */}
@@ -214,7 +216,7 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-        </section>
+        </section>    
       </main>
     </div>
   );

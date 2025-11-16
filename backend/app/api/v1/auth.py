@@ -1,12 +1,26 @@
 # backend/app/api/v1/auth.py
 
-from fastapi import APIRouter, Depends, status, Response
+from fastapi import APIRouter, Depends, status, Response, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas.usuario import UserCreate, UserPublic
-from app.schemas.auth import LoginSchema, Token, VerifyEmailSchema
-from app.services.usuario_service import create_user, login_user, verify_email
+from app.schemas.usuario import UserCreate, UserPublic, UserUpdate
+from app.schemas.auth import (
+    LoginSchema,
+    Token,
+    VerifyEmailSchema,
+    DeleteAccountSchema,
+    DeleteAccountResponse,
+)
+from app.services.usuario_service import (
+    GRACE_DAYS,
+    create_user,
+    login_user,
+    verify_email,
+    request_account_deletion,
+    delete_user,
+    update_profile,
+)
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.models.usuario import Usuario
@@ -66,6 +80,7 @@ def login(
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # segundos
         samesite="lax",
         secure=False,  # En producción pon esto en True (HTTPS)
+        path="/",
     )
 
     # Devolvemos también el token en el body por compatibilidad / debug
@@ -90,7 +105,13 @@ def logout(
     """
     Elimina la cookie de sesión (access_token).
     """
-    response.delete_cookie("access_token")
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        samesite="lax",
+        secure=False,  # En producción True
+        path="/",
+    )
     return {"message": "Sesión cerrada correctamente."}
 
 
@@ -118,11 +139,117 @@ def verify_email_endpoint(
         "correo": usuario.correo,
     }
 
-@router.get("/me")
+
+# =========================
+# Info de usuario autenticado
+# =========================
+
+@router.get("/me", response_model=UserPublic)
 def read_me(current_user: Usuario = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "nombre": current_user.nombre,
-        "correo": current_user.correo,
-        "rol": current_user.rol,
-    }
+    """
+    Devuelve el perfil del usuario autenticado:
+    - id, nombre, correo, telefono
+    - direccion asociada (según defina UserPublic)
+    No expone contraseña ni campos sensibles.
+    """
+    return current_user
+
+    # =========================
+    # US-03: Actualizar perfil del usuario autenticado.
+    # - Solo datos no sensibles (nombre, teléfono, dirección).
+    # - Valida formato básico y devuelve el perfil actualizado.
+    # =========================
+
+@router.put("/me", response_model=UserPublic)
+def update_me(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    
+    usuario_actualizado = update_profile(db, current_user, payload)
+    return usuario_actualizado
+
+
+# =========================
+# Eliminación directa por ID (uso administrativo)
+# =========================
+
+@router.delete(
+    "/{user_id}",
+    response_model=UserPublic,
+    status_code=status.HTTP_200_OK,
+)
+def delete_usuario(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Elimina un usuario por ID y devuelve sus datos.
+    Pensado para uso administrativo, no forma parte del flujo US-04 (el usuario
+    normal se elimina a sí mismo vía /delete-account).
+    """
+    usuario = delete_user(db, user_id)
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado.",
+        )
+
+    return usuario
+
+
+# =========================
+# Eliminación de cuenta propia (US-04)
+# =========================
+
+@router.post(
+    "/delete-account",
+    response_model=DeleteAccountResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def delete_my_account(
+    payload: DeleteAccountSchema,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    US-04: Como usuario quiero eliminar mi cuenta.
+
+    • Requiere usuario autenticado (cookie JWT).
+    • Requiere contraseña actual (reautenticación).
+    • Requiere confirmación explícita (checkbox).
+    • Desactiva la cuenta y la marca como pendiente de eliminación
+      (soft delete + periodo de gracia).
+    • Revoca la sesión actual eliminando la cookie.
+    """
+
+    usuario = request_account_deletion(
+        db=db,
+        usuario=current_user,
+        delete_in=payload,
+    )
+
+    # 🔐 Revocar acceso en este navegador: borrar cookie de sesión
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        samesite="lax",
+        secure=False,  # En producción True
+        path="/",
+    )
+
+    return DeleteAccountResponse(
+        detail=(
+            "Tu cuenta ha sido desactivada y se ha iniciado el proceso de eliminación. "
+            f"Será eliminada de forma irreversible después de {GRACE_DAYS} días, "
+            "salvo restricciones legales o de negocio."
+        ),
+        deletion_scheduled_for=(
+            usuario.eliminacion_programada_at.isoformat()
+            if usuario.eliminacion_programada_at
+            else None
+        ),
+    )
