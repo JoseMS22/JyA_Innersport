@@ -25,5 +25,21 @@ class TokenData(BaseModel):
     sub: Optional[str] = None
     rol: Optional[str] = None
 
+
 class VerifyEmailSchema(BaseModel):
     token: str
+
+
+# 🆕 US-06: Cambio de Contraseña
+class ChangePasswordSchema(BaseModel):
+    """
+    Esquema para cambiar la contraseña de un usuario autenticado.
+    
+    Validaciones:
+    - current_password: contraseña actual del usuario
+    - new_password: nueva contraseña (debe cumplir política)
+    - confirm_new_password: confirmación de nueva contraseña
+    """
+    current_password: str
+    new_password: str
+    confirm_new_password: str

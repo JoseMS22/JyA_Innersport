@@ -17,6 +17,8 @@ from app.core.password_policy import validate_password_policy
 from datetime import datetime, timedelta, timezone
 import secrets
 from app.core.email import send_verification_email
+from app.schemas.auth import ChangePasswordSchema
+from app.core.password_policy import validate_password_policy
 
 
 
@@ -204,4 +206,61 @@ def verify_email(db: Session, token: str) -> Usuario:
     db.commit()
     db.refresh(usuario)
 
+    return usuario
+
+# =========================
+# US-06: Cambio de Contraseña
+# =========================
+
+def change_password(
+    db: Session,
+    usuario: Usuario,
+    data: ChangePasswordSchema,
+) -> Usuario:
+    """
+    Cambia la contraseña de un usuario autenticado.
+    
+    Validaciones aplicadas:
+    1. La contraseña actual debe ser correcta
+    2. La nueva contraseña debe cumplir la política de seguridad
+    3. La nueva contraseña y su confirmación deben coincidir
+    4. La nueva contraseña NO puede ser igual a la actual
+    """
+    
+    # 1️⃣ Validar que la contraseña actual sea correcta
+    if not verify_password(data.current_password, usuario.contrasena_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=["La contraseña actual es incorrecta."],
+        )
+    
+    # 2️⃣ Validar que nueva contraseña y confirmación coincidan
+    if data.new_password != data.confirm_new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=["La nueva contraseña y su confirmación no coinciden."],
+        )
+    
+    # 3️⃣ Validar que la nueva contraseña NO sea igual a la actual
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=["La nueva contraseña debe ser diferente a la actual."],
+        )
+    
+    # 4️⃣ Validar política de contraseña (RF08)
+    validate_password_policy(data.new_password)
+    
+    # 5️⃣ Hashear nueva contraseña
+    nuevo_hash = get_password_hash(data.new_password)
+    
+    # 6️⃣ Actualizar en base de datos
+    usuario.contrasena_hash = nuevo_hash
+    
+    db.commit()
+    db.refresh(usuario)
+    
+    # 📝 Log de auditoría (RNF12)
+    print(f"[AUDIT] Usuario {usuario.id} ({usuario.correo}) cambió su contraseña")
+    
     return usuario

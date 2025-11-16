@@ -10,6 +10,18 @@ from app.services.usuario_service import create_user, login_user, verify_email
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.models.usuario import Usuario
+from app.schemas.auth import (
+    LoginSchema, 
+    Token, 
+    VerifyEmailSchema,
+    ChangePasswordSchema,  
+)
+from app.services.usuario_service import (
+    create_user, 
+    login_user, 
+    verify_email,
+    change_password,  
+)
 
 router = APIRouter()
 
@@ -125,4 +137,37 @@ def read_me(current_user: Usuario = Depends(get_current_user)):
         "nombre": current_user.nombre,
         "correo": current_user.correo,
         "rol": current_user.rol,
+    }
+
+# =========================
+# US-06: Cambio de Contraseña
+# =========================
+
+@router.put(
+    "/change-password",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+def change_password_endpoint(
+    data: ChangePasswordSchema,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Permite a un usuario autenticado cambiar su contraseña.
+    
+    **Validaciones aplicadas:**
+    - Contraseña actual correcta
+    - Nueva contraseña cumple política de seguridad
+    - Nueva contraseña y confirmación coinciden
+    - Nueva contraseña diferente a la actual
+    
+    **Requiere autenticación:** ✅ (JWT en cookie HttpOnly)
+    """
+    
+    change_password(db, current_user, data)
+    
+    return {
+        "message": "Contraseña actualizada correctamente.",
+        "usuario": current_user.correo,
     }
