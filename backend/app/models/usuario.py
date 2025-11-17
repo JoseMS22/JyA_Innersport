@@ -3,7 +3,6 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from app.db import Base
 
@@ -12,37 +11,28 @@ class Usuario(Base):
     __tablename__ = "usuario"
 
     id = Column(Integer, primary_key=True, index=True)
-
     nombre = Column(String(120), nullable=False)
-    pendiente_eliminacion = Column(Boolean, default=False, nullable=False)
-    eliminacion_solicitada_at = Column(DateTime(timezone=True), nullable=True)
-    eliminacion_programada_at = Column(DateTime(timezone=True), nullable=True)
-
-    # correo único
     correo = Column(String(100), nullable=False, unique=True, index=True)
-
-    # En el ERD aparece como "contraseña_hash".
-    # Aquí usamos "contrasena_hash" (sin ñ) porque los nombres de atributos en Python
-    # no pueden llevar caracteres especiales. La columna en BD también se llamará así.
     contrasena_hash = Column(String(255), nullable=False)
-
     telefono = Column(String(20), nullable=True)
-
-    # ADMIN | VENDEDOR | CLIENTE
     rol = Column(String(20), nullable=False, default="CLIENTE")
-
     activo = Column(Boolean, nullable=False, default=True)
 
-    # 🔹 CAMPOS PARA VERIFICACIÓN DE CORREO
+    # Verificación de correo
     email_verificado = Column(Boolean, nullable=False, default=False)
     token_verificacion = Column(String(255), nullable=True, index=True)
     token_verificacion_expira = Column(DateTime(timezone=True), nullable=True)
 
-    # 🔹 NUEVOS CAMPOS PARA RECUPERACIÓN DE CONTRASEÑA (US-07 / RF10)
+    # Recuperación de contraseña
     reset_password_token = Column(String(255), nullable=True, index=True)
     reset_password_token_expira = Column(DateTime(timezone=True), nullable=True)
     reset_password_attempts = Column(Integer, nullable=False, default=0)
     ultimo_intento_reset = Column(DateTime(timezone=True), nullable=True)
+
+    # 🔹 Eliminación de cuenta (de ramaAdrian)
+    pendiente_eliminacion = Column(Boolean, nullable=False, default=False)
+    eliminacion_solicitada_at = Column(DateTime(timezone=True), nullable=True)
+    eliminacion_programada_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

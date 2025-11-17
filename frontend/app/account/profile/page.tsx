@@ -280,13 +280,24 @@ export default function ProfilePage() {
               {saving ? "Guardando cambios..." : "Guardar cambios"}
             </button>
 
-            <button
+            <div className="flex gap-2">
+              {/* 🆕 Botón Cambiar contraseña */}
+              <button
+                type="button"
+                onClick={() => router.push("/change-password")}
+                className="rounded-lg bg-[#6b21a8] hover:bg-[#7e22ce] text-white font-medium px-4 py-2 text-xs"
+              >
+                Cambiar contraseña
+              </button>
+
+              <button
                 type="button"
                 onClick={() => router.push("/account/delete")}
                 className="rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 text-xs"
-                >
+              >
                 Eliminar cuenta
-            </button>
+              </button>
+            </div>
           </div>
         </form>
       </main>
