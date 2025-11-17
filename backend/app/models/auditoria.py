@@ -25,24 +25,19 @@ class AuditoriaUsuario(Base):
     )
 
     # Tipo de acción realizada
-    # Ejemplos: CREATE, UPDATE, DELETE, LOGIN, LOGOUT, 
-    #           REGISTER, CHANGE_PASSWORD, RESET_PASSWORD,
-    #           CREATE_ORDER, CANCEL_ORDER, PROCESS_PAYMENT, etc.
     accion = Column(String(50), nullable=False, index=True)
 
     # Entidad afectada
-    # Ejemplos: Usuario, Producto, Pedido, VentaPOS, Caja, etc.
     entidad = Column(String(50), nullable=False, index=True)
 
     # ID de la entidad afectada (si aplica)
     entidad_id = Column(Integer, nullable=True, index=True)
 
     # Detalles adicionales en formato JSON o texto
-    # Puede contener valores antes/después del cambio, campos modificados, etc.
     detalles = Column(Text, nullable=True)
 
     # IP desde donde se realizó la acción
-    ip_address = Column(String(45), nullable=True)  # IPv6 puede ser más largo
+    ip_address = Column(String(45), nullable=True)
 
     # Timestamp de la acción
     fecha = Column(
