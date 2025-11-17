@@ -14,13 +14,17 @@ from app.schemas.auth import (
     LoginSchema, 
     Token, 
     VerifyEmailSchema,
-    ChangePasswordSchema,  
+    ChangePasswordSchema,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.services.usuario_service import (
     create_user, 
     login_user, 
     verify_email,
-    change_password,  
+    change_password,
+    request_password_reset,
+    reset_password_with_token,
 )
 
 router = APIRouter()
@@ -171,3 +175,77 @@ def change_password_endpoint(
         "message": "Contraseña actualizada correctamente.",
         "usuario": current_user.correo,
     }
+# =========================
+# US-07 / RF10: Recuperación de Contraseña
+# =========================
+
+@router.post(
+    "/forgot-password",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+def forgot_password(
+    data: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Solicita recuperación de contraseña.
+    
+    **Flujo:**
+    1. Usuario ingresa su correo
+    2. Si el correo existe, se envía un enlace con token
+    3. SIEMPRE se muestra mensaje genérico (no revela si el correo existe)
+    
+    **Seguridad:**
+    - Rate limiting: máximo 3 intentos por hora
+    - Token expira en 30 minutos
+    - Cada token es de un solo uso
+    
+    **Criterios de aceptación RF10:**
+    - ✅ Mensaje genérico siempre (CA1)
+    - ✅ Rate limiting por usuario/IP (CA2)
+    - ✅ Token seguro con expiración (CA1)
+    - ✅ Auditoría sin exponer datos sensibles (CA2)
+    """
+    return request_password_reset(db, data)
+
+
+@router.post(
+    "/reset-password",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+def reset_password(
+    data: ResetPasswordRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Restablece contraseña con token de recuperación.
+    
+    **Flujo:**
+    1. Usuario recibe token por correo
+    2. Ingresa token + nueva contraseña + confirmación
+    3. Sistema valida token y política de contraseña
+    4. Actualiza contraseña e invalida token
+    5. Invalida todas las sesiones activas (logout global)
+    
+    **Validaciones:**
+    - Token válido y no expirado
+    - Nueva contraseña cumple política
+    - Contraseña y confirmación coinciden
+    
+    **Criterios de aceptación RF10:**
+    - ✅ Validación completa de token (CA3)
+    - ✅ Política de contraseña aplicada (CA3)
+    - ✅ Confirmación requerida (CA3)
+    - ✅ Rechazo si token inválido/expirado (CA3)
+    - ✅ Logout global (CA4)
+    - ✅ Auditoría (CA4)
+    """
+    result = reset_password_with_token(db, data)
+    
+    # Limpiar cookie de sesión (logout global - CA4)
+    response.delete_cookie("access_token")
+    
+    return result

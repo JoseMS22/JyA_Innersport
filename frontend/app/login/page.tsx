@@ -65,6 +65,17 @@ export default function LoginPage() {
             required
           />
 
+          {/* 🆕 Enlace de recuperación de contraseña */}
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => router.push("/forgot-password")}
+              className="text-xs text-[#6b21a8] hover:text-[#a855f7] hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
           {errorMsg && (
             <div className="text-xs text-red-600 whitespace-pre-line">
               {errorMsg}

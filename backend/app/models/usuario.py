@@ -1,3 +1,5 @@
+# backend/app/models/usuario.py
+
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -27,10 +29,16 @@ class Usuario(Base):
 
     activo = Column(Boolean, nullable=False, default=True)
 
-    # 🔹 NUEVOS CAMPOS PARA VERIFICACIÓN DE CORREO
+    # 🔹 CAMPOS PARA VERIFICACIÓN DE CORREO
     email_verificado = Column(Boolean, nullable=False, default=False)
     token_verificacion = Column(String(255), nullable=True, index=True)
     token_verificacion_expira = Column(DateTime(timezone=True), nullable=True)
+
+    # 🔹 NUEVOS CAMPOS PARA RECUPERACIÓN DE CONTRASEÑA (US-07 / RF10)
+    reset_password_token = Column(String(255), nullable=True, index=True)
+    reset_password_token_expira = Column(DateTime(timezone=True), nullable=True)
+    reset_password_attempts = Column(Integer, nullable=False, default=0)
+    ultimo_intento_reset = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

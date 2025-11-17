@@ -43,3 +43,29 @@ class ChangePasswordSchema(BaseModel):
     current_password: str
     new_password: str
     confirm_new_password: str
+
+# =========================
+# US-07: Recuperación de Contraseña (RF10)
+# =========================
+
+class ForgotPasswordRequest(BaseModel):
+    """
+    Esquema para solicitar recuperación de contraseña.
+    
+    Solo requiere el correo del usuario.
+    """
+    correo: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Esquema para restablecer contraseña con token.
+    
+    Validaciones:
+    - token: código recibido por correo
+    - new_password: nueva contraseña (debe cumplir política)
+    - confirm_new_password: confirmación de nueva contraseña
+    """
+    token: str
+    new_password: str
+    confirm_new_password: str
