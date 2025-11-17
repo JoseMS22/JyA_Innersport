@@ -562,7 +562,7 @@ def reset_password(
         
         # Buscar usuario por token para auditoría
         usuario = db.query(Usuario).filter(
-            Usuario.token_reset_password == data.token
+            Usuario.reset_password_token == data.token
         ).first()
         
         if usuario:
