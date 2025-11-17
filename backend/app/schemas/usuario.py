@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
 
 # =========================
@@ -75,6 +75,21 @@ class UserPublic(UserBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class UserUpdate(BaseModel):
+    """
+    Datos que el usuario puede actualizar de su perfil.
+    NO incluye correo, rol, ni contraseña.
+    """
+    nombre: Optional[str] = Field(None, max_length=120)
+    telefono: Optional[str] = Field(None, max_length=20)
+
+    # Campos de la dirección principal
+    provincia: Optional[str] = Field(None, max_length=100)
+    canton: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=100)
+    detalle: Optional[str] = None
+    telefono_direccion: Optional[str] = Field(None, max_length=20)
+
 
 class UserInDB(UserBase):
     """
@@ -87,3 +102,16 @@ class UserInDB(UserBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(..., description="Contraseña actual para reautenticación")
+    confirm: bool = Field(
+        ...,
+        description="Debe ser true indicando que el usuario acepta la eliminación y la pérdida de datos",
+    )
+
+
+class DeleteAccountResponse(BaseModel):
+    detail: str
+    deletion_scheduled_for: datetime | None = None

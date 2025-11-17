@@ -83,7 +83,13 @@ def get_current_user(
 ) -> Usuario:
     """
     Obtiene el usuario actual a partir del token almacenado en la cookie 'access_token'.
+    Bloquea:
+    - usuarios inactivos
+    - usuarios en proceso de eliminación (US-04)
+    - tokens inválidos
     """
+
+    # 1) Verificar que existe el token en cookie
     token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(
@@ -91,6 +97,7 @@ def get_current_user(
             detail="No se encontró token de autenticación.",
         )
 
+    # 2) Decodificar token
     payload = _decode_token(token)
     sub = payload.get("sub")
 
@@ -100,16 +107,29 @@ def get_current_user(
             detail="Token sin identificador de usuario.",
         )
 
+    # 3) Cargar usuario desde la base de datos
     user = db.query(Usuario).filter(Usuario.id == int(sub)).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario no encontrado.",
         )
+
+    # 4) Bloqueo por inactividad
     if not user.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo o bloqueado.",
+            detail="Tu cuenta está desactivada.",
+        )
+
+    # 5) **Nuevo:** Bloqueo para US-04 (pendiente de eliminación)
+    if getattr(user, "pendiente_eliminacion", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Tu cuenta está en proceso de eliminación. "
+                "No puedes acceder mientras el proceso esté activo."
+            ),
         )
 
     return user
