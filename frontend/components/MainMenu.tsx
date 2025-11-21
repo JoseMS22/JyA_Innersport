@@ -118,34 +118,43 @@ export function MainMenu() {
           {!checking && (
             <>
               {user ? (
-                <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline text-xs text-gray-600">
-                    Hola, <span className="font-semibold">{user.nombre}</span>
+              <div className="flex items-center gap-2">
+                {/* Nombre de usuario clicable que lleva al perfil */}
+                Hola,{""}<button
+                  type="button"
+                  onClick={() => router.push("/account/profile")}
+                  className="hidden sm:inline text-xs text-gray-600 hover:text-[#6b21a8]"
+                >
+                  
+                  <span className="font-semibold underline decoration-[#a855f7]/60 underline-offset-2">
+                    {user.nombre}
                   </span>
-                  <button
-                    onClick={handleLogout}
-                    className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs">
-                  <button
-                    onClick={() => router.push("/login")}
-                    className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                  >
-                    Iniciar sesión
-                  </button>
-                  <span className="text-gray-400">/</span>
-                  <button
-                    onClick={() => router.push("/register")}
-                    className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
-                  >
-                    Crear cuenta
-                  </button>
-                </div>
-              )}
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  onClick={() => router.push("/login")}
+                  className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                >
+                  Iniciar sesión
+                </button>
+                <span className="text-gray-400">/</span>
+                <button
+                  onClick={() => router.push("/register")}
+                  className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
+                >
+                  Crear cuenta
+                </button>
+              </div>
+            )}
             </>
           )}
 

@@ -3,33 +3,32 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo } from "../../components/Logo";
+import { Logo } from "@/components/Logo";
+import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    const payload = {
-      correo: formData.get("correo") as string,
-      password: formData.get("password") as string,
-    };
-
     try {
       await apiFetch("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          correo: email,
+          password: password,
+        }),
       });
 
-      // Aquí el backend devuelve el token, pero lo importante es la cookie HttpOnly
-      // Redirigimos al home o al dashboard
+      // Login exitoso, redirigir al home
       router.push("/");
     } catch (err: any) {
       setErrorMsg(err.message ?? "Error al iniciar sesión");
@@ -41,54 +40,86 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white/90 rounded-2xl shadow-xl border border-[#a855f7]/10 p-8">
+        {/* Logo */}
         <div className="flex flex-col items-center mb-6">
-          <Logo size={160} />
+          <Logo size={120} />
+          <h1 className="mt-4 text-2xl font-bold text-[#6b21a8]">
+            Bienvenido de nuevo
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Inicia sesión en tu cuenta
+          </p>
         </div>
 
-        <h1 className="text-xl font-semibold text-center text-[#6b21a8] mb-4">
-          Iniciar sesión
-        </h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
+              placeholder="tu@correo.com"
+              required
+              disabled={loading}
+              autoComplete="email"
+            />
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3 text-sm">
-          <input
-            type="email"
-            name="correo"
-            placeholder="Correo electrónico"
-            className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+          {/* Contraseña con ojo */}
+          <PasswordInput
+            label="Contraseña"
+            value={password}
+            onChange={setPassword}
+            placeholder="Ingresa tu contraseña"
             required
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Contraseña"
-            className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
-            required
+            disabled={loading}
+            autoComplete="current-password"
           />
 
+          {/* Olvidé mi contraseña */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => router.push("/forgot-password")}
+              className="text-xs text-[#6b21a8] hover:text-[#a855f7] font-medium"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
+          {/* Error */}
           {errorMsg && (
-            <div className="text-xs text-red-600 whitespace-pre-line">
-              {errorMsg}
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-xs text-red-700">{errorMsg}</p>
             </div>
           )}
 
+          {/* Botón */}
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2 text-sm disabled:opacity-60"
+            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? "Ingresando..." : "Entrar"}
+            {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </button>
 
-          <p className="mt-2 text-xs text-center text-[#6b21a8]">
-            ¿Aún no tienes cuenta?{" "}
-            <button
-              type="button"
-              onClick={() => router.push("/register")}
-              className="font-semibold text-[#eab308] hover:underline"
-            >
-              Crear cuenta
-            </button>
-          </p>
+          {/* Registro */}
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-center text-sm text-gray-600">
+              ¿No tienes cuenta?{" "}
+              <button
+                type="button"
+                onClick={() => router.push("/register")}
+                className="text-[#6b21a8] hover:text-[#a855f7] font-medium"
+              >
+                Regístrate aquí
+              </button>
+            </p>
+          </div>
         </form>
       </div>
     </div>

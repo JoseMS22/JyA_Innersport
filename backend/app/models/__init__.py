@@ -1,4 +1,16 @@
+# backend/app/models/__init__.py
+
 from .usuario import Usuario
 from .direccion import Direccion
+from .auditoria import AuditoriaUsuario
+from .categoria import Categoria
+from .producto import Producto
+from .producto_categoria import ProductoCategoria
+from .media import Media
+from .variante import Variante
+from .historial_precio import HistorialPrecio
+from .sucursal import Sucursal
+from .inventario import Inventario
+from .movimiento_inventario import MovimientoInventario
 
-__all__ = ["Usuario", "Direccion"]
+__all__ = ["Usuario", "Direccion", "AuditoriaUsuario"]
