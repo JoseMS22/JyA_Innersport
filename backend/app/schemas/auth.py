@@ -41,6 +41,8 @@ class TokenData(BaseModel):
 class VerifyEmailSchema(BaseModel):
     token: str
 
+class ReactivateAccountResponse(BaseModel):
+    detail: str
 
 # 🆕 US-06: Cambio de Contraseña
 class ChangePasswordSchema(BaseModel):

@@ -13,7 +13,8 @@ from app.schemas.auth import (
     DeleteAccountResponse,
     ChangePasswordSchema,  
     ForgotPasswordRequest,  
-    ResetPasswordRequest,  
+    ResetPasswordRequest,
+    ReactivateAccountResponse,  
 )
 from app.services.usuario_service import (
     GRACE_DAYS,
@@ -25,10 +26,11 @@ from app.services.usuario_service import (
     update_profile,
     change_password,  
     request_password_reset,  
-    reset_password_with_token,  
+    reset_password_with_token,
+    reactivate_account,  
 )
 from app.services.audit_service import registrar_auditoria
-from app.core.security import get_current_user
+from app.core.security import get_current_user, create_access_token
 from app.core.config import settings
 from app.core.request_utils import get_client_ip
 from app.core.logging_config import get_logger, get_audit_logger
@@ -437,6 +439,40 @@ def delete_my_account(
         logger.error(f"Error en solicitud de eliminación de cuenta: {str(e)}")
         raise
 
+# =========================
+# US-04: Reactivación de cuenta en periodo de gracia
+# =========================
+
+@router.post("/reactivate-account", response_model=ReactivateAccountResponse)
+def reactivate_account_endpoint(
+    data: LoginSchema,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Reactiva una cuenta en periodo de gracia y genera de nuevo el JWT en cookie.
+    """
+
+    usuario = reactivate_account(db, data)
+
+    token_data = {
+        "sub": str(usuario.id),
+        "rol": usuario.rol,
+    }
+    access_token = create_access_token(token_data)
+
+    # 🧁 Setear cookie HttpOnly igual que en tu login
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,  # o True/False según tengas
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+    return {"detail": "Tu cuenta ha sido reactivada correctamente."}
 
 # =========================
 # US-06: Cambio de Contraseña
