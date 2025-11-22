@@ -15,43 +15,49 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-  e.preventDefault();
-  setErrorMsg(null);
-  setLoading(true);
-  const formData = new FormData(e.currentTarget);
-  const payload = {
-    correo: formData.get("correo") as string,
-    password: formData.get("password") as string,
-  };
+    e.preventDefault();
+    setErrorMsg(null);
+    setLoading(true);
 
-  try {
-    await apiFetch("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    // 👉 Usamos directamente el estado de React
+    const payload = {
+      correo: email,      // el backend espera "correo"
+      password: password, // y "password"
+    };
 
-    // Si todo bien → home
-    router.push("/");
-  } catch (err: any) {
-    const msg = err?.message ?? "Error al iniciar sesión";
+    try {
+      await apiFetch("/api/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        // si apiFetch no pone headers, aquí iría:
+        // headers: { "Content-Type": "application/json" },
+      });
 
-    if (typeof msg === "string" && msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")) {
-      // msg viene como: "CUENTA_PENDIENTE_ELIMINACION;2026-01-01T12:00:00+00:00"
-      const [, deletionIso] = msg.split(";", 2);
+      // Si todo bien → home
+      router.push("/");
+    } catch (err: any) {
+      const msg = err?.message ?? "Error al iniciar sesión";
 
-      const params = new URLSearchParams();
-      params.set("correo", payload.correo);
-      if (deletionIso) params.set("deletion", deletionIso);
+      if (
+        typeof msg === "string" &&
+        msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")
+      ) {
+        // msg viene como: "CUENTA_PENDIENTE_ELIMINACION;2026-01-01T12:00:00+00:00"
+        const [, deletionIso] = msg.split(";", 2);
 
-      router.push(`/account/reactivate?${params.toString()}`);
-      return;
+        const params = new URLSearchParams();
+        params.set("correo", payload.correo);
+        if (deletionIso) params.set("deletion", deletionIso);
+
+        router.push(`/account/reactivate?${params.toString()}`);
+        return;
+      }
+
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
     }
-
-    setErrorMsg(msg);
-  } finally {
-    setLoading(false);
   }
-}
 
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center px-4">
