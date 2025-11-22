@@ -133,19 +133,16 @@ export default function ProfilePage() {
       <MainMenu />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-xl font-semibold text-[#6b21a8] mb-1">
-          Mi perfil
-        </h1>
+        <h1 className="text-xl font-semibold text-[#6b21a8] mb-1">Mi perfil</h1>
         <p className="text-xs text-gray-500 mb-6">
-          Aquí puedes ver y actualizar tu información básica y dirección de
-          entrega.
+          Aquí puedes ver y actualizar tu información básica y dirección de entrega.
         </p>
 
         <form
           onSubmit={handleSubmit}
           className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-5 space-y-4 text-sm"
         >
-          {/* Datos de cuenta (correo solo lectura) */}
+          {/* Datos de cuenta */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-gray-500 mb-1">
@@ -155,7 +152,9 @@ export default function ProfilePage() {
                 name="nombre"
                 value={form.nombre}
                 onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none 
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
                 required
               />
             </div>
@@ -167,7 +166,8 @@ export default function ProfilePage() {
               <input
                 value={profile.correo}
                 readOnly
-                className="w-full rounded-lg border px-3 py-2 bg-gray-50 text-gray-500 cursor-not-allowed border-[#e5e7eb]"
+                className="w-full rounded-lg border px-3 py-2 bg-gray-50 
+                           text-gray-500 cursor-not-allowed border-[#e5e7eb]"
               />
               <p className="mt-1 text-[10px] text-gray-400">
                 El correo no puede modificarse desde aquí.
@@ -177,15 +177,15 @@ export default function ProfilePage() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Teléfono
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Teléfono</label>
               <input
                 name="telefono"
                 value={form.telefono}
                 onChange={handleChange}
                 maxLength={20}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
               />
             </div>
           </div>
@@ -199,41 +199,43 @@ export default function ProfilePage() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Provincia
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Provincia</label>
               <input
                 name="provincia"
                 value={form.provincia}
                 onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
               />
             </div>
+
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Cantón
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Cantón</label>
               <input
                 name="canton"
                 value={form.canton}
                 onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
               />
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Distrito
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Distrito</label>
               <input
                 name="distrito"
                 value={form.distrito}
                 onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
               />
             </div>
+
             <div>
               <label className="block text-xs text-gray-500 mb-1">
                 Teléfono de entrega
@@ -243,7 +245,9 @@ export default function ProfilePage() {
                 value={form.telefono_direccion}
                 onChange={handleChange}
                 maxLength={20}
-                className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+                className="w-full rounded-lg border px-3 py-2 outline-none
+                           border-[#e5e7eb] focus:border-[#a855f7]
+                           text-gray-800 placeholder-gray-400"
               />
             </div>
           </div>
@@ -257,7 +261,9 @@ export default function ProfilePage() {
               value={form.detalle}
               onChange={handleChange}
               rows={2}
-              className="w-full rounded-lg border px-3 py-2 outline-none border-[#e5e7eb] focus:border-[#a855f7]"
+              className="w-full rounded-lg border px-3 py-2 outline-none
+                         border-[#e5e7eb] focus:border-[#a855f7]
+                         text-gray-800 placeholder-gray-400"
             />
           </div>
 
@@ -281,7 +287,6 @@ export default function ProfilePage() {
             </button>
 
             <div className="flex gap-2">
-              {/* 🆕 Botón Cambiar contraseña */}
               <button
                 type="button"
                 onClick={() => router.push("/change-password")}
@@ -301,6 +306,6 @@ export default function ProfilePage() {
           </div>
         </form>
       </main>
-    </div>
-  );
+    </div>
+  );
 }

@@ -4,6 +4,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
+import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
 export default function ChangePasswordPage() {
@@ -87,19 +88,15 @@ export default function ChangePasswordPage() {
         router.push("/");
       }, 2000);
     } catch (err: any) {
-      // Manejar errores del backend
       let errorMessage = err.message ?? "Error al cambiar contraseña";
       
-      // Si el error es un array (validaciones múltiples)
       if (typeof errorMessage === "string" && errorMessage.includes("[")) {
         try {
           const errors = JSON.parse(errorMessage);
           if (Array.isArray(errors)) {
             errorMessage = errors.join("\n");
           }
-        } catch {
-          // Si no se puede parsear, usar el mensaje original
-        }
+        } catch {}
       }
       
       setErrorMsg(errorMessage);
@@ -108,7 +105,6 @@ export default function ChangePasswordPage() {
     }
   }
 
-  // Verificar si todos los requisitos se cumplen
   const allValid = Object.values(validations).every(v => v) && passwords.current !== "";
 
   return (
@@ -137,33 +133,27 @@ export default function ChangePasswordPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Contraseña actual */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contraseña actual
-              </label>
-              <input
-                type="password"
-                value={passwords.current}
-                onChange={(e) => handlePasswordChange("current", e.target.value)}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
-                placeholder="Ingresa tu contraseña actual"
-                required
-              />
-            </div>
+            {/* Contraseña actual con ojo */}
+            <PasswordInput
+              label="Contraseña actual"
+              value={passwords.current}
+              onChange={(value) => handlePasswordChange("current", value)}
+              placeholder="Ingresa tu contraseña actual"
+              required
+              disabled={loading}
+              autoComplete="current-password"
+            />
 
-            {/* Nueva contraseña */}
+            {/* Nueva contraseña con ojo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nueva contraseña
-              </label>
-              <input
-                type="password"
+              <PasswordInput
+                label="Nueva contraseña"
                 value={passwords.new}
-                onChange={(e) => handlePasswordChange("new", e.target.value)}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
+                onChange={(value) => handlePasswordChange("new", value)}
                 placeholder="Ingresa tu nueva contraseña"
                 required
+                disabled={loading}
+                autoComplete="new-password"
               />
 
               {/* Requisitos de contraseña */}
@@ -202,21 +192,18 @@ export default function ChangePasswordPage() {
               )}
             </div>
 
-            {/* Confirmar nueva contraseña */}
+            {/* Confirmar nueva contraseña con ojo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirmar nueva contraseña
-              </label>
-              <input
-                type="password"
+              <PasswordInput
+                label="Confirmar nueva contraseña"
                 value={passwords.confirm}
-                onChange={(e) => handlePasswordChange("confirm", e.target.value)}
-                className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
+                onChange={(value) => handlePasswordChange("confirm", value)}
                 placeholder="Confirma tu nueva contraseña"
                 required
+                disabled={loading}
+                autoComplete="new-password"
               />
 
-              {/* Indicador de coincidencia */}
               {passwords.confirm && (
                 <div className="mt-2">
                   <ValidationItem
@@ -227,7 +214,7 @@ export default function ChangePasswordPage() {
               )}
             </div>
 
-            {/* Mensajes de error/éxito */}
+            {/* Mensajes */}
             {errorMsg && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-xs text-red-700 whitespace-pre-line">
@@ -281,7 +268,6 @@ export default function ChangePasswordPage() {
   );
 }
 
-// Componente helper para mostrar requisitos
 function ValidationItem({ valid, text }: { valid: boolean; text: string }) {
   return (
     <div className="flex items-center gap-2">

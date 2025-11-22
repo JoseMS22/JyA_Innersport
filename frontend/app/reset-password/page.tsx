@@ -4,6 +4,7 @@
 import { FormEvent, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
 function ResetPasswordForm() {
@@ -98,7 +99,6 @@ function ResetPasswordForm() {
     } catch (err: any) {
       let errorMessage = err.message ?? "Error al restablecer contraseña";
       
-      // Parsear errores de array
       if (typeof errorMessage === "string" && errorMessage.includes("[")) {
         try {
           const errors = JSON.parse(errorMessage);
@@ -131,19 +131,16 @@ function ResetPasswordForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Nueva contraseña */}
+          {/* Nueva contraseña con ojo */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nueva contraseña
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              label="Nueva contraseña"
               value={passwords.new}
-              onChange={(e) => handlePasswordChange("new", e.target.value)}
-              className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
+              onChange={(value) => handlePasswordChange("new", value)}
               placeholder="Ingresa tu nueva contraseña"
               required
               disabled={loading || !token}
+              autoComplete="new-password"
             />
 
             {/* Requisitos de contraseña */}
@@ -182,19 +179,16 @@ function ResetPasswordForm() {
             )}
           </div>
 
-          {/* Confirmar contraseña */}
+          {/* Confirmar contraseña con ojo */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirmar nueva contraseña
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              label="Confirmar nueva contraseña"
               value={passwords.confirm}
-              onChange={(e) => handlePasswordChange("confirm", e.target.value)}
-              className="w-full rounded-lg border px-4 py-2.5 outline-none border-[#e5e7eb] focus:border-[#a855f7] transition-colors"
+              onChange={(value) => handlePasswordChange("confirm", value)}
               placeholder="Confirma tu nueva contraseña"
               required
               disabled={loading || !token}
+              autoComplete="new-password"
             />
 
             {passwords.confirm && (
@@ -257,7 +251,6 @@ function ResetPasswordForm() {
   );
 }
 
-// Componente helper
 function ValidationItem({ valid, text }: { valid: boolean; text: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -273,9 +266,11 @@ function ValidationItem({ valid, text }: { valid: boolean; text: string }) {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
-      <p className="text-gray-600">Cargando...</p>
-    </div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
+        <p className="text-gray-600">Cargando...</p>
+      </div>
+    }>
       <ResetPasswordForm />
     </Suspense>
   );

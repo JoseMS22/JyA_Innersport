@@ -10,6 +10,14 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
 from app.api.v1.auth import router as auth_router
 from app.api.v1.audit import router as audit_router
+# Routers de catálogo y productos
+from app.api.v1.categorias import router as categorias_router
+from app.api.v1.productos import router as productos_router
+from app.api.v1.variantes import router as variantes_router
+# Routers de sucursales e inventario
+from app.api.v1.sucursales import router as sucursales_router
+from app.api.v1.inventario import router as inventario_router
+
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -115,6 +123,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Autenticación"])
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["Auditoría"])
+# Catálogo y productos
+app.include_router(categorias_router, prefix="/api/v1/categorias", tags=["Categorías"])
+app.include_router(productos_router, prefix="/api/v1/productos", tags=["Productos"])
+app.include_router(variantes_router, prefix="/api/v1/variantes", tags=["Variantes"])
+# Sucursales e inventario
+app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucursales"])
+app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
+
 
 
 @app.get("/")
