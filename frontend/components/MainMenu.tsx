@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { SearchBar } from "./SearchBar"; // 👈 NUEVO
 
 type UserMe = {
   id: number;
@@ -27,7 +28,7 @@ export function MainMenu() {
     async function fetchMe() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-          credentials: "include", // manda la cookie HttpOnly
+          credentials: "include",
         });
 
         if (!res.ok) {
@@ -63,17 +64,20 @@ export function MainMenu() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <header className="border-b border-[#e5e7eb] bg-white/90 backdrop-blur">
+    <header className="border-b border-gray-200 bg-white/90 backdrop-blur sticky top-0 z-50">
       {/* Barra superior tipo aviso */}
-      <div className="bg-[#0ea5e9] text-white text-xs text-center py-1">
-        Recibí tu pedido el mismo día con envío rápido realizando tu compra antes de la 1:00 pm 📦
+      <div className="bg-[#0ea5e9] text-white text-xs text-center py-1.5 px-4">
+        <span className="hidden sm:inline">
+          Recibí tu pedido el mismo día con envío rápido realizando tu compra antes de la 1:00 pm 📦
+        </span>
+        <span className="sm:hidden">Envío rápido antes de 1:00 pm 📦</span>
       </div>
 
       {/* Navbar principal */}
-      <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3 gap-4">
+      <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3 gap-4">
         {/* Logo */}
         <button
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 flex-shrink-0"
           onClick={() => router.push("/")}
         >
           <Image
@@ -83,93 +87,98 @@ export function MainMenu() {
             height={46}
             className="drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]"
           />
-          <span className="font-bold tracking-wide text-[#6b21a8]">
+          <span className="hidden sm:block font-bold tracking-wide text-[#6b21a8]">
             JYA<span className="text-[#a855f7]"> Innersport</span>
           </span>
         </button>
 
-        {/* Menú central */}
-        <nav className="hidden md:flex items-center gap-6 text-sm text-gray-700">
-          <Link
-            href="/"
-            className={isActive("/") ? "font-semibold text-[#6b21a8]" : ""}
-          >
-            Inicio
-          </Link>
-          <button className="hover:text-[#6b21a8]">Lo nuevo</button>
-          <button className="hover:text-[#6b21a8]">Now Trending</button>
-          <button className="hover:text-[#6b21a8]">Hombre</button>
-          <button className="hover:text-[#6b21a8]">Mujer</button>
-          <button className="hover:text-[#6b21a8]">Niños</button>
-          <button className="hover:text-[#6b21a8]">Sale</button>
-        </nav>
+        {/* 🔍 BARRA DE BÚSQUEDA - RESPONSIVE */}
+        <div className="hidden md:flex flex-1 max-w-xl mx-4">
+          <SearchBar />
+        </div>
 
-        {/* Zona derecha: buscar + usuario + carrito */}
+        {/* Zona derecha: usuario + carrito */}
         <div className="flex items-center gap-3">
-          {/* Buscar (solo ícono por ahora) */}
-          <button
-            aria-label="Buscar"
-            className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7]"
-          >
-            🔍
-          </button>
-
           {/* Botón usuario: login / logout */}
           {!checking && (
             <>
               {user ? (
-              <div className="flex items-center gap-2">
-                {/* Nombre de usuario clicable que lleva al perfil */}
-                Hola,{""}<button
-                  type="button"
-                  onClick={() => router.push("/account/profile")}
-                  className="hidden sm:inline text-xs text-gray-600 hover:text-[#6b21a8]"
-                >
-                  
-                  <span className="font-semibold underline decoration-[#a855f7]/60 underline-offset-2">
-                    {user.nombre}
+                <div className="flex items-center gap-2">
+                  {/* Nombre de usuario clicable que lleva al perfil */}
+                  <span className="hidden sm:inline text-xs text-gray-600">
+                    Hola,{" "}
                   </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/account/profile")}
+                    className="hidden sm:inline text-xs text-gray-800 hover:text-[#6b21a8] font-medium"
+                  >
+                    {user.nombre}
+                  </button>
 
-                <button
-                  onClick={handleLogout}
-                  className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  onClick={() => router.push("/login")}
-                  className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                >
-                  Iniciar sesión
-                </button>
-                <span className="text-gray-400">/</span>
-                <button
-                  onClick={() => router.push("/register")}
-                  className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
-                >
-                  Crear cuenta
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                  >
+                    Iniciar sesión
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => router.push("/register")}
+                    className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
+                  >
+                    Crear cuenta
+                  </button>
+                </div>
+              )}
             </>
           )}
 
           {/* Carrito dummy */}
           <button
             aria-label="Carrito"
-            className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative"
+            className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] hover:bg-[#a855f7]/5 relative transition-colors"
           >
             🛒
-            <span className="absolute -top-1 -right-1 text-[10px] bg-[#a855f7] text-white rounded-full px-1">
+            <span className="absolute -top-1 -right-1 text-[10px] bg-[#a855f7] text-white rounded-full px-1.5 py-0.5 font-semibold">
               0
             </span>
           </button>
         </div>
       </div>
+
+      {/* 📱 BÚSQUEDA MÓVIL - Debajo del navbar */}
+      <div className="md:hidden px-4 pb-3">
+        <SearchBar />
+      </div>
+
+      {/* Menú de categorías - Opcional */}
+      <nav className="hidden lg:flex items-center justify-center gap-6 px-4 py-2 border-t border-gray-100 text-sm text-gray-700">
+        <Link
+          href="/catalogo"
+          className={`hover:text-[#6b21a8] transition-colors ${
+            isActive("/catalogo") ? "font-semibold text-[#6b21a8]" : ""
+          }`}
+        >
+          Todo
+        </Link>
+        <button className="hover:text-[#6b21a8] transition-colors">Lo nuevo</button>
+        <button className="hover:text-[#6b21a8] transition-colors">Hombre</button>
+        <button className="hover:text-[#6b21a8] transition-colors">Mujer</button>
+        <button className="hover:text-[#6b21a8] transition-colors">Niños</button>
+        <button className="hover:text-[#6b21a8] transition-colors text-red-600 font-medium">
+          Sale
+        </button>
+      </nav>
     </header>
   );
 }
