@@ -110,13 +110,6 @@ textarea::placeholder {
   background: #7e22ce;
 }
 
-/* Animaciones suaves */
-* {
-  transition-property: color, background-color, border-color;
-  transition-duration: 150ms;
-  transition-timing-function: ease-in-out;
-}
-
 /* Focus visible para accesibilidad */
 *:focus-visible {
   outline: 2px solid var(--primary);
