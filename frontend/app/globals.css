@@ -2,8 +2,26 @@
 @import "tailwindcss";
 
 :root {
+  /* Colores de fondo */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1f2937; /* Gris oscuro 800 - MUCHO MÁS OSCURO */
+  
+  /* Colores de marca */
+  --primary: #6b21a8; /* Púrpura principal */
+  --primary-light: #a855f7;
+  --secondary: #eab308; /* Amarillo/dorado */
+  
+  /* Colores de texto */
+  --text-primary: #111827; /* Casi negro para títulos */
+  --text-secondary: #374151; /* Gris oscuro para texto normal */
+  --text-muted: #6b7280; /* Gris medio para texto secundario */
+  --text-light: #9ca3af; /* Gris claro para placeholders */
+  
+  /* Colores de estado */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
 }
 
 @theme inline {
@@ -26,18 +44,113 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* 🆕 Animación de desvanecimiento*/
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Estilos globales para texto */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-out;
+p, span, div {
+  color: var(--text-secondary);
+}
+
+/* Clases utilitarias para texto */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-brand {
+  color: var(--primary);
+}
+
+/* Mejoras de accesibilidad y legibilidad */
+button, a {
+  color: inherit;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs y formularios */
+input, textarea, select {
+  color: var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-light);
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a855f7;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7e22ce;
+}
+
+/* Animaciones suaves */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Focus visible para accesibilidad */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Estilos para links */
+a {
+  text-decoration: none;
+  color: var(--primary);
+}
+
+a:hover {
+  color: var(--primary-light);
+}
+
+/* Utilidades para truncar texto */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }

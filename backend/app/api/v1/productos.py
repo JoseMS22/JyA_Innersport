@@ -8,6 +8,7 @@ from app.db import get_db
 from app.models.producto import Producto
 from app.models.categoria import Categoria
 from app.models.media import Media
+from sqlalchemy import or_, func
 from app.schemas.producto import (
     ProductoCreate,
     ProductoUpdate,
@@ -221,3 +222,168 @@ def eliminar_media(
     db.delete(media)
     db.commit()
     return
+
+# =========================
+#  Búsqueda con autocompletado de producto
+# =========================
+
+@router.get("/buscar", response_model=List[ProductoRead])
+def buscar_productos(
+    q: str = Query(..., min_length=2, description="Término de búsqueda (mínimo 2 caracteres)"),
+    limit: int = Query(10, ge=1, le=50, description="Máximo de resultados"),
+    db: Session = Depends(get_db),
+):
+    """
+    US-13 / RF12: Búsqueda de productos con autocompletado.
+    
+    Criterios de aceptación:
+    - Busca por nombre, SKU, código de barras o categoría
+    - Prioriza coincidencias exactas y parciales
+    - Solo muestra productos activos con variantes activas
+    - Retorna máximo 10 resultados por defecto
+    """
+    
+    # Normalizar término de búsqueda
+    search_term = q.strip().lower()
+    
+    # Buscar productos que coincidan con el término
+    # Orden de prioridad:
+    # 1. Coincidencia exacta en nombre de producto
+    # 2. Coincidencia parcial en nombre de producto
+    # 3. Coincidencia en SKU o barcode de variante
+    # 4. Coincidencia en categoría
+    
+    query = (
+        db.query(Producto)
+        .options(
+            joinedload(Producto.categorias),
+            joinedload(Producto.media),
+            joinedload(Producto.variantes),
+        )
+        .filter(Producto.activo.is_(True))
+    )
+    
+    # Construir filtros de búsqueda
+    search_filters = []
+    
+    # Búsqueda en nombre del producto (case-insensitive)
+    search_filters.append(
+        func.lower(Producto.nombre).contains(search_term)
+    )
+    
+    # Búsqueda en descripción del producto
+    search_filters.append(
+        func.lower(Producto.descripcion).contains(search_term)
+    )
+    
+    # Búsqueda por SKU o barcode en variantes
+    query = query.outerjoin(Variante)
+    search_filters.append(
+        func.lower(Variante.sku).contains(search_term)
+    )
+    search_filters.append(
+        func.lower(Variante.barcode).contains(search_term)
+    )
+    
+    # Búsqueda en nombre de categoría
+    query = query.outerjoin(Producto.categorias)
+    search_filters.append(
+        func.lower(Categoria.nombre).contains(search_term)
+    )
+    
+    # Aplicar filtros con OR
+    query = query.filter(or_(*search_filters))
+    
+    # Ordenar por relevancia:
+    # 1. Productos cuyo nombre empieza con el término (mayor prioridad)
+    # 2. Productos cuyo nombre contiene el término
+    # 3. Por nombre alfabéticamente
+    query = query.order_by(
+        func.lower(Producto.nombre).startswith(search_term).desc(),
+        func.lower(Producto.nombre).contains(search_term).desc(),
+        Producto.nombre.asc()
+    )
+    
+    # Limitar resultados
+    productos = query.distinct().limit(limit).all()
+    
+    # Filtrar solo productos con variantes activas y disponibles
+    productos_disponibles = []
+    for producto in productos:
+        # Verificar si tiene al menos una variante activa
+        tiene_variantes_activas = any(
+            v.activo for v in producto.variantes
+        )
+        if tiene_variantes_activas:
+            productos_disponibles.append(producto)
+    
+    return productos_disponibles
+
+
+@router.get("/sugerencias", response_model=List[dict])
+def obtener_sugerencias(
+    q: str = Query(..., min_length=2, description="Término de búsqueda"),
+    limit: int = Query(5, ge=1, le=10),
+    db: Session = Depends(get_db),
+):
+    """
+    Endpoint optimizado para autocompletado.
+    Retorna solo información básica para sugerencias rápidas.
+    """
+    
+    search_term = q.strip().lower()
+    
+    # Buscar productos
+    productos = (
+        db.query(
+            Producto.id,
+            Producto.nombre,
+            Categoria.nombre.label("categoria_nombre")
+        )
+        .outerjoin(Producto.categorias)
+        .filter(
+            Producto.activo.is_(True),
+            or_(
+                func.lower(Producto.nombre).contains(search_term),
+                func.lower(Categoria.nombre).contains(search_term)
+            )
+        )
+        .order_by(
+            func.lower(Producto.nombre).startswith(search_term).desc(),
+            Producto.nombre.asc()
+        )
+        .distinct()
+        .limit(limit)
+        .all()
+    )
+    
+    # Formatear respuesta para autocompletado
+    sugerencias = []
+    for producto in productos:
+        sugerencias.append({
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "categoria": producto.categoria_nombre,
+            "tipo": "producto"
+        })
+    
+    # Buscar también en categorías
+    categorias = (
+        db.query(Categoria.id, Categoria.nombre)
+        .filter(
+            Categoria.activo.is_(True),
+            func.lower(Categoria.nombre).contains(search_term)
+        )
+        .order_by(Categoria.nombre.asc())
+        .limit(3)
+        .all()
+    )
+    
+    for categoria in categorias:
+        sugerencias.append({
+            "id": categoria.id,
+            "nombre": categoria.nombre,
+            "tipo": "categoria"
+        })
+    
+    return sugerencias[:limit]
