@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MainMenu } from "../components/MainMenu";
 
 type Producto = {
   id: number;
@@ -153,24 +154,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#fdf6e3]">
-      {/* Header simple */}
-      <header className="border-b border-[#e5e7eb] bg-white/90 backdrop-blur">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2"
-          >
-            <span className="font-bold tracking-wide text-[#6b21a8]">
-              JYA<span className="text-[#a855f7]"> Innersport</span>
-            </span>
-          </button>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-gray-700">
-            <button className="hover:text-[#6b21a8]">Lo nuevo</button>
-            <button className="hover:text-[#6b21a8]">Nosotros</button>
-            <button className="hover:text-[#6b21a8]">Contacto</button>
-          </nav>
-        </div>
-      </header>
+      <MainMenu />
 
       {/* Contenido principal */}
       <main className="max-w-6xl mx-auto px-4 py-6">
