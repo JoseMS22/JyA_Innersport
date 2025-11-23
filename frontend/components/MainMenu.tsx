@@ -104,15 +104,8 @@ export function MainMenu() {
           <button className="hover:text-[#6b21a8]">Sale</button>
         </nav>
 
-        {/* Zona derecha: buscar + usuario + carrito */}
+        {/* Zona derecha: usuario + carrito */}
         <div className="flex items-center gap-3">
-          {/* Buscar (solo ícono por ahora) */}
-          <button
-            aria-label="Buscar"
-            className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7]"
-          >
-            🔍
-          </button>
 
           {/* Botón usuario: login / logout */}
           {!checking && (

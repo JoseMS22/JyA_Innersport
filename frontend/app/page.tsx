@@ -2,8 +2,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "../components/MainMenu";
+import { SearchBar } from "../components/SearchBar";
 
 type Producto = {
   id: number;
@@ -33,28 +34,43 @@ type Filtros = {
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Estados
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [filtrosDisponibles, setFiltrosDisponibles] = useState<Filtros | null>(null);
-  
+
   // Paginación
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Filtros activos
+  // Filtros activos - Inicializar desde URL params
   const [filtrosActivos, setFiltrosActivos] = useState({
-    categoria: "",
+    categoria: searchParams.get("categoria") || "",
     marca: "",
     color: "",
     talla: "",
     precio_min: "",
     precio_max: "",
     ordenar_por: "destacados",
-    buscar: "",
+    buscar: searchParams.get("buscar") || "",
   });
+
+  // Sincronizar filtros con URL al montar
+  useEffect(() => {
+    const categoriaUrl = searchParams.get("categoria");
+    const buscarUrl = searchParams.get("buscar");
+
+    if (categoriaUrl || buscarUrl) {
+      setFiltrosActivos(prev => ({
+        ...prev,
+        categoria: categoriaUrl || prev.categoria,
+        buscar: buscarUrl || prev.buscar,
+      }));
+    }
+  }, [searchParams]);
 
   // Cargar filtros disponibles
   useEffect(() => {
@@ -77,8 +93,8 @@ export default function HomePage() {
       try {
         const params = new URLSearchParams();
         params.set("pagina", String(pagina));
-        params.set("por_pagina", "6"); // 6 productos para el grid de 3x2
-        
+        params.set("por_pagina", "6");
+
         if (filtrosActivos.categoria) params.set("categoria", filtrosActivos.categoria);
         if (filtrosActivos.marca) params.set("marca", filtrosActivos.marca);
         if (filtrosActivos.color) params.set("color", filtrosActivos.color);
@@ -105,13 +121,26 @@ export default function HomePage() {
     cargarProductos();
   }, [pagina, filtrosActivos]);
 
+  // Manejar búsqueda desde SearchBar
+  function handleSearch(query: string) {
+    // Si viene con prefijo "categoria:", aplicar filtro de categoría
+    if (query.startsWith("categoria:")) {
+      const categoria = query.replace("categoria:", "");
+      aplicarFiltro("categoria", categoria);
+      aplicarFiltro("buscar", "");
+    } else {
+      // Búsqueda normal
+      aplicarFiltro("buscar", query);
+    }
+  }
+
   // Aplicar filtro
   function aplicarFiltro(key: string, value: string) {
     setFiltrosActivos((prev) => ({ ...prev, [key]: value }));
     setPagina(1);
   }
 
-  // Toggle filtro (para checkboxes y tallas)
+  // Toggle filtro
   function toggleFiltro(key: string, value: string) {
     const valorActual = filtrosActivos[key as keyof typeof filtrosActivos];
     const nuevoValor = valorActual === value ? "" : value;
@@ -131,9 +160,12 @@ export default function HomePage() {
       buscar: "",
     });
     setPagina(1);
+
+    // Limpiar URL
+    router.push("/");
   }
 
-  // Aplicar filtro de precio por rango
+  // Aplicar filtro de precio
   function aplicarFiltroPrecio(min: string, max: string) {
     setFiltrosActivos((prev) => ({
       ...prev,
@@ -162,11 +194,15 @@ export default function HomePage() {
         <div className="text-xs text-gray-500 mb-4">
           Inicio <span className="mx-1">›</span>{" "}
           <span className="text-gray-800 font-medium">
-            Colección Innersport
+            {filtrosActivos.buscar
+              ? `Resultados para "${filtrosActivos.buscar}"`
+              : filtrosActivos.categoria
+                ? filtrosActivos.categoria
+                : "Colección Innersport"}
           </span>
         </div>
 
-        {/* Hero tipo banner: dos columnas */}
+        {/* Hero tipo banner */}
         <section className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Columna izquierda */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#f97316] via-[#facc15] to-[#fef3c7] min-h-[260px] flex items-end p-6">
@@ -209,10 +245,29 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Filtros + listado de productos */}
+        {/* Mostrar badge de búsqueda activa */}
+        {filtrosActivos.buscar && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            <span className="text-gray-600">Buscando:</span>
+            <span className="px-3 py-1 bg-[#a855f7] text-white rounded-full font-medium flex items-center gap-2">
+              "{filtrosActivos.buscar}"
+              <button
+                onClick={() => aplicarFiltro("buscar", "")}
+                className="hover:bg-white/20 rounded-full p-0.5"
+                aria-label="Limpiar búsqueda"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          </div>
+        )}
+
+        {/* Filtros + listado */}
         <section className="grid md:grid-cols-[260px,1fr] gap-6">
-          {/* Filtros laterales FUNCIONALES */}
-          <aside className="bg-white/90 rounded-2xl border border-[#e5e7eb] p-4 text-sm">
+          {/* Filtros laterales */}
+          <aside className="bg-white/90 rounded-2xl border border-[#e5e7eb] p-4 text-sm h-fit">
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-gray-800">Filtrar</span>
               <button
@@ -224,22 +279,13 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* Barra de búsqueda destacada */}
+            <div className="mb-6">
+              <SearchBar onSearch={handleSearch} className="max-w-2xl mx-auto" />
+            </div>
+
             {filtrosDisponibles && (
               <div className="space-y-4">
-                {/* Búsqueda */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                    🔍 Buscar
-                  </h3>
-                  <input
-                    type="text"
-                    value={filtrosActivos.buscar || ""}
-                    onChange={(e) => aplicarFiltro("buscar", e.target.value)}
-                    placeholder="Nombre o SKU..."
-                    className="w-full text-xs px-3 py-2 border rounded-lg focus:border-[#a855f7] focus:ring-2 focus:ring-[#a855f7]/20 outline-none transition-all"
-                  />
-                </div>
-
                 {/* Categoría */}
                 {filtrosDisponibles.categorias.length > 0 && (
                   <div>
@@ -314,11 +360,10 @@ export default function HomePage() {
                         <button
                           key={talla}
                           onClick={() => toggleFiltro("talla", talla)}
-                          className={`px-2 py-1 rounded-full border transition-all ${
-                            filtrosActivos.talla === talla
+                          className={`px-2 py-1 rounded-full border transition-all ${filtrosActivos.talla === talla
                               ? "border-[#a855f7] bg-[#a855f7] text-white"
                               : "border-gray-200 hover:border-[#a855f7]"
-                          }`}
+                            }`}
                         >
                           {talla}
                         </button>
@@ -379,7 +424,7 @@ export default function HomePage() {
             )}
           </aside>
 
-          {/* Grid de productos FUNCIONAL */}
+          {/* Grid de productos */}
           <div>
             <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
               <span>
@@ -442,7 +487,7 @@ export default function HomePage() {
                         ) : (
                           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,_white,_transparent_60%)]" />
                         )}
-                        
+
                         {/* Badges */}
                         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 text-[10px]">
                           {!producto.tiene_stock && (
@@ -507,16 +552,15 @@ export default function HomePage() {
                       } else {
                         num = pagina - 2 + i;
                       }
-                      
+
                       return (
                         <button
                           key={num}
                           onClick={() => setPagina(num)}
-                          className={`w-8 h-8 text-xs rounded-lg transition-all ${
-                            pagina === num
+                          className={`w-8 h-8 text-xs rounded-lg transition-all ${pagina === num
                               ? "bg-[#a855f7] text-white font-semibold"
                               : "border hover:border-[#a855f7]"
-                          }`}
+                            }`}
                         >
                           {num}
                         </button>
