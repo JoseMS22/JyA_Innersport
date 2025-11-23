@@ -17,6 +17,8 @@ from app.api.v1.variantes import router as variantes_router
 # Routers de sucursales e inventario
 from app.api.v1.sucursales import router as sucursales_router
 from app.api.v1.inventario import router as inventario_router
+# 🆕 Router de catálogo con filtros
+from app.api.v1.catalogo import router as catalogo_router
 
 
 # Inicializar sistema de logging ANTES de crear la app
@@ -130,6 +132,8 @@ app.include_router(variantes_router, prefix="/api/v1/variantes", tags=["Variante
 # Sucursales e inventario
 app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucursales"])
 app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
+# 🆕 Catálogo con filtros avanzados
+app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
 
 
 
