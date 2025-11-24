@@ -86,6 +86,7 @@ def crear_variante(
                 detail="Ya existe una variante con ese código de barras.",
             )
 
+    # 🆕 Incluir marca al crear la variante
     variante = Variante(
         producto_id=producto_id,
         sku=data.sku,

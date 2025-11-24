@@ -1,4 +1,4 @@
-# app/models/variante.py
+# backend/app/models/variante.py
 from sqlalchemy import (
     Column,
     Integer,

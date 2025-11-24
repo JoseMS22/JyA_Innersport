@@ -20,6 +20,8 @@ from app.api.v1.inventario import router as inventario_router
 from fastapi.staticfiles import StaticFiles
 import os
 
+from app.api.v1.catalogo import router as catalogo_router
+
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -137,6 +139,8 @@ app.include_router(variantes_router, prefix="/api/v1/variantes", tags=["Variante
 # Sucursales e inventario
 app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucursales"])
 app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
+# 🆕 Catálogo con filtros avanzados
+app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
 
 
 

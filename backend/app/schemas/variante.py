@@ -1,4 +1,4 @@
-# app/schemas/variante.py
+# backend/app/schemas/variante.py
 from pydantic import BaseModel
 from typing import Optional, List
 from decimal import Decimal
