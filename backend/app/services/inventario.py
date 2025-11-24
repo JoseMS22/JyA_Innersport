@@ -60,6 +60,7 @@ def ajustar_inventario(
     cantidad: int,
     motivo: Optional[str] = None,
     referencia: Optional[str] = None,
+    min_stock: Optional[int] = None,
     source_type: Optional[str] = "AJUSTE_MANUAL",
     usuario_id: Optional[int] = None,
 ) -> Inventario:
@@ -94,6 +95,9 @@ def ajustar_inventario(
         )
 
     inv.cantidad = nueva_cantidad
+
+    if min_stock is not None:
+        inv.min_stock = min_stock
 
     mov = MovimientoInventario(
         variante_id=variante_id,

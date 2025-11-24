@@ -7,6 +7,13 @@ import { Logo } from "@/components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
+type UserMe = {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -19,22 +26,28 @@ export default function LoginPage() {
     setErrorMsg(null);
     setLoading(true);
 
-    // 👉 Usamos directamente el estado de React
     const payload = {
-      correo: email,      // el backend espera "correo"
-      password: password, // y "password"
+      correo: email,
+      password: password,
     };
 
     try {
+      // 1) Login normal
       await apiFetch("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify(payload),
-        // si apiFetch no pone headers, aquí iría:
-        // headers: { "Content-Type": "application/json" },
       });
 
-      // Si todo bien → home
-      router.push("/");
+      // 2) Consultar /me para saber el rol
+      const me = (await apiFetch("/api/v1/auth/me", {
+        method: "GET",
+      })) as UserMe;
+
+      if (me.rol === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     } catch (err: any) {
       const msg = err?.message ?? "Error al iniciar sesión";
 
@@ -42,7 +55,6 @@ export default function LoginPage() {
         typeof msg === "string" &&
         msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")
       ) {
-        // msg viene como: "CUENTA_PENDIENTE_ELIMINACION;2026-01-01T12:00:00+00:00"
         const [, deletionIso] = msg.split(";", 2);
 
         const params = new URLSearchParams();
@@ -91,7 +103,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Contraseña con ojo */}
+          {/* Contraseña */}
           <PasswordInput
             label="Contraseña"
             value={password}

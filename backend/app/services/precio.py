@@ -21,13 +21,16 @@ def cambiar_precio_variante(
             detail="Variante no encontrada.",
         )
 
+    # (Opcional) validar que no sea negativo
+    if nuevo_precio < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El precio no puede ser negativo.",
+        )
+
     ahora = datetime.now(timezone.utc)
 
-    # Si el precio es el mismo, no hacemos nada
-    if variante.precio_actual == nuevo_precio:
-        return variante
-
-    # Cerrar historial vigente (si existe)
+    # Buscar historial vigente (si existe)
     historial_vigente = (
         db.query(HistorialPrecio)
         .filter(
@@ -38,14 +41,22 @@ def cambiar_precio_variante(
         .first()
     )
 
+    # ⚠️ OJO:
+    # - Si YA hay historial vigente y el precio es el mismo → no hacemos nada.
+    # - Si NO hay historial, aunque el precio sea igual al precio_actual, SÍ creamos el primero.
+    if historial_vigente and variante.precio_actual == nuevo_precio:
+        return variante
+
+    # Cerrar historial vigente (si existe)
     if historial_vigente:
         historial_vigente.vigente_hasta = ahora
 
-    # Crear nuevo registro de historial
+    # Crear nuevo registro de historial (primer precio o cambio)
     nuevo_historial = HistorialPrecio(
         variante_id=variante_id,
         precio=nuevo_precio,
         vigente_desde=ahora,
+        vigente_hasta=None,
     )
     db.add(nuevo_historial)
 

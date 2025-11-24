@@ -25,3 +25,10 @@ class ProductoRead(ProductoBase):
 
     class Config:
         from_attributes = True
+
+class ProductoMini(BaseModel):
+    id: int
+    nombre: str
+
+    class Config:
+        from_attributes = True

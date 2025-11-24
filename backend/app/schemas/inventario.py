@@ -34,3 +34,4 @@ class AjusteInventarioRequest(BaseModel):
     cantidad: int     # siempre positiva
     motivo: Optional[str] = None
     referencia: Optional[str] = None
+    min_stock: Optional[int] = None

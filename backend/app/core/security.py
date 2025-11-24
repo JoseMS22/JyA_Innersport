@@ -122,7 +122,7 @@ def get_current_user(
             detail="Tu cuenta está desactivada.",
         )
 
-    # 5) **Nuevo:** Bloqueo para US-04 (pendiente de eliminación)
+    # 5) Bloqueo para US-04 (pendiente de eliminación)
     if getattr(user, "pendiente_eliminacion", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -142,4 +142,37 @@ def get_current_active_user(
     Wrapper por si luego quieres añadir más reglas
     (por ejemplo verificación de correo, etc.).
     """
+    return current_user
+
+
+# =========================
+# HELPERS DE PERMISOS (ROLES)
+# =========================
+
+def get_current_admin_user(
+    current_user: Usuario = Depends(get_current_user),
+) -> Usuario:
+    """
+    Devuelve el usuario actual solo si tiene rol ADMIN.
+    """
+    if current_user.rol != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para realizar esta acción (se requiere rol ADMIN).",
+        )
+    return current_user
+
+
+def get_current_staff_user(
+    current_user: Usuario = Depends(get_current_user),
+) -> Usuario:
+    """
+    Devuelve el usuario actual si es ADMIN o VENDEDOR.
+    Útil para inventario, POS, etc.
+    """
+    if current_user.rol not in ("ADMIN", "VENDEDOR"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para realizar esta acción (se requiere ADMIN o VENDEDOR).",
+        )
     return current_user

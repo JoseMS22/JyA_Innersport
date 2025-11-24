@@ -12,6 +12,9 @@ from app.schemas.categoria import (
     CategoriaRead,
 )
 
+from app.core.security import get_current_admin_user
+from app.models.usuario import Usuario
+
 router = APIRouter()
 
 
@@ -30,6 +33,7 @@ def listar_categorias(
 def crear_categoria(
     data: CategoriaCreate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     # Validar nombre único
     existente = db.query(Categoria).filter(Categoria.nombre == data.nombre).first()
@@ -68,6 +72,7 @@ def actualizar_categoria(
     categoria_id: int,
     data: CategoriaUpdate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     categoria = db.query(Categoria).get(categoria_id)
     if not categoria:
@@ -105,6 +110,7 @@ def actualizar_categoria(
 def desactivar_categoria(
     categoria_id: int,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     categoria = db.query(Categoria).get(categoria_id)
     if not categoria:
@@ -114,6 +120,24 @@ def desactivar_categoria(
         )
 
     categoria.activo = False
+    db.commit()
+    db.refresh(categoria)
+    return categoria
+
+@router.patch("/{categoria_id}/activar", response_model=CategoriaRead)
+def activar_categoria(
+    categoria_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
+):
+    categoria = db.query(Categoria).get(categoria_id)
+    if not categoria:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoría no encontrada.",
+        )
+
+    categoria.activo = True
     db.commit()
     db.refresh(categoria)
     return categoria

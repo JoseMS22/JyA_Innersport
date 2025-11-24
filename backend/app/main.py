@@ -17,6 +17,8 @@ from app.api.v1.variantes import router as variantes_router
 # Routers de sucursales e inventario
 from app.api.v1.sucursales import router as sucursales_router
 from app.api.v1.inventario import router as inventario_router
+from fastapi.staticfiles import StaticFiles
+import os
 
 
 # Inicializar sistema de logging ANTES de crear la app
@@ -115,6 +117,11 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": "Error interno del servidor. El incidente ha sido registrado.",
         },
     )
+
+
+MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
+
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 # =========================

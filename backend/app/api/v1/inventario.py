@@ -17,6 +17,9 @@ from app.schemas.inventario import (
 from app.schemas.movimiento_inventario import MovimientoInventarioRead
 from app.services.inventario import ajustar_inventario
 
+from app.core.security import get_current_staff_user
+from app.models.usuario import Usuario
+
 router = APIRouter()
 
 
@@ -26,9 +29,10 @@ def listar_inventario(
     variante_id: Optional[int] = Query(None),
     producto_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
+    staff: Usuario = Depends(get_current_staff_user),
 ):
     query = db.query(Inventario).options(
-        joinedload(Inventario.variante),
+        joinedload(Inventario.variante).joinedload(Variante.producto),
         joinedload(Inventario.sucursal),
     )
 
@@ -50,6 +54,7 @@ def obtener_inventario_detalle(
     sucursal_id: int,
     variante_id: int,
     db: Session = Depends(get_db),
+    staff: Usuario = Depends(get_current_staff_user),
 ):
     inv = (
         db.query(Inventario)
@@ -75,6 +80,7 @@ def obtener_inventario_detalle(
 def ajustar_stock(
     data: AjusteInventarioRequest,
     db: Session = Depends(get_db),
+    staff: Usuario = Depends(get_current_staff_user),
 ):
     inv = ajustar_inventario(
         db,
@@ -84,8 +90,9 @@ def ajustar_stock(
         cantidad=data.cantidad,
         motivo=data.motivo,
         referencia=data.referencia,
+        min_stock=data.min_stock,
         source_type="AJUSTE_MANUAL",
-        usuario_id=None,  # luego puedes pasar el usuario logueado
+        usuario_id=staff.id,
     )
 
     inv = (
@@ -107,6 +114,7 @@ def listar_movimientos(
     fecha_desde: Optional[datetime] = Query(None),
     fecha_hasta: Optional[datetime] = Query(None),
     db: Session = Depends(get_db),
+    staff: Usuario = Depends(get_current_staff_user),
 ):
     query = db.query(MovimientoInventario)
 
