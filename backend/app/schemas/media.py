@@ -1,6 +1,6 @@
 # app/schemas/media.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class MediaBase(BaseModel):
     url: str
@@ -16,3 +16,10 @@ class MediaRead(MediaBase):
 
     class Config:
         from_attributes = True
+
+class MediaReorderItem(BaseModel):
+    id: int
+    orden: int
+
+class MediaReorderRequest(BaseModel):
+    items: List[MediaReorderItem]

@@ -1,11 +1,15 @@
-// frontend/app/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "../components/MainMenu";
 import { SearchBar } from "../components/SearchBar";
+import { useCart } from "./context/cartContext";
+import { useFavorites } from "./context/favoritesContext";
 
+// ======================
+// Tipos del catálogo real (API)
+// ======================
 type Producto = {
   id: number;
   nombre: string;
@@ -32,21 +36,48 @@ type Filtros = {
   precio_maximo: number;
 };
 
+// ======================
+// API BASE + Helper imágenes
+// ======================
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+function buildMediaUrl(url: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_BASE_URL}${url}`;
+}
+
+// Toast
+type ToastState = {
+  type: "success" | "error";
+  message: string;
+} | null;
+
 export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Estados
+  const { addItem } = useCart();
+  const { toggleFavorite, isFavorite } = useFavorites();
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [toast, setToast] = useState<ToastState>(null);
+
+  // Estados catálogo
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [filtrosDisponibles, setFiltrosDisponibles] = useState<Filtros | null>(null);
+  const [filtrosDisponibles, setFiltrosDisponibles] = useState<Filtros | null>(
+    null
+  );
 
   // Paginación
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Filtros activos - Inicializar desde URL params
+  // Filtros activos
   const [filtrosActivos, setFiltrosActivos] = useState({
     categoria: searchParams.get("categoria") || "",
     marca: "",
@@ -58,13 +89,12 @@ export default function HomePage() {
     buscar: searchParams.get("buscar") || "",
   });
 
-  // Sincronizar filtros con URL al montar
   useEffect(() => {
     const categoriaUrl = searchParams.get("categoria");
     const buscarUrl = searchParams.get("buscar");
 
     if (categoriaUrl || buscarUrl) {
-      setFiltrosActivos(prev => ({
+      setFiltrosActivos((prev) => ({
         ...prev,
         categoria: categoriaUrl || prev.categoria,
         buscar: buscarUrl || prev.buscar,
@@ -76,7 +106,7 @@ export default function HomePage() {
   useEffect(() => {
     async function cargarFiltros() {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/catalogo/filtros");
+        const res = await fetch(`${API_BASE_URL}/api/v1/catalogo/filtros`);
         const data = await res.json();
         setFiltrosDisponibles(data);
       } catch (error) {
@@ -86,7 +116,7 @@ export default function HomePage() {
     cargarFiltros();
   }, []);
 
-  // Cargar productos
+  // Cargar productos desde API
   useEffect(() => {
     async function cargarProductos() {
       setLoading(true);
@@ -95,17 +125,23 @@ export default function HomePage() {
         params.set("pagina", String(pagina));
         params.set("por_pagina", "6");
 
-        if (filtrosActivos.categoria) params.set("categoria", filtrosActivos.categoria);
+        if (filtrosActivos.categoria)
+          params.set("categoria", filtrosActivos.categoria);
         if (filtrosActivos.marca) params.set("marca", filtrosActivos.marca);
         if (filtrosActivos.color) params.set("color", filtrosActivos.color);
         if (filtrosActivos.talla) params.set("talla", filtrosActivos.talla);
-        if (filtrosActivos.precio_min) params.set("precio_min", filtrosActivos.precio_min);
-        if (filtrosActivos.precio_max) params.set("precio_max", filtrosActivos.precio_max);
-        if (filtrosActivos.buscar) params.set("buscar", filtrosActivos.buscar);
+        if (filtrosActivos.precio_min)
+          params.set("precio_min", filtrosActivos.precio_min);
+        if (filtrosActivos.precio_max)
+          params.set("precio_max", filtrosActivos.precio_max);
+        if (filtrosActivos.buscar)
+          params.set("buscar", filtrosActivos.buscar);
         params.set("ordenar_por", filtrosActivos.ordenar_por);
         params.set("solo_disponibles", "true");
 
-        const res = await fetch(`http://localhost:8000/api/v1/catalogo?${params.toString()}`);
+        const res = await fetch(
+          `${API_BASE_URL}/api/v1/catalogo?${params.toString()}`
+        );
         const data: CatalogoResponse = await res.json();
 
         setProductos(data.productos);
@@ -121,33 +157,48 @@ export default function HomePage() {
     cargarProductos();
   }, [pagina, filtrosActivos]);
 
-  // Manejar búsqueda desde SearchBar
-  function handleSearch(query: string) {
-    // Si viene con prefijo "categoria:", aplicar filtro de categoría
-    if (query.startsWith("categoria:")) {
-      const categoria = query.replace("categoria:", "");
-      aplicarFiltro("categoria", categoria);
-      aplicarFiltro("buscar", "");
-    } else {
-      // Búsqueda normal
-      aplicarFiltro("buscar", query);
+  // Check auth
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+          credentials: "include",
+        });
+        setIsLoggedIn(res.ok);
+      } catch {
+        setIsLoggedIn(false);
+      } finally {
+        setCheckingAuth(false);
+      }
     }
+    checkAuth();
+  }, []);
+
+  // Auto ocultar toast
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // ======================
+  // Handlers
+  // ======================
+
+  function handleSearch(query: string) {
+    aplicarFiltro("buscar", query);
   }
 
-  // Aplicar filtro
   function aplicarFiltro(key: string, value: string) {
     setFiltrosActivos((prev) => ({ ...prev, [key]: value }));
     setPagina(1);
   }
 
-  // Toggle filtro
   function toggleFiltro(key: string, value: string) {
     const valorActual = filtrosActivos[key as keyof typeof filtrosActivos];
-    const nuevoValor = valorActual === value ? "" : value;
-    aplicarFiltro(key, nuevoValor);
+    aplicarFiltro(key, valorActual === value ? "" : value);
   }
 
-  // Limpiar filtros
   function limpiarFiltros() {
     setFiltrosActivos({
       categoria: "",
@@ -160,12 +211,9 @@ export default function HomePage() {
       buscar: "",
     });
     setPagina(1);
-
-    // Limpiar URL
     router.push("/");
   }
 
-  // Aplicar filtro de precio
   function aplicarFiltroPrecio(min: string, max: string) {
     setFiltrosActivos((prev) => ({
       ...prev,
@@ -179,7 +227,85 @@ export default function HomePage() {
     return `₡${precio.toLocaleString("es-CR")}`;
   }
 
-  // Determinar si hay filtros activos
+  function handleAddToCart(producto: Producto) {
+    if (checkingAuth) {
+      setToast({
+        type: "error",
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setToast({
+        type: "error",
+        message: "Debes iniciar sesión para agregar productos al carrito.",
+      });
+      return;
+    }
+
+    // Por ahora usamos el id del producto como id de la "variante"
+    const variante = {
+      id: producto.id,
+      precio_actual: producto.precio_minimo,
+    };
+
+    const productoInfo = {
+      id: producto.id,
+      nombre: producto.nombre,
+    };
+
+    const imagenUrl = buildMediaUrl(producto.imagen_principal);
+
+    addItem(variante as any, productoInfo as any, 1, imagenUrl);
+
+    setToast({
+      type: "success",
+      message: "El producto se añadió al carrito.",
+    });
+  }
+
+  // 🔹 Favoritos para productos reales
+  function handleToggleFavorite(producto: Producto) {
+    if (checkingAuth) {
+      setToast({
+        type: "error",
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setToast({
+        type: "error",
+        message: "Debes iniciar sesión para guardar productos favoritos.",
+      });
+      return;
+    }
+
+    const alreadyFav = isFavorite(producto.id);
+
+    const favItem = {
+      id: producto.id,
+      productoId: producto.id,
+      name: producto.nombre,
+      brand: "Innersport",
+      price: producto.precio_minimo,
+      imagenUrl: buildMediaUrl(producto.imagen_principal),
+    };
+
+    toggleFavorite(favItem);
+
+    setToast({
+      type: "success",
+      message: alreadyFav
+        ? "El producto se quitó de favoritos."
+        : "Producto guardado en favoritos.",
+    });
+  }
+
   const hayFiltrosActivos = Object.entries(filtrosActivos).some(
     ([key, value]) => value && key !== "ordenar_por"
   );
@@ -188,9 +314,9 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
-      {/* Contenido principal */}
+      {/* CONTENIDO PRINCIPAL */}
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {/* Migas de pan */}
+        {/* Migas */}
         <div className="text-xs text-gray-500 mb-4">
           Inicio <span className="mx-1">›</span>{" "}
           <span className="text-gray-800 font-medium">
@@ -202,9 +328,8 @@ export default function HomePage() {
           </span>
         </div>
 
-        {/* Hero tipo banner */}
+        {/* Hero */}
         <section className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Columna izquierda */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#f97316] via-[#facc15] to-[#fef3c7] min-h-[260px] flex items-end p-6">
             <div>
               <p className="uppercase text-xs font-semibold tracking-[0.2em] text-white/90">
@@ -214,20 +339,12 @@ export default function HomePage() {
                 Colección Innersport
               </h1>
               <p className="mt-3 text-sm text-white/90 max-w-md">
-                Ropa deportiva pensada para entrenamiento, running y
-                estilo urbano. Diseñada para acompañarte dentro y fuera
-                de la pista.
+                Ropa deportiva pensada para entrenamiento, running y estilo
+                urbano.
               </p>
-              <button
-                onClick={() => window.scrollTo({ top: document.querySelector('section')?.offsetTop, behavior: 'smooth' })}
-                className="mt-4 inline-flex items-center px-4 py-2 rounded-full bg-white/95 text-[#6b21a8] text-xs font-semibold shadow hover:bg-white transition-all"
-              >
-                Ver productos →
-              </button>
             </div>
           </div>
 
-          {/* Columna derecha */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-tl from-[#111827] via-[#1f2937] to-[#6b21a8] min-h-[260px] flex items-end justify-end p-6">
             <div className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.8),_transparent_60%)]" />
             <div className="relative max-w-xs text-right ml-auto">
@@ -237,56 +354,33 @@ export default function HomePage() {
               <h2 className="mt-2 text-2xl font-bold text-white">
                 Movimiento que se siente bien
               </h2>
-              <p className="mt-3 text-xs text-gray-300">
-                Telas ligeras, secado rápido y soporte donde más lo necesitas.
-                Ideal para entrenar sin perder estilo.
-              </p>
             </div>
           </div>
         </section>
 
-        {/* Mostrar badge de búsqueda activa */}
-        {filtrosActivos.buscar && (
-          <div className="mb-4 flex items-center gap-2 text-sm">
-            <span className="text-gray-600">Buscando:</span>
-            <span className="px-3 py-1 bg-[#a855f7] text-white rounded-full font-medium flex items-center gap-2">
-              "{filtrosActivos.buscar}"
-              <button
-                onClick={() => aplicarFiltro("buscar", "")}
-                className="hover:bg-white/20 rounded-full p-0.5"
-                aria-label="Limpiar búsqueda"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </span>
-          </div>
-        )}
-
         {/* Filtros + listado */}
         <section className="grid md:grid-cols-[260px,1fr] gap-6">
-          {/* Filtros laterales */}
-          <aside className="bg-white/90 rounded-2xl border border-[#e5e7eb] p-4 text-sm h-fit">
+          {/* FILTROS LATERALES */}
+          <aside className="bg-white/90 rounded-2xl border p-4 text-sm h-fit">
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-gray-800">Filtrar</span>
               <button
                 onClick={limpiarFiltros}
-                className="text-xs text-[#6b21a8] hover:text-[#a855f7] transition-colors"
+                className="text-xs text-[#6b21a8] hover:text-[#a855f7]"
                 disabled={!hayFiltrosActivos}
               >
                 Limpiar
               </button>
             </div>
 
-            {/* Barra de búsqueda destacada */}
+            {/* Barra de búsqueda */}
             <div className="mb-6">
-              <SearchBar onSearch={handleSearch} className="max-w-2xl mx-auto" />
+              <SearchBar onSearch={handleSearch} />
             </div>
 
             {filtrosDisponibles && (
               <div className="space-y-4">
-                {/* Categoría */}
+                {/* Categorías */}
                 {filtrosDisponibles.categorias.length > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -294,10 +388,12 @@ export default function HomePage() {
                     </h3>
                     <select
                       value={filtrosActivos.categoria}
-                      onChange={(e) => aplicarFiltro("categoria", e.target.value)}
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg focus:border-[#a855f7] outline-none"
+                      onChange={(e) =>
+                        aplicarFiltro("categoria", e.target.value)
+                      }
+                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
                     >
-                      <option value="">Todas las categorías</option>
+                      <option value="">Todas</option>
                       {filtrosDisponibles.categorias.map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
@@ -315,8 +411,10 @@ export default function HomePage() {
                     </h3>
                     <select
                       value={filtrosActivos.marca}
-                      onChange={(e) => aplicarFiltro("marca", e.target.value)}
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg focus:border-[#a855f7] outline-none"
+                      onChange={(e) =>
+                        aplicarFiltro("marca", e.target.value)
+                      }
+                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
                     >
                       <option value="">Todas</option>
                       {filtrosDisponibles.marcas.map((marca) => (
@@ -328,7 +426,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Color */}
+                {/* Colores */}
                 {filtrosDisponibles.colores.length > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -336,8 +434,10 @@ export default function HomePage() {
                     </h3>
                     <select
                       value={filtrosActivos.color}
-                      onChange={(e) => aplicarFiltro("color", e.target.value)}
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg focus:border-[#a855f7] outline-none"
+                      onChange={(e) =>
+                        aplicarFiltro("color", e.target.value)
+                      }
+                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
                     >
                       <option value="">Todos</option>
                       {filtrosDisponibles.colores.map((color) => (
@@ -349,7 +449,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Talla */}
+                {/* Tallas */}
                 {filtrosDisponibles.tallas.length > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -360,9 +460,9 @@ export default function HomePage() {
                         <button
                           key={talla}
                           onClick={() => toggleFiltro("talla", talla)}
-                          className={`px-2 py-1 rounded-full border transition-all ${filtrosActivos.talla === talla
-                              ? "border-[#a855f7] bg-[#a855f7] text-white"
-                              : "border-gray-200 hover:border-[#a855f7]"
+                          className={`px-2 py-1 rounded-full border ${filtrosActivos.talla === talla
+                            ? "border-[#a855f7] bg-[#a855f7] text-white"
+                            : "border-gray-200 hover:border-[#a855f7]"
                             }`}
                         >
                           {talla}
@@ -371,69 +471,25 @@ export default function HomePage() {
                     </div>
                   </div>
                 )}
-
-                {/* Precio */}
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                    Precio
-                  </h3>
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-[#6b21a8]">
-                      <input
-                        type="radio"
-                        name="precio"
-                        className="accent-[#a855f7]"
-                        checked={!filtrosActivos.precio_min && !filtrosActivos.precio_max}
-                        onChange={() => aplicarFiltroPrecio("", "")}
-                      />
-                      Todos
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-[#6b21a8]">
-                      <input
-                        type="radio"
-                        name="precio"
-                        className="accent-[#a855f7]"
-                        checked={filtrosActivos.precio_max === "20000"}
-                        onChange={() => aplicarFiltroPrecio("", "20000")}
-                      />
-                      Hasta ₡20.000
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-[#6b21a8]">
-                      <input
-                        type="radio"
-                        name="precio"
-                        className="accent-[#a855f7]"
-                        checked={filtrosActivos.precio_min === "20000" && filtrosActivos.precio_max === "35000"}
-                        onChange={() => aplicarFiltroPrecio("20000", "35000")}
-                      />
-                      ₡20.000 - ₡35.000
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:text-[#6b21a8]">
-                      <input
-                        type="radio"
-                        name="precio"
-                        className="accent-[#a855f7]"
-                        checked={filtrosActivos.precio_min === "35000"}
-                        onChange={() => aplicarFiltroPrecio("35000", "")}
-                      />
-                      Más de ₡35.000
-                    </label>
-                  </div>
-                </div>
               </div>
             )}
           </aside>
 
-          {/* Grid de productos */}
+          {/* GRID DE PRODUCTOS */}
           <div>
             <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
               <span>
-                {loading ? "Cargando..." : `${total} ${total === 1 ? "producto" : "productos"}`}
+                {loading
+                  ? "Cargando..."
+                  : `${total} producto${total === 1 ? "" : "s"} disponibles`}
               </span>
+
               <select
                 value={filtrosActivos.ordenar_por}
-                onChange={(e) => aplicarFiltro("ordenar_por", e.target.value)}
-                className="text-xs px-2 py-1 border rounded-lg hover:border-[#a855f7] outline-none cursor-pointer"
+                onChange={(e) =>
+                  aplicarFiltro("ordenar_por", e.target.value)
+                }
+                className="text-xs px-2 py-1 border rounded-lg"
               >
                 <option value="destacados">Destacados</option>
                 <option value="precio_asc">Precio: Menor a mayor</option>
@@ -442,30 +498,25 @@ export default function HomePage() {
               </select>
             </div>
 
+            {/* Loading skeleton */}
             {loading ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden animate-pulse">
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl border animate-pulse"
+                  >
                     <div className="h-44 bg-gray-200"></div>
                     <div className="p-3 space-y-2">
                       <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                       <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                      <div className="h-6 bg-gray-200 rounded"></div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : productos.length === 0 ? (
-              <div className="text-center py-20 bg-white/50 rounded-2xl border border-[#e5e7eb]">
-                <div className="text-5xl mb-3">🔍</div>
-                <p className="text-gray-600 font-medium mb-2">No se encontraron productos</p>
-                <button
-                  onClick={limpiarFiltros}
-                  className="mt-2 text-sm text-[#6b21a8] hover:text-[#a855f7] font-medium"
-                >
-                  Limpiar filtros
-                </button>
+              <div className="text-center text-xs text-gray-500 py-10">
+                No hay productos con estos filtros.
               </div>
             ) : (
               <>
@@ -474,60 +525,89 @@ export default function HomePage() {
                     <article
                       key={producto.id}
                       onClick={() => router.push(`/productos/${producto.id}`)}
-                      className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                      className="bg-white rounded-2xl border overflow-hidden hover:shadow-md transition cursor-pointer group"
                     >
-                      {/* Imagen */}
                       <div className="relative h-44 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden">
                         {producto.imagen_principal ? (
                           <img
-                            src={producto.imagen_principal}
+                            src={buildMediaUrl(producto.imagen_principal)!}
                             alt={producto.nombre}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-105 transition"
                           />
                         ) : (
-                          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,_white,_transparent_60%)]" />
+                          <div className="flex items-center justify-center h-full text-white">
+                            📦
+                          </div>
                         )}
 
-                        {/* Badges */}
-                        <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 text-[10px]">
+                        <div className="absolute bottom-2 left-2 flex gap-1 text-[10px]">
                           {!producto.tiene_stock && (
-                            <span className="px-1.5 py-0.5 rounded bg-red-500 text-white font-semibold">
+                            <span className="px-1.5 py-0.5 bg-red-500 text-white font-semibold rounded">
                               AGOTADO
                             </span>
                           )}
                           {producto.tiene_stock && (
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white font-semibold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                            <span className="px-1.5 py-0.5 bg-emerald-500 text-white font-semibold rounded flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                               DISPONIBLE
                             </span>
                           )}
-                          {producto.categorias.length > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-[#fef9c3] text-[#854d0e] font-semibold">
-                              {producto.categorias[0]}
-                            </span>
-                          )}
                         </div>
+
+                        {/* 🔹 Botón de favoritos (corazón) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(producto);
+                          }}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-sm shadow hover:bg-white"
+                        >
+                          <span
+                            className={
+                              isFavorite(producto.id) ? "text-red-500" : "text-gray-500"
+                            }
+                          >
+                            {isFavorite(producto.id) ? "♥" : "♡"}
+                          </span>
+                        </button>
                       </div>
 
-                      {/* Info */}
                       <div className="p-3 text-xs">
                         <p className="text-gray-500">Innersport</p>
-                        <p className="mt-1 text-gray-900 line-clamp-2">{producto.nombre}</p>
+                        <p className="mt-1 line-clamp-2 text-gray-900">
+                          {producto.nombre}
+                        </p>
                         <p className="mt-2 font-semibold text-[#6b21a8]">
                           {formatoPrecio(producto.precio_minimo)}
                         </p>
+
+                        {/* 🔹 Botón Ver detalles */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(`/productos/${producto.id}`);
                           }}
-                          className="mt-2 w-full text-center text-[11px] font-semibold text-white bg-[#a855f7] hover:bg-[#7e22ce] rounded-lg py-1.5 transition-colors"
+                          className="mt-2 w-full text-center text-white bg-[#a855f7] hover:bg-[#7e22ce] py-1.5 text-[11px] rounded-lg"
                         >
                           Ver detalles
+                        </button>
+
+                        {/* 🔹 Botón Agregar al carrito */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCart(producto);
+                          }}
+                          disabled={!producto.tiene_stock}
+                          className="mt-2 w-full text-center text-[11px] font-semibold rounded-lg py-1.5 border border-[#a855f7] text-[#6b21a8] hover:bg-[#f5e9ff] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {producto.tiene_stock ? "Agregar al carrito" : "Producto agotado"}
                         </button>
                       </div>
                     </article>
                   ))}
+
                 </div>
 
                 {/* Paginación */}
@@ -536,41 +616,28 @@ export default function HomePage() {
                     <button
                       disabled={pagina === 1}
                       onClick={() => setPagina(pagina - 1)}
-                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#a855f7] hover:bg-[#a855f7] hover:text-white transition-all"
+                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50"
                     >
                       ← Anterior
                     </button>
 
-                    {Array.from({ length: Math.min(totalPaginas, 5) }, (_, i) => {
-                      let num;
-                      if (totalPaginas <= 5) {
-                        num = i + 1;
-                      } else if (pagina <= 3) {
-                        num = i + 1;
-                      } else if (pagina >= totalPaginas - 2) {
-                        num = totalPaginas - 4 + i;
-                      } else {
-                        num = pagina - 2 + i;
-                      }
-
-                      return (
-                        <button
-                          key={num}
-                          onClick={() => setPagina(num)}
-                          className={`w-8 h-8 text-xs rounded-lg transition-all ${pagina === num
-                              ? "bg-[#a855f7] text-white font-semibold"
-                              : "border hover:border-[#a855f7]"
-                            }`}
-                        >
-                          {num}
-                        </button>
-                      );
-                    })}
+                    {Array.from({ length: totalPaginas }, (_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setPagina(i + 1)}
+                        className={`w-8 h-8 text-xs rounded-lg ${pagina === i + 1
+                          ? "bg-[#a855f7] text-white"
+                          : "border"
+                          }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
 
                     <button
                       disabled={pagina === totalPaginas}
                       onClick={() => setPagina(pagina + 1)}
-                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#a855f7] hover:bg-[#a855f7] hover:text-white transition-all"
+                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50"
                     >
                       Siguiente →
                     </button>
@@ -581,6 +648,30 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div
+            className={`flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg text-xs border ${toast.type === "success"
+              ? "bg-white border-[#22c55e]/40 text-[#166534]"
+              : "bg-white border-[#f97316]/40 text-[#9a3412]"
+              }`}
+          >
+            <span className="text-lg">
+              {toast.type === "success" ? "✅" : "⚠️"}
+            </span>
+            <div className="flex flex-col">
+              <span className="font-semibold">
+                {toast.type === "success"
+                  ? "Acción realizada"
+                  : "Error"}
+              </span>
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

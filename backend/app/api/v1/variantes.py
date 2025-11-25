@@ -17,6 +17,9 @@ from app.schemas.variante import (
 from app.schemas.historial_precio import HistorialPrecioRead
 from app.services.precio import cambiar_precio_variante
 
+from app.core.security import get_current_admin_user
+from app.models.usuario import Usuario
+
 router = APIRouter()
 
 # =========================
@@ -53,6 +56,7 @@ def crear_variante(
     producto_id: int,
     data: VarianteCreate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     producto = db.query(Producto).get(producto_id)
     if not producto:
@@ -87,7 +91,7 @@ def crear_variante(
         producto_id=producto_id,
         sku=data.sku,
         barcode=data.barcode,
-        marca=data.marca,  # 🆕 AÑADIR ESTA LÍNEA
+        marca=data.marca, 
         color=data.color,
         talla=data.talla,
         precio_actual=data.precio_actual,
@@ -130,6 +134,7 @@ def actualizar_variante(
     variante_id: int,
     data: VarianteUpdate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     variante = db.query(Variante).get(variante_id)
     if not variante:
@@ -166,6 +171,10 @@ def actualizar_variante(
             )
         variante.barcode = data.barcode
 
+    # Marca 👇
+    if data.marca is not None:
+        variante.marca = data.marca
+
     if data.color is not None:
         variante.color = data.color
 
@@ -201,6 +210,7 @@ def actualizar_variante(
 def desactivar_variante(
     variante_id: int,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     variante = db.query(Variante).get(variante_id)
     if not variante:
@@ -251,6 +261,7 @@ def cambiar_precio(
     variante_id: int,
     data: CambioPrecioRequest,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     cambiar_precio_variante(db, variante_id, data.nuevo_precio)
     variante = (

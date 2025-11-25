@@ -157,6 +157,29 @@ def login_user(db: Session, login_in: LoginSchema) -> str:
             detail="Credenciales incorrectas.",
         )
 
+    # 🔴 NUEVO: si la cuenta está en proceso de eliminación, no iniciamos sesión normal
+    if usuario.pendiente_eliminacion:
+        now_utc = datetime.now(timezone.utc)
+
+        # Si ya pasó la fecha programada, no permitir reactivación por aquí
+        if usuario.eliminacion_programada_at and usuario.eliminacion_programada_at <= now_utc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="El periodo de gracia ha expirado. La cuenta no puede reactivarse.",
+            )
+
+        # Devolvemos un mensaje especial para que el frontend sepa redirigir
+        deletion_iso = (
+            usuario.eliminacion_programada_at.isoformat()
+            if usuario.eliminacion_programada_at
+            else ""
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"CUENTA_PENDIENTE_ELIMINACION;{deletion_iso}",
+        )
+
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -311,6 +334,60 @@ def request_account_deletion(
     
     return usuario
 
+
+
+def reactivate_account(
+    db: Session,
+    data: LoginSchema,
+) -> Usuario:
+    """
+    Reactiva una cuenta en periodo de gracia.
+    """
+
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.correo == data.correo)
+        .first()
+    )
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado.",
+        )
+
+    if not usuario.pendiente_eliminacion:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cuenta no está en proceso de eliminación.",
+        )
+
+    # Validar contraseña
+    if not verify_password(data.password, usuario.contrasena_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales incorrectas.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    if usuario.eliminacion_programada_at and usuario.eliminacion_programada_at <= now_utc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El periodo de gracia ha expirado. La cuenta ya no puede reactivarse.",
+        )
+
+    # ✅ Reactivar
+    usuario.activo = True
+    usuario.pendiente_eliminacion = False
+    usuario.eliminacion_solicitada_at = None
+    usuario.eliminacion_programada_at = None
+
+    db.commit()
+    db.refresh(usuario)
+
+    print(f"[AUDIT] Usuario {usuario.id} ({usuario.correo}) reactivó su cuenta")
+
+    return usuario
 
 def update_profile(
     db: Session,

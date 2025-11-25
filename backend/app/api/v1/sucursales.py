@@ -12,6 +12,9 @@ from app.schemas.sucursal import (
     SucursalRead,
 )
 
+from app.core.security import get_current_admin_user
+from app.models.usuario import Usuario
+
 router = APIRouter()
 
 
@@ -30,6 +33,7 @@ def listar_sucursales(
 def crear_sucursal(
     data: SucursalCreate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     existente = db.query(Sucursal).filter(Sucursal.nombre == data.nombre).first()
     if existente:
@@ -68,6 +72,7 @@ def actualizar_sucursal(
     sucursal_id: int,
     data: SucursalUpdate,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     sucursal = db.query(Sucursal).get(sucursal_id)
     if not sucursal:
@@ -107,6 +112,7 @@ def actualizar_sucursal(
 def desactivar_sucursal(
     sucursal_id: int,
     db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
 ):
     sucursal = db.query(Sucursal).get(sucursal_id)
     if not sucursal:
@@ -116,6 +122,24 @@ def desactivar_sucursal(
         )
 
     sucursal.activo = False
+    db.commit()
+    db.refresh(sucursal)
+    return sucursal
+
+@router.patch("/{sucursal_id}/activar", response_model=SucursalRead)
+def activar_sucursal(
+    sucursal_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(get_current_admin_user),
+):
+    sucursal = db.query(Sucursal).get(sucursal_id)
+    if not sucursal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sucursal no encontrada.",
+        )
+
+    sucursal.activo = True
     db.commit()
     db.refresh(sucursal)
     return sucursal

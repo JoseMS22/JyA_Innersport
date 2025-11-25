@@ -17,8 +17,11 @@ from app.api.v1.variantes import router as variantes_router
 # Routers de sucursales e inventario
 from app.api.v1.sucursales import router as sucursales_router
 from app.api.v1.inventario import router as inventario_router
-# 🆕 Router de catálogo con filtros
+from fastapi.staticfiles import StaticFiles
+import os
+
 from app.api.v1.catalogo import router as catalogo_router
+from app.api.v1.public_inventario import router as inventario_publico_router
 
 
 # Inicializar sistema de logging ANTES de crear la app
@@ -119,6 +122,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
+
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
+
 # =========================
 # RUTAS
 # =========================
@@ -134,6 +142,8 @@ app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucurs
 app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
 # 🆕 Catálogo con filtros avanzados
 app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
+# Endpoint público para inventario
+app.include_router(inventario_publico_router, prefix="/api/v1", tags=["Inventario Público"])
 
 
 

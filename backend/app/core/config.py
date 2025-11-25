@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     EMAIL_FROM_ADDRESS: str = "onboarding@resend.dev"  # default ok
     FRONTEND_BASE_URL: str = "http://localhost:3000"
 
+    # 🔹 Cookies
+    # En desarrollo normalmente False (HTTP), en producción lo pones True detrás de HTTPS
+    COOKIE_SECURE: bool = bool(os.getenv("COOKIE_SECURE", "").lower() == "true")
+
     # Redis / Celery
     # Estos valores se sobrescriben con lo que tengas en el .env
     REDIS_URL: str = "redis://redis:6379/0"

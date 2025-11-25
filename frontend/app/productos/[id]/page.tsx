@@ -6,6 +6,16 @@ import { useRouter, useParams } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+function buildMediaUrl(url: string) {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  return `${API_BASE}${url}`; // ej: http://localhost:8000/media/archivo.jpg
+}
+
 type Variante = {
   id: number;
   sku: string;
@@ -59,10 +69,12 @@ export default function ProductDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [producto, setProducto] = useState<ProductoDetalle | null>(null);
-  const [inventarios, setInventarios] = useState<Record<number, InventarioDisponibilidad>>({});
-  
+  const [inventarios, setInventarios] =
+    useState<Record<number, InventarioDisponibilidad>>({});
+
   // Estados de selección
-  const [selectedVariante, setSelectedVariante] = useState<Variante | null>(null);
+  const [selectedVariante, setSelectedVariante] =
+    useState<Variante | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedTalla, setSelectedTalla] = useState<string>("");
   const [selectedMarca, setSelectedMarca] = useState<string>("");
@@ -78,54 +90,74 @@ export default function ProductDetailPage() {
     async function cargarProducto() {
       setLoading(true);
       setErrorMsg(null);
-      
+
       try {
         // 1. Cargar producto
-        const resProducto = await fetch(`http://localhost:8000/api/v1/productos/${productoId}`);
-        
+        const resProducto = await fetch(
+          `${API_BASE}/api/v1/productos/${productoId}`
+        );
+
         if (!resProducto.ok) {
           throw new Error("Producto no encontrado");
         }
 
         const dataProducto: ProductoDetalle = await resProducto.json();
-        
+
         // 2. Cargar variantes del producto
         const resVariantes = await fetch(
-          `http://localhost:8000/api/v1/variantes/productos/${productoId}/variantes?solo_activas=true`
+          `${API_BASE}/api/v1/variantes/productos/${productoId}/variantes?solo_activas=true`
         );
-        
+
         if (!resVariantes.ok) {
           throw new Error("Error cargando variantes");
         }
 
         const variantes: Variante[] = await resVariantes.json();
-        
+
         // Combinar producto con variantes
         const productoCompleto = {
           ...dataProducto,
-          variantes: variantes,
+          variantes,
         };
-        
+
         setProducto(productoCompleto);
 
         // 3. Cargar inventarios de todas las variantes activas
-        const variantesActivas = variantes.filter(v => v.activo);
+        const variantesActivas = variantes.filter((v) => v.activo);
         const inventariosPromises = variantesActivas.map(async (variante) => {
-          const invRes = await fetch(
-            `http://localhost:8000/api/v1/inventario?variante_id=${variante.id}`
+        const invRes = await fetch(
+          `${API_BASE}/api/v1/public/inventario?variante_id=${variante.id}`
+        );
+
+        let invData: any[] = [];
+
+        if (invRes.ok) {
+          const raw = await invRes.json();
+          invData = Array.isArray(raw) ? raw : [];
+        } else {
+          console.error(
+            "Error cargando inventario para variante",
+            variante.id,
+            invRes.status
           );
-          const invData = await invRes.json();
-          
-          return {
-            variante_id: variante.id,
-            inventarios: invData.map((inv: any) => ({
-              sucursal_id: inv.sucursal_id,
-              sucursal_nombre: inv.sucursal?.nombre || "Sucursal",
-              cantidad: inv.cantidad,
-            })),
-            total_stock: invData.reduce((sum: number, inv: any) => sum + inv.cantidad, 0),
-          };
-        });
+          invData = [];
+        }
+
+        return {
+          variante_id: variante.id,
+          inventarios: invData.map((inv: any) => ({
+            sucursal_id: inv.sucursal_id,
+            // el backend ya manda sucursal_nombre plano
+            sucursal_nombre: inv.sucursal_nombre || "Sucursal",
+            cantidad: inv.cantidad,
+          })),
+          total_stock: invData.reduce(
+            (sum: number, inv: any) => sum + (inv.cantidad || 0),
+            0
+          ),
+        };
+      });
+
 
         const inventariosData = await Promise.all(inventariosPromises);
         const inventariosMap = inventariosData.reduce((acc, inv) => {
@@ -137,9 +169,9 @@ export default function ProductDetailPage() {
 
         // 4. Preseleccionar primera variante disponible con stock
         const primeraConStock = variantesActivas.find(
-          v => inventariosMap[v.id]?.total_stock > 0
+          (v) => inventariosMap[v.id]?.total_stock > 0
         );
-        
+
         if (primeraConStock) {
           setSelectedVariante(primeraConStock);
           setSelectedColor(primeraConStock.color || "");
@@ -183,15 +215,30 @@ export default function ProductDetailPage() {
 
   // Extraer opciones únicas
   const coloresDisponibles = Array.from(
-    new Set(producto?.variantes.filter(v => v.activo).map(v => v.color).filter(Boolean))
+    new Set(
+      producto?.variantes
+        .filter((v) => v.activo)
+        .map((v) => v.color)
+        .filter(Boolean)
+    )
   ) as string[];
 
   const tallasDisponibles = Array.from(
-    new Set(producto?.variantes.filter(v => v.activo).map(v => v.talla).filter(Boolean))
+    new Set(
+      producto?.variantes
+        .filter((v) => v.activo)
+        .map((v) => v.talla)
+        .filter(Boolean)
+    )
   ) as string[];
 
   const marcasDisponibles = Array.from(
-    new Set(producto?.variantes.filter(v => v.activo).map(v => v.marca).filter(Boolean))
+    new Set(
+      producto?.variantes
+        .filter((v) => v.activo)
+        .map((v) => v.marca)
+        .filter(Boolean)
+    )
   ) as string[];
 
   function formatoPrecio(precio: number) {
@@ -204,8 +251,9 @@ export default function ProductDetailPage() {
       return;
     }
 
-    const stockDisponible = inventarios[selectedVariante.id]?.total_stock || 0;
-    
+    const stockDisponible =
+      inventarios[selectedVariante.id]?.total_stock || 0;
+
     if (stockDisponible === 0) {
       alert("Esta variante no tiene stock disponible");
       return;
@@ -217,14 +265,16 @@ export default function ProductDetailPage() {
     }
 
     // TODO: Implementar lógica del carrito
-    alert(`Agregado al carrito: ${cantidad} x ${producto?.nombre} (${selectedVariante.sku})`);
+    alert(
+      `Agregado al carrito: ${cantidad} x ${producto?.nombre} (${selectedVariante.sku})`
+    );
   }
 
   function incrementCantidad() {
-    const stockDisponible = selectedVariante 
-      ? inventarios[selectedVariante.id]?.total_stock || 0 
+    const stockDisponible = selectedVariante
+      ? inventarios[selectedVariante.id]?.total_stock || 0
       : 0;
-    
+
     if (cantidad < stockDisponible) {
       setCantidad(cantidad + 1);
     }
@@ -280,10 +330,10 @@ export default function ProductDetailPage() {
     );
   }
 
-  const imagenes = producto.media.sort((a, b) => a.orden - b.orden);
+  const imagenes = [...producto.media].sort((a, b) => a.orden - b.orden);
   const imagenActual = imagenes[selectedImageIndex] || imagenes[0];
-  const stockTotal = selectedVariante 
-    ? inventarios[selectedVariante.id]?.total_stock || 0 
+  const stockTotal = selectedVariante
+    ? inventarios[selectedVariante.id]?.total_stock || 0
     : 0;
   const hayStock = stockTotal > 0;
 
@@ -294,14 +344,21 @@ export default function ProductDetailPage() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         {/* Breadcrumb */}
         <div className="text-xs text-gray-500 mb-6">
-          <button onClick={() => router.push("/")} className="hover:text-[#6b21a8]">
+          <button
+            onClick={() => router.push("/")}
+            className="hover:text-[#6b21a8]"
+          >
             Inicio
           </button>
           <span className="mx-2">›</span>
           {producto.categorias.length > 0 && (
             <>
-              <button 
-                onClick={() => router.push(`/?categoria=${producto.categorias[0].nombre}`)}
+              <button
+                onClick={() =>
+                  router.push(
+                    `/?categoria=${producto.categorias[0].nombre}`
+                  )
+                }
                 className="hover:text-[#6b21a8]"
               >
                 {producto.categorias[0].nombre}
@@ -309,20 +366,22 @@ export default function ProductDetailPage() {
               <span className="mx-2">›</span>
             </>
           )}
-          <span className="text-gray-800 font-medium">{producto.nombre}</span>
+          <span className="text-gray-800 font-medium">
+            {producto.nombre}
+          </span>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           {/* Galería de imágenes */}
           <div className="space-y-4">
             {/* Imagen principal */}
-            <div 
+            <div
               className="relative aspect-square bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] rounded-2xl overflow-hidden cursor-zoom-in"
               onClick={() => setShowZoom(!showZoom)}
             >
               {imagenActual ? (
                 <img
-                  src={imagenActual.url}
+                  src={buildMediaUrl(imagenActual.url)}
                   alt={producto.nombre}
                   className="w-full h-full object-cover"
                 />
@@ -361,7 +420,7 @@ export default function ProductDetailPage() {
                     }`}
                   >
                     <img
-                      src={img.url}
+                      src={buildMediaUrl(img.url)}
                       alt={`${producto.nombre} - vista ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -378,7 +437,7 @@ export default function ProductDetailPage() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {producto.nombre}
               </h1>
-              
+
               {producto.categorias.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {producto.categorias.map((cat) => (
@@ -496,23 +555,33 @@ export default function ProductDetailPage() {
                   <span>📍</span> Disponibilidad por sucursal
                 </h3>
                 <div className="space-y-2">
-                  {inventarios[selectedVariante.id].inventarios.map((inv) => (
+                  {inventarios[
+                    selectedVariante.id
+                  ].inventarios.map((inv) => (
                     <div
                       key={inv.sucursal_id}
                       className="flex items-center justify-between text-xs"
                     >
-                      <span className="text-gray-700">{inv.sucursal_nombre}</span>
+                      <span className="text-gray-700">
+                        {inv.sucursal_nombre}
+                      </span>
                       <span
                         className={`font-semibold ${
-                          inv.cantidad > 0 ? "text-emerald-600" : "text-red-600"
+                          inv.cantidad > 0
+                            ? "text-emerald-600"
+                            : "text-red-600"
                         }`}
                       >
-                        {inv.cantidad > 0 ? `${inv.cantidad} disponibles` : "Agotado"}
+                        {inv.cantidad > 0
+                          ? `${inv.cantidad} disponibles`
+                          : "Agotado"}
                       </span>
                     </div>
                   ))}
                   <div className="pt-2 border-t border-gray-200 flex items-center justify-between">
-                    <span className="text-gray-700 font-semibold">Total</span>
+                    <span className="text-gray-700 font-semibold">
+                      Total
+                    </span>
                     <span className="font-bold text-[#6b21a8]">
                       {stockTotal} unidades
                     </span>
@@ -565,9 +634,7 @@ export default function ProductDetailPage() {
                 ) : !hayStock ? (
                   "Producto agotado"
                 ) : (
-                  <>
-                    🛒 Agregar al carrito
-                  </>
+                  <>🛒 Agregar al carrito</>
                 )}
               </button>
 
@@ -586,14 +653,15 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Información adicional en tabs */}
+        {/* Información adicional */}
         <div className="bg-white/90 rounded-2xl border border-[#e5e7eb] p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Información adicional
           </h2>
           <div className="prose prose-sm max-w-none">
             <p className="text-gray-700">
-              {producto.descripcion || "Producto de alta calidad para tu entrenamiento diario."}
+              {producto.descripcion ||
+                "Producto de alta calidad para tu entrenamiento diario."}
             </p>
             {selectedVariante?.marca && (
               <p className="mt-2 text-sm text-gray-600">
@@ -607,7 +675,7 @@ export default function ProductDetailPage() {
       {/* Modal de zoom */}
       {imagenActual && (
         <ImageZoomModal
-          imageUrl={imagenActual.url}
+          imageUrl={buildMediaUrl(imagenActual.url)}
           productName={producto.nombre}
           isOpen={showZoom}
           onClose={() => setShowZoom(false)}

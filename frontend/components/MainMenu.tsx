@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useCart } from "../app/context/cartContext";
+import { useFavorites } from "../app/context/favoritesContext";
 
 type UserMe = {
   id: number;
@@ -19,32 +21,41 @@ export function MainMenu() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const { totalItems, setUserId: setCartUserId, clearCart } = useCart();
+  const { setUserId: setFavUserId, clearFavorites } = useFavorites();
+
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-  // Cargar usuario actual (si hay cookie)
+  // Cargar usuario actual (si hay cookie) y sincronizar carrito/favoritos por usuario
   useEffect(() => {
     async function fetchMe() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-          credentials: "include", // manda la cookie HttpOnly
+          credentials: "include",
         });
 
         if (!res.ok) {
           setUser(null);
+          setCartUserId(null);
+          setFavUserId(null);
         } else {
           const data = await res.json();
           setUser(data);
+          setCartUserId(data.id);
+          setFavUserId(data.id);
         }
       } catch {
         setUser(null);
+        setCartUserId(null);
+        setFavUserId(null);
       } finally {
         setChecking(false);
       }
     }
 
     fetchMe();
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, setCartUserId, setFavUserId]);
 
   async function handleLogout() {
     try {
@@ -53,9 +64,13 @@ export function MainMenu() {
         credentials: "include",
       });
     } catch {
-      // ignoramos errores para no molestar al usuario
+      // ignoramos errores
     } finally {
       setUser(null);
+      clearCart();
+      clearFavorites();
+      setCartUserId(null);
+      setFavUserId(null);
       router.push("/");
     }
   }
@@ -66,7 +81,8 @@ export function MainMenu() {
     <header className="border-b border-[#e5e7eb] bg-white/90 backdrop-blur">
       {/* Barra superior tipo aviso */}
       <div className="bg-[#0ea5e9] text-white text-xs text-center py-1">
-        Recibí tu pedido el mismo día con envío rápido realizando tu compra antes de la 1:00 pm 📦
+        Recibí tu pedido el mismo día con envío rápido realizando tu compra antes
+        de la 1:00 pm 📦
       </div>
 
       {/* Navbar principal */}
@@ -102,64 +118,83 @@ export function MainMenu() {
           <button className="hover:text-[#6b21a8]">Mujer</button>
           <button className="hover:text-[#6b21a8]">Niños</button>
           <button className="hover:text-[#6b21a8]">Sale</button>
+          <Link
+            href="/favorites"
+            className={
+              isActive("/favorites")
+                ? "font-semibold text-[#6b21a8]"
+                : "hover:text-[#6b21a8]"
+            }
+          >
+            Favoritos
+          </Link>
         </nav>
 
-        {/* Zona derecha: usuario + carrito */}
+        {/* Zona derecha: buscar + usuario + carrito */}
         <div className="flex items-center gap-3">
+          {/* Buscar (solo ícono por ahora) */}
+          <button
+            aria-label="Buscar"
+            className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7]"
+          >
+            🔍
+          </button>
 
-          {/* Botón usuario: login / logout */}
+          {/* Usuario */}
           {!checking && (
             <>
               {user ? (
-              <div className="flex items-center gap-2">
-                {/* Nombre de usuario clicable que lleva al perfil */}
-                Hola,{""}<button
-                  type="button"
-                  onClick={() => router.push("/account/profile")}
-                  className="hidden sm:inline text-xs text-gray-600 hover:text-[#6b21a8]"
-                >
-                  
-                  <span className="font-semibold underline decoration-[#a855f7]/60 underline-offset-2">
-                    {user.nombre}
-                  </span>
-                </button>
+                <div className="flex items-center gap-2">
+                  Hola,{" "}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/account/profile")}
+                    className="hidden sm:inline text-xs text-gray-600 hover:text-[#6b21a8]"
+                  >
+                    <span className="font-semibold underline decoration-[#a855f7]/60 underline-offset-2">
+                      {user.nombre}
+                    </span>
+                  </button>
 
-                <button
-                  onClick={handleLogout}
-                  className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  onClick={() => router.push("/login")}
-                  className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
-                >
-                  Iniciar sesión
-                </button>
-                <span className="text-gray-400">/</span>
-                <button
-                  onClick={() => router.push("/register")}
-                  className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
-                >
-                  Crear cuenta
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="font-semibold text-[#6b21a8] hover:text-[#a855f7]"
+                  >
+                    Iniciar sesión
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => router.push("/register")}
+                    className="font-semibold text-[#eab308] hover:text-[#ca8a04]"
+                  >
+                    Crear cuenta
+                  </button>
+                </div>
+              )}
             </>
           )}
 
-          {/* Carrito dummy */}
+          {/* Carrito */}
           <button
             aria-label="Carrito"
+            onClick={() => router.push("/cart")}
             className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative"
           >
             🛒
-            <span className="absolute -top-1 -right-1 text-[10px] bg-[#a855f7] text-white rounded-full px-1">
-              0
-            </span>
+            {totalItems > 0 && (
+              <span className="absolute -top-1 -right-1 text-[10px] bg-[#a855f7] text-white rounded-full px-1">
+                {totalItems}
+              </span>
+            )}
           </button>
         </div>
       </div>

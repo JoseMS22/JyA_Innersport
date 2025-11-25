@@ -28,7 +28,7 @@ class Variante(Base):
     barcode = Column(String(100), unique=True, nullable=True, index=True)
 
     marca = Column(String(100), nullable=True, index=True)
-    
+
     color = Column(String(100), nullable=True)
     talla = Column(String(50), nullable=True)
 

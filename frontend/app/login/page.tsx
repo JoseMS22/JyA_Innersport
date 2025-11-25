@@ -7,6 +7,13 @@ import { Logo } from "@/components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
+type UserMe = {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -19,19 +26,46 @@ export default function LoginPage() {
     setErrorMsg(null);
     setLoading(true);
 
+    const payload = {
+      correo: email,
+      password: password,
+    };
+
     try {
+      // 1) Login normal
       await apiFetch("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({
-          correo: email,
-          password: password,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      // Login exitoso, redirigir al home
-      router.push("/");
+      // 2) Consultar /me para saber el rol
+      const me = (await apiFetch("/api/v1/auth/me", {
+        method: "GET",
+      })) as UserMe;
+
+      if (me.rol === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     } catch (err: any) {
-      setErrorMsg(err.message ?? "Error al iniciar sesión");
+      const msg = err?.message ?? "Error al iniciar sesión";
+
+      if (
+        typeof msg === "string" &&
+        msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")
+      ) {
+        const [, deletionIso] = msg.split(";", 2);
+
+        const params = new URLSearchParams();
+        params.set("correo", payload.correo);
+        if (deletionIso) params.set("deletion", deletionIso);
+
+        router.push(`/account/reactivate?${params.toString()}`);
+        return;
+      }
+
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -69,7 +103,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Contraseña con ojo */}
+          {/* Contraseña */}
           <PasswordInput
             label="Contraseña"
             value={password}
