@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from app.api.v1.catalogo import router as catalogo_router
+from app.api.v1.public_inventario import router as inventario_publico_router
 
 
 # Inicializar sistema de logging ANTES de crear la app
@@ -141,6 +142,8 @@ app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucurs
 app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
 # 🆕 Catálogo con filtros avanzados
 app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
+# Endpoint público para inventario
+app.include_router(inventario_publico_router, prefix="/api/v1", tags=["Inventario Público"])
 
 
 
