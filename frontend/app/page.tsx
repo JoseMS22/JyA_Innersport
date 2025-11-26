@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "../components/MainMenu";
 import { SearchBar } from "../components/SearchBar";
@@ -14,10 +14,18 @@ type Producto = {
   id: number;
   nombre: string;
   precio_minimo: number;
+
+  // antes solo tenías esto:
   imagen_principal: string | null;
+
+  // 🔹 añadimos campos opcionales:
+  marca?: string;
+  imagenes?: string[]; // array de URLs adicionales (si tu API las manda)
+
   categorias: string[];
   tiene_stock: boolean;
 };
+
 
 type CatalogoResponse = {
   productos: Producto[];
@@ -36,14 +44,20 @@ type Filtros = {
   precio_maximo: number;
 };
 
+type HomeHeroConfig = {
+  video_url: string | null;
+  banner1_url: string | null;
+  banner2_url: string | null;
+};
+
 // ======================
 // API BASE + Helper imágenes
 // ======================
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-function buildMediaUrl(url: string | null) {
-  if (!url) return null;
+function buildMediaUrl(url: string | null): string {
+  if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `${API_BASE_URL}${url}`;
 }
@@ -53,6 +67,166 @@ type ToastState = {
   type: "success" | "error";
   message: string;
 } | null;
+
+type ProductoNuevoCardProps = {
+  producto: Producto;
+  isFavorite: (id: number) => boolean;
+  onToggleFavorite: (producto: Producto) => void;
+  onAddToCart: (producto: Producto) => void;
+  onOpen: () => void;
+};
+
+function formatoPrecio(precio: number) {
+  return `₡${precio.toLocaleString("es-CR")}`;
+}
+
+function ProductoNuevoCard({
+  producto,
+  isFavorite,
+  onToggleFavorite,
+  onAddToCart,
+  onOpen,
+}: ProductoNuevoCardProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Construimos todas las imágenes disponibles
+  const imagenes: string[] = [];
+
+  if (producto.imagen_principal) {
+    imagenes.push(buildMediaUrl(producto.imagen_principal));
+  }
+
+  if (producto.imagenes && producto.imagenes.length > 0) {
+    for (const img of producto.imagenes) {
+      const url = buildMediaUrl(img);
+      if (!imagenes.includes(url)) {
+        imagenes.push(url);
+      }
+    }
+  }
+
+  const tieneVariasImagenes = imagenes.length > 1;
+
+  function startCarousel() {
+    if (!tieneVariasImagenes) return;
+    if (intervalRef.current) return;
+
+    intervalRef.current = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const next = prev + 1;
+        return next >= imagenes.length ? 0 : next;
+      });
+    }, 1500);
+  }
+
+  function stopCarousel() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setCurrentIndex(0);
+  }
+
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <article
+      onClick={onOpen}
+      className="min-w-[240px] max-w-[300px] md:min-w-[260px] md:max-w-[320px] bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition cursor-pointer group"
+    >
+      {/* 🔹 IMAGEN MÁS ALTA + CARRUSEL */}
+      <div
+        className="relative h-64 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden"
+        onMouseEnter={startCarousel}
+        onMouseLeave={stopCarousel}
+      >
+        {imagenes.length > 0 ? (
+          <div className="relative w-full h-full">
+            {imagenes.map((url, index) => (
+              <img
+                key={index}
+                src={url}
+                alt={producto.nombre}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentIndex ? "opacity-100" : "opacity-0"
+                  } ${!tieneVariasImagenes ? "group-hover:scale-105 transition-transform duration-300" : ""}`}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-white">
+            📦
+          </div>
+        )}
+
+        {/* Badges de stock */}
+        <div className="absolute bottom-2 left-2 flex gap-1 text-[10px]">
+          {!producto.tiene_stock && (
+            <span className="px-1.5 py-0.5 bg-red-500 text-white font-semibold rounded">
+              AGOTADO
+            </span>
+          )}
+          {producto.tiene_stock && (
+            <span className="px-1.5 py-0.5 bg-emerald-500 text-white font-semibold rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              DISPONIBLE
+            </span>
+          )}
+        </div>
+
+        {/* Corazón favoritos */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(producto);
+          }}
+          className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-sm shadow hover:bg-white"
+        >
+          <span
+            className={
+              isFavorite(producto.id) ? "text-red-500" : "text-gray-500"
+            }
+          >
+            {isFavorite(producto.id) ? "♥" : "♡"}
+          </span>
+        </button>
+      </div>
+
+      {/* 🔹 TEXTO: marca + nombre + precio */}
+      <div className="p-4 text-[13px]">
+        <p className="text-gray-500 text-[11px] uppercase tracking-wide">
+          {producto.marca || "Innersport"}
+        </p>
+        <p className="mt-1 line-clamp-2 text-gray-900 text-sm">
+          {producto.nombre}
+        </p>
+        <p className="mt-2 font-semibold text-[15px] text-[#6b21a8]">
+          {formatoPrecio(producto.precio_minimo)}
+        </p>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToCart(producto);
+          }}
+          disabled={!producto.tiene_stock}
+          className="mt-3 w-full text-center text-[11px] font-semibold rounded-lg py-1.5 border border-[#a855f7] text-[#6b21a8] hover:bg-[#f5e9ff] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {producto.tiene_stock ? "Agregar al carrito" : "Producto agotado"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 
 export default function HomePage() {
   const router = useRouter();
@@ -65,7 +239,7 @@ export default function HomePage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [toast, setToast] = useState<ToastState>(null);
 
-  // Estados catálogo
+  // Estados catálogo principal
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [filtrosDisponibles, setFiltrosDisponibles] = useState<Filtros | null>(
@@ -88,6 +262,17 @@ export default function HomePage() {
     ordenar_por: "destacados",
     buscar: searchParams.get("buscar") || "",
   });
+
+  // ======================
+  // ESTADO PARA "LO NUEVO"
+  // ======================
+  const [nuevosProductos, setNuevosProductos] = useState<Producto[]>([]);
+  const [loadingNuevos, setLoadingNuevos] = useState(true);
+  const nuevosRef = useRef<HTMLDivElement | null>(null);
+
+  // Hero
+  const [heroConfig, setHeroConfig] = useState<HomeHeroConfig | null>(null);
+  const [loadingHero, setLoadingHero] = useState(true);
 
   useEffect(() => {
     const categoriaUrl = searchParams.get("categoria");
@@ -116,7 +301,7 @@ export default function HomePage() {
     cargarFiltros();
   }, []);
 
-  // Cargar productos desde API
+  // Cargar productos desde API (catálogo principal)
   useEffect(() => {
     async function cargarProductos() {
       setLoading(true);
@@ -157,6 +342,32 @@ export default function HomePage() {
     cargarProductos();
   }, [pagina, filtrosActivos]);
 
+  // Cargar productos "Lo nuevo"
+  useEffect(() => {
+    async function cargarNuevos() {
+      try {
+        setLoadingNuevos(true);
+        const params = new URLSearchParams();
+        params.set("pagina", "1");
+        params.set("por_pagina", "8");
+        params.set("solo_disponibles", "true");
+        params.set("ordenar_por", "destacados");
+
+        const res = await fetch(
+          `${API_BASE_URL}/api/v1/catalogo?${params.toString()}`
+        );
+        const data: CatalogoResponse = await res.json();
+        setNuevosProductos(data.productos);
+      } catch (error) {
+        console.error("Error cargando productos nuevos:", error);
+      } finally {
+        setLoadingNuevos(false);
+      }
+    }
+
+    cargarNuevos();
+  }, []);
+
   // Check auth
   useEffect(() => {
     async function checkAuth() {
@@ -180,6 +391,29 @@ export default function HomePage() {
     const id = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Cargar configuración de portada (pública)
+  useEffect(() => {
+    async function loadHero() {
+      try {
+        setLoadingHero(true);
+        const res = await fetch(`${API_BASE_URL}/api/v1/home-hero/public`);
+        if (!res.ok) {
+          setHeroConfig(null);
+          return;
+        }
+        const data = (await res.json()) as HomeHeroConfig;
+        setHeroConfig(data);
+      } catch (error) {
+        console.error("Error cargando portada:", error);
+        setHeroConfig(null);
+      } finally {
+        setLoadingHero(false);
+      }
+    }
+
+    loadHero();
+  }, []);
 
   // ======================
   // Handlers
@@ -223,10 +457,6 @@ export default function HomePage() {
     setPagina(1);
   }
 
-  function formatoPrecio(precio: number) {
-    return `₡${precio.toLocaleString("es-CR")}`;
-  }
-
   function handleAddToCart(producto: Producto) {
     if (checkingAuth) {
       setToast({
@@ -245,7 +475,6 @@ export default function HomePage() {
       return;
     }
 
-    // Por ahora usamos el id del producto como id de la "variante"
     const variante = {
       id: producto.id,
       precio_actual: producto.precio_minimo,
@@ -266,7 +495,6 @@ export default function HomePage() {
     });
   }
 
-  // 🔹 Favoritos para productos reales
   function handleToggleFavorite(producto: Producto) {
     if (checkingAuth) {
       setToast({
@@ -291,10 +519,11 @@ export default function HomePage() {
       id: producto.id,
       productoId: producto.id,
       name: producto.nombre,
-      brand: "Innersport",
+      brand: producto.marca || "Innersport",
       price: producto.precio_minimo,
       imagenUrl: buildMediaUrl(producto.imagen_principal),
     };
+
 
     toggleFavorite(favItem);
 
@@ -310,341 +539,183 @@ export default function HomePage() {
     ([key, value]) => value && key !== "ordenar_por"
   );
 
+  // Carrusel "Lo nuevo"
+  function scrollNuevos(direction: "left" | "right") {
+    const el = nuevosRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.8;
+    el.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  }
+
   return (
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
+      {/* ===================== */}
+      {/* HERO VIDEO SUPERIOR   */}
+      {/* ===================== */}
+
+      {/* ===================== */}
+      {/* HERO VIDEO SUPERIOR   */}
+      {/* ===================== */}
+
+      <section className="w-full overflow-hidden pt-[120px]">
+        <div className="w-full h-[40vh] sm:h-[50vh] md:h-[83vh] bg-black flex items-center justify-center overflow-hidden">
+          {heroConfig && heroConfig.video_url ? (
+            <video
+              className="
+          w-full h-full
+          object-contain      /* móvil: que NO se recorte */
+          md:object-cover     /* en pantallas medianas+ sí se recorta tipo hero */
+        "
+              src={buildMediaUrl(heroConfig.video_url)}
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-xs text-gray-300 opacity-70">
+                Configura el video de portada en el panel de administración.
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
+
+
+      {/* ===================== */}
+      {/* DOS IMÁGENES VERTICALES */}
+      {/* ===================== */}
+
+      <section className="w-full py-6">
+        <div className="grid md:grid-cols-2 gap-2">
+          <div className="w-full h-[55vh] min-h-[700px] bg-gray-200 flex items-center justify-center overflow-hidden">
+            {heroConfig && heroConfig.banner1_url ? (
+              <img
+                src={buildMediaUrl(heroConfig.banner1_url)}
+                alt="Banner colección 1"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-[11px] text-gray-500 p-4 text-center">
+                Configura el banner 1 en el panel de administración.
+              </span>
+            )}
+          </div>
+
+          <div className="w-full h-[55vh] min-h-[700px] bg-gray-200 flex items-center justify-center overflow-hidden">
+            {heroConfig && heroConfig.banner2_url ? (
+              <img
+                src={buildMediaUrl(heroConfig.banner2_url)}
+                alt="Banner colección 2"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-[11px] text-gray-500 p-4 text-center">
+                Configura el banner 2 en el panel de administración.
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* CONTENIDO PRINCIPAL */}
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {/* Migas */}
-        <div className="text-xs text-gray-500 mb-4">
-          Inicio <span className="mx-1">›</span>{" "}
-          <span className="text-gray-800 font-medium">
-            {filtrosActivos.buscar
-              ? `Resultados para "${filtrosActivos.buscar}"`
-              : filtrosActivos.categoria
-                ? filtrosActivos.categoria
-                : "Colección Innersport"}
-          </span>
-        </div>
 
-        {/* Hero */}
-        <section className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#f97316] via-[#facc15] to-[#fef3c7] min-h-[260px] flex items-end p-6">
+        {/* ===================== */}
+        {/* SECCIÓN "LO NUEVO"    */}
+        {/* ===================== */}
+        <section className="mb-10">
+          <div className="flex items-baseline justify-between gap-4 mb-3">
             <div>
-              <p className="uppercase text-xs font-semibold tracking-[0.2em] text-white/90">
-                NUEVA TEMPORADA
-              </p>
-              <h1 className="mt-2 text-3xl md:text-4xl font-extrabold text-white drop-shadow">
-                Colección Innersport
-              </h1>
-              <p className="mt-3 text-sm text-white/90 max-w-md">
-                Ropa deportiva pensada para entrenamiento, running y estilo
-                urbano.
-              </p>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-tl from-[#111827] via-[#1f2937] to-[#6b21a8] min-h-[260px] flex items-end justify-end p-6">
-            <div className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.8),_transparent_60%)]" />
-            <div className="relative max-w-xs text-right ml-auto">
-              <p className="uppercase text-xs font-semibold tracking-[0.25em] text-[#e5e7eb]/80">
-                RUNNING & TRAINING
-              </p>
-              <h2 className="mt-2 text-2xl font-bold text-white">
-                Movimiento que se siente bien
+              <h2 className="text-2xl md:text-3xl font-extrabold tracking-wide text-gray-900 uppercase">
+                Lo nuevo
               </h2>
+              <p className="text-xs text-gray-500">
+                Las últimas prendas y accesorios que acaban de llegar a
+                Innersport.
+              </p>
             </div>
-          </div>
-        </section>
 
-        {/* Filtros + listado */}
-        <section className="grid md:grid-cols-[260px,1fr] gap-6">
-          {/* FILTROS LATERALES */}
-          <aside className="bg-white/90 rounded-2xl border p-4 text-sm h-fit">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-gray-800">Filtrar</span>
+            <div className="hidden sm:flex items-center gap-2">
               <button
-                onClick={limpiarFiltros}
-                className="text-xs text-[#6b21a8] hover:text-[#a855f7]"
-                disabled={!hayFiltrosActivos}
+                type="button"
+                onClick={() => scrollNuevos("left")}
+                className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-sm hover:border-[#a855f7]"
               >
-                Limpiar
+                ←
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollNuevos("right")}
+                className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-sm hover:border-[#a855f7]"
+              >
+                →
               </button>
             </div>
+          </div>
 
-            {/* Barra de búsqueda */}
-            <div className="mb-6">
-              <SearchBar onSearch={handleSearch} />
-            </div>
-
-            {filtrosDisponibles && (
-              <div className="space-y-4">
-                {/* Categorías */}
-                {filtrosDisponibles.categorias.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Categoría
-                    </h3>
-                    <select
-                      value={filtrosActivos.categoria}
-                      onChange={(e) =>
-                        aplicarFiltro("categoria", e.target.value)
-                      }
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
-                    >
-                      <option value="">Todas</option>
-                      {filtrosDisponibles.categorias.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Marca */}
-                {filtrosDisponibles.marcas.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Marca
-                    </h3>
-                    <select
-                      value={filtrosActivos.marca}
-                      onChange={(e) =>
-                        aplicarFiltro("marca", e.target.value)
-                      }
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
-                    >
-                      <option value="">Todas</option>
-                      {filtrosDisponibles.marcas.map((marca) => (
-                        <option key={marca} value={marca}>
-                          {marca}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Colores */}
-                {filtrosDisponibles.colores.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Color
-                    </h3>
-                    <select
-                      value={filtrosActivos.color}
-                      onChange={(e) =>
-                        aplicarFiltro("color", e.target.value)
-                      }
-                      className="w-full text-xs px-2 py-1.5 border rounded-lg"
-                    >
-                      <option value="">Todos</option>
-                      {filtrosDisponibles.colores.map((color) => (
-                        <option key={color} value={color}>
-                          {color}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Tallas */}
-                {filtrosDisponibles.tallas.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Talla
-                    </h3>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {filtrosDisponibles.tallas.map((talla) => (
-                        <button
-                          key={talla}
-                          onClick={() => toggleFiltro("talla", talla)}
-                          className={`px-2 py-1 rounded-full border ${filtrosActivos.talla === talla
-                            ? "border-[#a855f7] bg-[#a855f7] text-white"
-                            : "border-gray-200 hover:border-[#a855f7]"
-                            }`}
-                        >
-                          {talla}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </aside>
-
-          {/* GRID DE PRODUCTOS */}
-          <div>
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
-              <span>
-                {loading
-                  ? "Cargando..."
-                  : `${total} producto${total === 1 ? "" : "s"} disponibles`}
-              </span>
-
-              <select
-                value={filtrosActivos.ordenar_por}
-                onChange={(e) =>
-                  aplicarFiltro("ordenar_por", e.target.value)
+          <div className="relative">
+            <div
+              ref={nuevosRef}
+              className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none]"
+            >
+              <style jsx>{`
+                div::-webkit-scrollbar {
+                  display: none;
                 }
-                className="text-xs px-2 py-1 border rounded-lg"
-              >
-                <option value="destacados">Destacados</option>
-                <option value="precio_asc">Precio: Menor a mayor</option>
-                <option value="precio_desc">Precio: Mayor a menor</option>
-                <option value="nombre_asc">Nombre: A-Z</option>
-              </select>
-            </div>
+              `}</style>
 
-            {/* Loading skeleton */}
-            {loading ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
-                {[...Array(6)].map((_, i) => (
+              {loadingNuevos ? (
+                [...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="bg-white rounded-2xl border animate-pulse"
+                    className="min-w-[220px] max-w-[260px] bg-white rounded-2xl border animate-pulse"
                   >
-                    <div className="h-44 bg-gray-200"></div>
+                    <div className="h-40 bg-gray-200" />
                     <div className="p-3 space-y-2">
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : productos.length === 0 ? (
-              <div className="text-center text-xs text-gray-500 py-10">
-                No hay productos con estos filtros.
-              </div>
-            ) : (
-              <>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
-                  {productos.map((producto) => (
-                    <article
-                      key={producto.id}
-                      onClick={() => router.push(`/productos/${producto.id}`)}
-                      className="bg-white rounded-2xl border overflow-hidden hover:shadow-md transition cursor-pointer group"
-                    >
-                      <div className="relative h-44 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden">
-                        {producto.imagen_principal ? (
-                          <img
-                            src={buildMediaUrl(producto.imagen_principal)!}
-                            alt={producto.nombre}
-                            className="w-full h-full object-cover group-hover:scale-105 transition"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-white">
-                            📦
-                          </div>
-                        )}
-
-                        <div className="absolute bottom-2 left-2 flex gap-1 text-[10px]">
-                          {!producto.tiene_stock && (
-                            <span className="px-1.5 py-0.5 bg-red-500 text-white font-semibold rounded">
-                              AGOTADO
-                            </span>
-                          )}
-                          {producto.tiene_stock && (
-                            <span className="px-1.5 py-0.5 bg-emerald-500 text-white font-semibold rounded flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                              DISPONIBLE
-                            </span>
-                          )}
-                        </div>
-
-                        {/* 🔹 Botón de favoritos (corazón) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleFavorite(producto);
-                          }}
-                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-sm shadow hover:bg-white"
-                        >
-                          <span
-                            className={
-                              isFavorite(producto.id) ? "text-red-500" : "text-gray-500"
-                            }
-                          >
-                            {isFavorite(producto.id) ? "♥" : "♡"}
-                          </span>
-                        </button>
-                      </div>
-
-                      <div className="p-3 text-xs">
-                        <p className="text-gray-500">Innersport</p>
-                        <p className="mt-1 line-clamp-2 text-gray-900">
-                          {producto.nombre}
-                        </p>
-                        <p className="mt-2 font-semibold text-[#6b21a8]">
-                          {formatoPrecio(producto.precio_minimo)}
-                        </p>
-
-                        {/* 🔹 Botón Ver detalles */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/productos/${producto.id}`);
-                          }}
-                          className="mt-2 w-full text-center text-white bg-[#a855f7] hover:bg-[#7e22ce] py-1.5 text-[11px] rounded-lg"
-                        >
-                          Ver detalles
-                        </button>
-
-                        {/* 🔹 Botón Agregar al carrito */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCart(producto);
-                          }}
-                          disabled={!producto.tiene_stock}
-                          className="mt-2 w-full text-center text-[11px] font-semibold rounded-lg py-1.5 border border-[#a855f7] text-[#6b21a8] hover:bg-[#f5e9ff] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {producto.tiene_stock ? "Agregar al carrito" : "Producto agotado"}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-
+                ))
+              ) : nuevosProductos.length === 0 ? (
+                <div className="text-xs text-gray-500 py-6">
+                  No hay productos nuevos por el momento.
                 </div>
+              ) : (
+                nuevosProductos.map((producto) => (
+                  <ProductoNuevoCard
+                    key={producto.id}
+                    producto={producto}
+                    isFavorite={isFavorite}
+                    onToggleFavorite={handleToggleFavorite}
+                    onAddToCart={handleAddToCart}
+                    onOpen={() => router.push(`/productos/${producto.id}`)}
+                  />
+                ))
+              )
+              }
 
-                {/* Paginación */}
-                {totalPaginas > 1 && (
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      disabled={pagina === 1}
-                      onClick={() => setPagina(pagina - 1)}
-                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50"
-                    >
-                      ← Anterior
-                    </button>
+            </div>
+          </div>
 
-                    {Array.from({ length: totalPaginas }, (_, i) => (
-                      <button
-                        key={i + 1}
-                        onClick={() => setPagina(i + 1)}
-                        className={`w-8 h-8 text-xs rounded-lg ${pagina === i + 1
-                          ? "bg-[#a855f7] text-white"
-                          : "border"
-                          }`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-
-                    <button
-                      disabled={pagina === totalPaginas}
-                      onClick={() => setPagina(pagina + 1)}
-                      className="px-3 py-1.5 text-xs border rounded-lg disabled:opacity-50"
-                    >
-                      Siguiente →
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+          <div className="mt-4 flex justify-between items-center">
+            <span className="text-[11px] text-gray-500">
+              Desliza para ver más productos.
+            </span>
+            <button
+              type="button"
+              onClick={() => router.push("/nuevo")}
+              className="text-xs font-semibold text-[#6b21a8] hover:text-[#a855f7] underline underline-offset-2"
+            >
+              Ver todo lo nuevo
+            </button>
           </div>
         </section>
       </main>
@@ -663,9 +734,7 @@ export default function HomePage() {
             </span>
             <div className="flex flex-col">
               <span className="font-semibold">
-                {toast.type === "success"
-                  ? "Acción realizada"
-                  : "Error"}
+                {toast.type === "success" ? "Acción realizada" : "Error"}
               </span>
               <span>{toast.message}</span>
             </div>

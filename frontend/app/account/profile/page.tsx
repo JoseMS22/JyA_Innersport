@@ -132,7 +132,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 pt-[140px]">
         <h1 className="text-xl font-semibold text-[#6b21a8] mb-1">Mi perfil</h1>
         <p className="text-xs text-gray-500 mb-6">
           Aquí puedes ver y actualizar tu información básica y dirección de entrega.

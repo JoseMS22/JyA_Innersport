@@ -22,7 +22,7 @@ import os
 
 from app.api.v1.catalogo import router as catalogo_router
 from app.api.v1.public_inventario import router as inventario_publico_router
-
+from app.api.v1.home_hero import router as home_hero_router
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -144,7 +144,7 @@ app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Invent
 app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
 # Endpoint público para inventario
 app.include_router(inventario_publico_router, prefix="/api/v1", tags=["Inventario Público"])
-
+app.include_router(home_hero_router, prefix="/api/v1", tags=["Home Hero"])
 
 
 @app.get("/")

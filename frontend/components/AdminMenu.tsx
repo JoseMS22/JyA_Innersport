@@ -23,6 +23,7 @@ const links = [
   { href: "/admin/sucursales", label: "Sucursales" },
   { href: "/admin/categorias", label: "Categorias" },
   { href: "/admin/historial-precios", label: "Historial de precios" },
+  { href: "/admin/home-hero", label: "Portada" },
 ];
 
 export function AdminMenu({ user, onLogout }: Props) {

@@ -12,5 +12,8 @@ from .historial_precio import HistorialPrecio
 from .sucursal import Sucursal
 from .inventario import Inventario
 from .movimiento_inventario import MovimientoInventario
+from .categoria_relacion import categoria_categoria  # si quieres exponerla
+from .home_hero import HomeHeroConfig  # noqa
+
 
 __all__ = ["Usuario", "Direccion", "AuditoriaUsuario"]

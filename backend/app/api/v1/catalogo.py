@@ -37,9 +37,13 @@ class ProductoCatalogo(BaseModel):
     imagen_principal: Optional[str] = None
     categorias: List[str] = []
     tiene_stock: bool
-    
+
+    marca: Optional[str] = None          # 👈 NUEVO
+    imagenes: list[str] = []             # 👈 aquí irán TODAS las fotos
+
     class Config:
         from_attributes = True
+
 
 
 class CatalogoResponse(BaseModel):
@@ -215,21 +219,25 @@ def obtener_catalogo(
     resultados = query.offset(offset).limit(por_pagina).all()
     
     # 1️⃣3️⃣ Construir respuesta con datos enriquecidos
-    productos_catalogo = []
-    
+    productos_catalogo: list[ProductoCatalogo] = []
+
     for producto, precio_minimo in resultados:
-        # Imagen principal
-        imagen_principal = (
+        # 🔹 Todas las imágenes del producto, ordenadas
+        medias = (
             db.query(Media.url)
             .filter(Media.producto_id == producto.id)
-            .order_by(Media.orden.asc())
-            .first()
+            .order_by(Media.orden.asc(), Media.id.asc())
+            .all()
         )
-        
-        # Categorías
+        imagenes_urls = [m[0] for m in medias]  # m es una tupla (url,)
+
+        # Imagen principal = la primera, si existe
+        imagen_principal_url = imagenes_urls[0] if imagenes_urls else None
+
+        # 🔹 Categorías
         categorias_nombres = [cat.nombre for cat in producto.categorias]
-        
-        # Verificar stock
+
+        # 🔹 Verificar stock
         tiene_stock = (
             db.query(Inventario.cantidad)
             .join(Variante, Variante.id == Inventario.variante_id)
@@ -240,15 +248,45 @@ def obtener_catalogo(
             )
             .first() is not None
         )
-        
-        productos_catalogo.append(ProductoCatalogo(
-            id=producto.id,
-            nombre=producto.nombre,
-            precio_minimo=precio_minimo or Decimal(0),
-            imagen_principal=imagen_principal[0] if imagen_principal else None,
-            categorias=categorias_nombres,
-            tiene_stock=tiene_stock,
-        ))
+
+        # 🔹 Marca (opcional)
+        marca_row = (
+            db.query(Variante.marca)
+            .filter(
+                Variante.producto_id == producto.id,
+                Variante.activo.is_(True),
+                Variante.marca.isnot(None),
+            )
+            .order_by(Variante.precio_actual.asc())
+            .first()
+        )
+        marca = marca_row[0] if marca_row else None
+
+        productos_catalogo.append(
+            ProductoCatalogo(
+                id=producto.id,
+                nombre=producto.nombre,
+                precio_minimo=precio_minimo or Decimal(0),
+                imagen_principal=imagen_principal_url,
+                categorias=categorias_nombres,
+                tiene_stock=tiene_stock,
+                marca=marca,
+                imagenes=imagenes_urls,
+            )
+        )
+
+    # 1️⃣4️⃣ Calcular total de páginas
+    total_paginas = (total + por_pagina - 1) // por_pagina
+
+    return CatalogoResponse(
+        productos=productos_catalogo,
+        total=total,
+        pagina=pagina,
+        total_paginas=total_paginas,
+        por_pagina=por_pagina,
+    )
+
+
     
     # 1️⃣4️⃣ Calcular total de páginas
     total_paginas = (total + por_pagina - 1) // por_pagina
