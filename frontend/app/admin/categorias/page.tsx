@@ -1,24 +1,39 @@
 // frontend/app/admin/categorias/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, Dispatch, SetStateAction } from "react";
 import { apiFetch } from "@/lib/api";
+
+type CategoriaLite = {
+  id: number;
+  nombre: string;
+};
 
 type Categoria = {
   id: number;
   nombre: string;
   descripcion?: string | null;
   activo: boolean;
+  principal: boolean;
+  secundaria: boolean;
+  principales: CategoriaLite[];
+  secundarias: CategoriaLite[];
 };
 
 type CategoriaFormState = {
   nombre: string;
   descripcion: string;
+  principal: boolean;
+  secundaria: boolean;
+  principales_ids: number[];
 };
 
 const EMPTY_FORM: CategoriaFormState = {
   nombre: "",
   descripcion: "",
+  principal: false,
+  secundaria: false,
+  principales_ids: [],
 };
 
 type ConfirmMode = "activar" | "desactivar" | null;
@@ -80,6 +95,9 @@ export default function AdminCategoriasPage() {
     setForm({
       nombre: categoria.nombre ?? "",
       descripcion: categoria.descripcion ?? "",
+      principal: categoria.principal,
+      secundaria: categoria.secundaria,
+      principales_ids: (categoria.principales || []).map((p) => p.id),
     });
     setEditingId(categoria.id);
     setIsEditOpen(true);
@@ -102,9 +120,21 @@ export default function AdminCategoriasPage() {
     setError(null);
 
     try {
+      // Validación: si es secundaria, debe tener al menos una principal
+      if (form.secundaria && form.principales_ids.length === 0) {
+        setError(
+          "Una categoría secundaria debe tener al menos una categoría principal asociada."
+        );
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         nombre: form.nombre.trim(),
         descripcion: form.descripcion.trim() || null,
+        principal: form.principal,
+        secundaria: form.secundaria,
+        principales_ids: form.secundaria ? form.principales_ids : [],
       };
 
       await apiFetch("/api/v1/categorias", {
@@ -130,9 +160,21 @@ export default function AdminCategoriasPage() {
     setError(null);
 
     try {
+      // Validación: si es secundaria, debe tener al menos una principal
+      if (form.secundaria && form.principales_ids.length === 0) {
+        setError(
+          "Una categoría secundaria debe tener al menos una categoría principal asociada."
+        );
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         nombre: form.nombre.trim(),
         descripcion: form.descripcion.trim() || null,
+        principal: form.principal,
+        secundaria: form.secundaria,
+        principales_ids: form.secundaria ? form.principales_ids : [],
       };
 
       await apiFetch(`/api/v1/categorias/${editingId}`, {
@@ -202,6 +244,27 @@ export default function AdminCategoriasPage() {
   }
 
   // =========================
+  // Helpers visuales
+  // =========================
+
+  function getTipoLabel(cat: Categoria) {
+    if (cat.principal && !cat.secundaria) return "Principal";
+    if (cat.secundaria && !cat.principal) return "Secundaria";
+    if (!cat.principal && !cat.secundaria) return "General";
+    return "Indefinido";
+  }
+
+  function getRelacionLabel(cat: Categoria) {
+    if (cat.secundaria && cat.principales.length > 0) {
+      return `Depende de: ${cat.principales.map((p) => p.nombre).join(", ")}`;
+    }
+    if (cat.principal && cat.secundarias.length > 0) {
+      return `Tiene ${cat.secundarias.length} subcategoría(s)`;
+    }
+    return "—";
+  }
+
+  // =========================
   // Render
   // =========================
 
@@ -212,7 +275,8 @@ export default function AdminCategoriasPage() {
         <div>
           <h1 className="text-xl font-bold text-[#6b21a8]">Categorías</h1>
           <p className="text-xs text-gray-500">
-            Gestiona las categorías que organizan tus productos.
+            Gestiona las categorías que organizan tus productos, marcando
+            cuáles son principales y cuáles son subcategorías.
           </p>
         </div>
         <button
@@ -227,14 +291,25 @@ export default function AdminCategoriasPage() {
       <section className="rounded-2xl bg-white/95 border border-[#e5e7eb] p-4 shadow-sm">
         {/* Barra superior: filtro / leyenda */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />{" "}
-            <span>Activa</span>
-            <span className="mx-2 text-gray-300">•</span>
-            <span className="w-2 h-2 rounded-full bg-gray-300" />{" "}
-            <span>Inactiva</span>
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Activa</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-gray-300" />
+              <span>Inactiva</span>
+            </div>
+            <span className="mx-2 text-gray-300 hidden sm:inline">•</span>
+            <div className="flex items-center gap-1">
+              <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                Principal
+              </span>
+              <span className="inline-block px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+                Secundaria
+              </span>
+            </div>
           </div>
-
         </div>
 
         {/* Errores */}
@@ -270,6 +345,12 @@ export default function AdminCategoriasPage() {
                   </th>
                   <th className="px-3 py-2 text-left font-semibold">
                     Nombre
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Tipo
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Relación
                   </th>
                   <th className="px-3 py-2 text-left font-semibold">
                     Descripción
@@ -310,6 +391,30 @@ export default function AdminCategoriasPage() {
                       <span className="font-semibold text-gray-800">
                         {cat.nombre}
                       </span>
+                    </td>
+
+                    {/* Tipo */}
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center gap-1 text-[11px]">
+                        {cat.principal && (
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                            Principal
+                          </span>
+                        )}
+                        {cat.secundaria && (
+                          <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+                            Secundaria
+                          </span>
+                        )}
+                        {!cat.principal && !cat.secundaria && (
+                          <span className="text-gray-400">General</span>
+                        )}
+                      </span>
+                    </td>
+
+                    {/* Relación */}
+                    <td className="px-3 py-2 text-gray-600 text-[11px]">
+                      {getRelacionLabel(cat)}
                     </td>
 
                     {/* Descripción */}
@@ -366,6 +471,8 @@ export default function AdminCategoriasPage() {
             onSubmit={handleCreate}
             saving={saving}
             actionLabel="Crear categoría"
+            categorias={categorias}
+            currentId={null}
           />
         </ModalWrapper>
       )}
@@ -379,6 +486,8 @@ export default function AdminCategoriasPage() {
             onSubmit={handleUpdate}
             saving={saving}
             actionLabel="Guardar cambios"
+            categorias={categorias}
+            currentId={editingId}
           />
         </ModalWrapper>
       )}
@@ -428,11 +537,14 @@ function ModalWrapper({ title, children, onClose }: ModalWrapperProps) {
 
 type CategoriaFormProps = {
   form: CategoriaFormState;
-  setForm: (f: CategoriaFormState) => void;
+  setForm: Dispatch<SetStateAction<CategoriaFormState>>;
   onSubmit: (e: FormEvent) => void;
   saving: boolean;
   actionLabel: string;
+  categorias: Categoria[];
+  currentId: number | null;
 };
+
 
 function CategoriaForm({
   form,
@@ -440,7 +552,62 @@ function CategoriaForm({
   onSubmit,
   saving,
   actionLabel,
+  categorias,
+  currentId,
 }: CategoriaFormProps) {
+  const posiblesPrincipales = categorias.filter(
+    (c) =>
+      c.activo &&
+      c.principal &&
+      (currentId === null || c.id !== currentId)
+  );
+
+  function togglePrincipal(checked: boolean) {
+    if (checked) {
+      // Si marcamos como principal, desmarcamos secundaria
+      setForm({
+        ...form,
+        principal: true,
+        secundaria: false,
+        principales_ids: [],
+      });
+    } else {
+      setForm({
+        ...form,
+        principal: false,
+      });
+    }
+  }
+
+  function toggleSecundaria(checked: boolean) {
+    if (checked) {
+      // Si marcamos como secundaria, desmarcamos principal
+      setForm({
+        ...form,
+        secundaria: true,
+        principal: false,
+      });
+    } else {
+      setForm({
+        ...form,
+        secundaria: false,
+        principales_ids: [],
+      });
+    }
+  }
+
+  function togglePrincipalAsociada(id: number) {
+    setForm((prev) => {
+      const exists = prev.principales_ids.includes(id);
+      return {
+        ...prev,
+        principales_ids: exists
+          ? prev.principales_ids.filter((p) => p !== id)
+          : [...prev.principales_ids, id],
+      };
+    });
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-3 text-xs">
       <div>
@@ -472,6 +639,93 @@ function CategoriaForm({
           placeholder="Ej. Categoría para todas las prendas deportivas..."
         />
       </div>
+
+      {/* Tipo de categoría */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2">
+        <p className="font-medium text-gray-700 text-[11px]">
+          Tipo de categoría
+        </p>
+        <p className="text-[11px] text-gray-500">
+          Puedes marcarla como <span className="font-semibold">principal</span>{" "}
+          (nivel superior) o como{" "}
+          <span className="font-semibold">secundaria</span> (subcategoría de
+          una o varias principales). También puede ser general (ninguna de las
+          dos).
+        </p>
+
+        <div className="flex flex-wrap gap-3 mt-1">
+          <label className="inline-flex items-center gap-2 text-[11px]">
+            <input
+              type="checkbox"
+              checked={form.principal}
+              onChange={(e) => togglePrincipal(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              Principal
+            </span>
+          </label>
+
+          <label className="inline-flex items-center gap-2 text-[11px]">
+            <input
+              type="checkbox"
+              checked={form.secundaria}
+              onChange={(e) => toggleSecundaria(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+              Secundaria
+            </span>
+          </label>
+        </div>
+
+        {form.principal && form.secundaria && (
+          <p className="text-[11px] text-red-600 mt-1">
+            Una categoría no puede ser principal y secundaria al mismo tiempo.
+          </p>
+        )}
+      </div>
+
+      {/* Selección de principales si es secundaria */}
+      {form.secundaria && (
+        <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/60 p-3 space-y-2">
+          <p className="font-medium text-violet-800 text-[11px]">
+            Asociar con categorías principales
+          </p>
+          {posiblesPrincipales.length === 0 ? (
+            <p className="text-[11px] text-violet-700">
+              No hay categorías principales activas disponibles. Primero crea
+              una categoría marcada como principal.
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] text-violet-700">
+                Selecciona una o varias categorías principales de las que
+                depende esta subcategoría.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {posiblesPrincipales.map((c) => {
+                  const active = form.principales_ids.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => togglePrincipalAsociada(c.id)}
+                      className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${
+                        active
+                          ? "bg-violet-600 border-violet-600 text-white shadow-sm"
+                          : "bg-white border-violet-200 text-violet-800 hover:bg-violet-100"
+                      }`}
+                    >
+                      {c.nombre}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="pt-2 flex justify-end gap-2">
         <button

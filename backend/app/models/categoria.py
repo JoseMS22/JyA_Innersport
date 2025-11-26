@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from app.db import Base
 from sqlalchemy.orm import relationship
+from app.models.categoria_relacion import categoria_categoria
 
 class Categoria(Base):
     __tablename__ = "categoria"
@@ -12,6 +13,10 @@ class Categoria(Base):
     descripcion = Column(String(500), nullable=True)
     activo = Column(Boolean, default=True)
 
+    principal = Column(Boolean, default=False)
+    secundaria = Column(Boolean, default=False)
+
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -20,4 +25,13 @@ class Categoria(Base):
         "Producto",
         secondary="producto_categoria",
         back_populates="categorias",
+    )
+
+    # Relación: una categoría principal tiene muchas secundarias
+    secundarias = relationship(
+        "Categoria",
+        secondary=categoria_categoria,
+        primaryjoin=id == categoria_categoria.c.categoria_principal_id,
+        secondaryjoin=id == categoria_categoria.c.categoria_secundaria_id,
+        backref="principales"
     )
