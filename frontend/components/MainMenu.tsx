@@ -78,7 +78,7 @@ export function MainMenu() {
   useEffect(() => {
     async function fetchMe() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/categorias/menu`, {
           credentials: "include",
         });
 
