@@ -3,26 +3,37 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 import time
+import os
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
+
+# Routers de autenticación y auditoría
 from app.api.v1.auth import router as auth_router
 from app.api.v1.audit import router as audit_router
+
 # Routers de catálogo y productos
 from app.api.v1.categorias import router as categorias_router
 from app.api.v1.productos import router as productos_router
 from app.api.v1.variantes import router as variantes_router
+
 # Routers de sucursales e inventario
 from app.api.v1.sucursales import router as sucursales_router
 from app.api.v1.inventario import router as inventario_router
-from fastapi.staticfiles import StaticFiles
-import os
 
+# Routers de catálogo público
 from app.api.v1.catalogo import router as catalogo_router
 from app.api.v1.public_inventario import router as inventario_publico_router
+
+# Router de configuración
 from app.api.v1.home_hero import router as home_hero_router
+
+# 🆕 US-19: Routers de direcciones y envío
+from app.api.v1.direcciones import router as direcciones_router
+from app.api.v1.envio import router as envio_router
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -122,30 +133,46 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
+# =========================
+# ARCHIVOS ESTÁTICOS (MEDIA)
+# =========================
 
+MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 # =========================
-# RUTAS
+# RUTAS DE LA API
 # =========================
 
+# Autenticación y auditoría
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Autenticación"])
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["Auditoría"])
+
 # Catálogo y productos
 app.include_router(categorias_router, prefix="/api/v1/categorias", tags=["Categorías"])
 app.include_router(productos_router, prefix="/api/v1/productos", tags=["Productos"])
 app.include_router(variantes_router, prefix="/api/v1/variantes", tags=["Variantes"])
+
 # Sucursales e inventario
 app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucursales"])
 app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
-# 🆕 Catálogo con filtros avanzados
+
+# Catálogo público
 app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
-# Endpoint público para inventario
 app.include_router(inventario_publico_router, prefix="/api/v1", tags=["Inventario Público"])
+
+# Configuración
 app.include_router(home_hero_router, prefix="/api/v1", tags=["Home Hero"])
 
+# 🆕 US-19: Direcciones y envío
+app.include_router(direcciones_router, prefix="/api/v1/direcciones", tags=["Direcciones"])
+app.include_router(envio_router, prefix="/api/v1/envio", tags=["Envío"])
+
+
+# =========================
+# ENDPOINTS RAÍZ
+# =========================
 
 @app.get("/")
 def read_root():

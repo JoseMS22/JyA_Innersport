@@ -1,4 +1,5 @@
 # backend/app/models/usuario.py
+# ACTUALIZACIÓN: cambiar relación 1:1 a 1:N
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
@@ -29,7 +30,7 @@ class Usuario(Base):
     reset_password_attempts = Column(Integer, nullable=False, default=0)
     ultimo_intento_reset = Column(DateTime(timezone=True), nullable=True)
 
-    # 🔹 Eliminación de cuenta (de ramaAdrian)
+    # Eliminación de cuenta
     pendiente_eliminacion = Column(Boolean, nullable=False, default=False)
     eliminacion_solicitada_at = Column(DateTime(timezone=True), nullable=True)
     eliminacion_programada_at = Column(DateTime(timezone=True), nullable=True)
@@ -47,10 +48,10 @@ class Usuario(Base):
         nullable=False,
     )
 
-    # Relación 1:1 con Dirección
-    direccion = relationship(
+    # ⚠️ CAMBIO: Relación 1:N con Direcciones (antes era 1:1)
+    direcciones = relationship(
         "Direccion",
         back_populates="usuario",
-        uselist=False,
         cascade="all, delete-orphan",
+        order_by="Direccion.predeterminada.desc(), Direccion.created_at.desc()"
     )
