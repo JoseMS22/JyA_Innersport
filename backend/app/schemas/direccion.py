@@ -1,7 +1,7 @@
 # backend/app/schemas/direccion.py
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DireccionBase(BaseModel):
@@ -15,10 +15,12 @@ class DireccionBase(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30)
     referencia: Optional[str] = Field(None, max_length=200, description="Referencias adicionales")
     
-    @validator('provincia', 'canton', 'distrito', 'detalle')
-    def no_empty_strings(cls, v, field):
+    # ✅ PYDANTIC V2: field_validator en lugar de @validator
+    @field_validator('provincia', 'canton', 'distrito', 'detalle')
+    @classmethod
+    def no_empty_strings(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError(f'{field.name} no puede estar vacío')
+            raise ValueError('Este campo no puede estar vacío')
         return v.strip()
 
 
@@ -47,4 +49,5 @@ class DireccionRead(DireccionBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+    # ✅ PYDANTIC V2: ConfigDict en lugar de class Config
     model_config = ConfigDict(from_attributes=True)
