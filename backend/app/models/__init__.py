@@ -14,6 +14,13 @@ from .inventario import Inventario
 from .movimiento_inventario import MovimientoInventario
 from .categoria_relacion import categoria_categoria  # si quieres exponerla
 from .home_hero import HomeHeroConfig  # noqa
+from .favoritos import Favorito
+from .carrito import Carrito, CarritoItem
+from .programa_puntos import (
+    ProgramaPuntosConfig,
+    SaldoPuntosUsuario,
+    MovimientoPuntosUsuario,
+)
 
 
 __all__ = ["Usuario", "Direccion", "AuditoriaUsuario"]

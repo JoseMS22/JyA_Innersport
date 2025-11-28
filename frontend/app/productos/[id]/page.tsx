@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
+import { useCart } from "../../context/cartContext";
+import { useFavorites } from "../../context/favoritesContext";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -62,15 +64,31 @@ type InventarioDisponibilidad = {
   total_stock: number;
 };
 
+type ToastState = {
+  type: "success" | "error";
+  message: string;
+} | null;
+
+type AuthAlertState = {
+  message: string;
+} | null;
+
 export default function ProductDetailPage() {
+  const { addItem } = useCart();
   const router = useRouter();
   const params = useParams();
   const productoId = params.id as string;
-
+  const { toggleFavorite, isFavorite } = useFavorites();
+  // Estados de la página
+  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
   const [loading, setLoading] = useState(true);
   const [producto, setProducto] = useState<ProductoDetalle | null>(null);
   const [inventarios, setInventarios] =
     useState<Record<number, InventarioDisponibilidad>>({});
+  // Estado de autenticación
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [toast, setToast] = useState<ToastState>(null);
 
   // Estados de selección
   const [selectedVariante, setSelectedVariante] =
@@ -84,6 +102,31 @@ export default function ProductDetailPage() {
   // Estados de UI
   const [showZoom, setShowZoom] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ✅ Verificar sesión
+  useEffect(() => {
+  async function checkAuth() {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+        credentials: "include",
+      });
+      setIsLoggedIn(res.ok);
+    } catch {
+      setIsLoggedIn(false);
+    } finally {
+      setCheckingAuth(false);
+    }
+  }
+
+  checkAuth();
+}, []);
+
+// Auto ocultar toast
+useEffect(() => {
+  if (!toast) return;
+  const id = setTimeout(() => setToast(null), 2500);
+  return () => clearTimeout(id);
+}, [toast]);
 
   // Cargar producto
   useEffect(() => {
@@ -245,29 +288,124 @@ export default function ProductDetailPage() {
     return `₡${precio.toLocaleString("es-CR")}`;
   }
 
+  function handleToggleFavorite() {
+  if (checkingAuth) {
+    setAuthAlert({
+      message:
+        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+    });
+    return;
+  }
+
+  if (!isLoggedIn) {
+    setAuthAlert({
+      message: "Debes iniciar sesión para guardar productos en favoritos.",
+    });
+    return;
+  }
+
+  if (!producto || !selectedVariante) {
+    setAuthAlert({
+      message: "Selecciona color y talla antes de guardar en favoritos.",
+    });
+    return;
+  }
+
+  const yaEraFavorito = isFavorite(selectedVariante.id);
+
+  const favItem = {
+    id: selectedVariante.id,
+    productoId: producto.id,
+    name: producto.nombre,
+    brand: selectedVariante.marca || undefined,
+    price: selectedVariante.precio_actual,
+    imagenUrl: null,
+    color: selectedVariante.color ?? (selectedColor || null),
+    talla: selectedVariante.talla ?? (selectedTalla || null),
+  };
+
+  toggleFavorite(favItem);
+
+  setAuthAlert({
+    message: yaEraFavorito
+      ? "El producto se quitó de favoritos."
+      : "Producto guardado en favoritos.",
+  });
+}
+
+  const isCurrentFavorite =
+    selectedVariante ? isFavorite(selectedVariante.id) : false;
+
   function handleAddToCart() {
-    if (!selectedVariante) {
-      alert("Por favor selecciona una variante");
-      return;
-    }
+     if (checkingAuth) {
+    setAuthAlert({
+      message:
+        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+    });
+    return;
+  }
+   if (!isLoggedIn) {
+    setAuthAlert({
+      message: "Debes iniciar sesión para agregar productos al carrito.",
+    });
+    return;
+  }
+   if (!selectedVariante || !producto) {
+    setAuthAlert({
+      message: "Por favor selecciona una variante válida.",
+    });
+    return;
+  }
 
     const stockDisponible =
       inventarios[selectedVariante.id]?.total_stock || 0;
 
     if (stockDisponible === 0) {
-      alert("Esta variante no tiene stock disponible");
-      return;
-    }
+    setAuthAlert({
+      message: "Esta variante no tiene stock disponible.",
+    });
+    return;
+  }
 
     if (cantidad > stockDisponible) {
-      alert(`Solo hay ${stockDisponible} unidades disponibles`);
-      return;
-    }
+    setAuthAlert({
+      message: `Solo hay ${stockDisponible} unidades disponibles.`,
+    });
+    return;
+  }
 
-    // TODO: Implementar lógica del carrito
-    alert(
-      `Agregado al carrito: ${cantidad} x ${producto?.nombre} (${selectedVariante.sku})`
+    // Construimos los objetos mínimos que espera el contexto
+    const varianteForCart = {
+      id: selectedVariante.id,
+      sku: selectedVariante.sku,
+      color: selectedVariante.color,
+      talla: selectedVariante.talla,
+      precio_actual: selectedVariante.precio_actual,
+    };
+
+    const productoForCart = producto
+      ? {
+          id: producto.id,
+          nombre: producto.nombre,
+          brand: selectedVariante.marca || undefined,
+        }
+      : null;
+
+    const imagenUrl = imagenActual
+      ? buildMediaUrl(imagenActual.url)
+      : null;
+
+    // El contexto se encarga de llamar al backend o usar localStorage
+    addItem(
+      varianteForCart as any,
+      productoForCart as any,
+      cantidad,
+      imagenUrl
     );
+
+    setAuthAlert({
+    message: "El producto se añadió al carrito.",
+  });
   }
 
   function incrementCantidad() {
@@ -638,6 +776,21 @@ export default function ProductDetailPage() {
                 )}
               </button>
 
+              {/* Botón favoritos */}
+              <button
+                type="button"
+                onClick={handleToggleFavorite}
+                disabled={!selectedVariante}
+                className="mt-2 w-full py-2 border rounded-lg text-xs font-medium flex items-center justify-center gap-2 text-[#6b21a8] hover:bg-[#f5e9ff] disabled:opacity-50"
+              >
+                <span>{selectedVariante && isFavorite(selectedVariante.id) ? "♥" : "♡"}</span>
+                <span>
+                  {selectedVariante && isFavorite(selectedVariante.id)
+                    ? "Quitar de favoritos"
+                    : "Guardar en favoritos"}
+                </span>
+              </button>
+
               {/* Información adicional */}
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <div className="flex items-center gap-1">
@@ -681,6 +834,52 @@ export default function ProductDetailPage() {
           onClose={() => setShowZoom(false)}
         />
       )}
+
+      {toast && (
+      <div className="fixed bottom-4 right-4 z-50">
+        <div
+          className={`flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg text-xs border ${
+            toast.type === "success"
+              ? "bg-white/95 border-[#22c55e]/40 text-[#166534]"
+              : "bg-white/95 border-[#f97316]/40 text-[#9a3412]"
+          }`}
+        >
+          <span className="text-lg">
+                  {toast.type === "success" ? "✅" : "⚠️"}
+                </span>
+                <div className="flex flex-col">
+                  <span className="font-semibold">
+                    {toast.type === "success"
+                      ? "Acción realizada"
+                      : "No se pudo completar"}
+                  </span>
+                  <span>{toast.message}</span>
+                </div>
+              </div>
+            </div>
+      )}
+      {authAlert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
+            <div className="flex items-start gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
+                <p className="text-gray-700">{authAlert.message}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAuthAlert(null)}
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }

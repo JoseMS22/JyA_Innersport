@@ -47,10 +47,36 @@ class Usuario(Base):
         nullable=False,
     )
 
+    favoritos = relationship(
+        "Favorito",
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
+    carritos = relationship(
+        "Carrito",
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
     # Relación 1:1 con Dirección
     direccion = relationship(
         "Direccion",
         back_populates="usuario",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    # Relación con saldo y movimientos de puntos
+    saldo_puntos = relationship(
+        "SaldoPuntosUsuario",
+        uselist=False,
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
+    movimientos_puntos = relationship(
+        "MovimientoPuntosUsuario",
+        back_populates="usuario",
         cascade="all, delete-orphan",
     )

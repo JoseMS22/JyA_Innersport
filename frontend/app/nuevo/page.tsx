@@ -1,3 +1,4 @@
+// frontend/app/nuevo/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -50,6 +51,11 @@ function buildMediaUrl(url: string | null) {
 // Toast
 type ToastState = {
   type: "success" | "error";
+  message: string;
+} | null;
+
+// Modal de autenticación / avisos importantes
+type AuthAlertState = {
   message: string;
 } | null;
 
@@ -110,20 +116,6 @@ function ProductoNuevoCard({
             </span>
           )}
         </div>
-
-        {/* Favoritos */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/95 flex items-center justify-center text-base shadow hover:bg-white"
-        >
-          <span className={isFavorite ? "text-red-500" : "text-gray-500"}>
-            {isFavorite ? "♥" : "♡"}
-          </span>
-        </button>
       </div>
 
       <div className="p-4 text-sm">
@@ -173,6 +165,7 @@ export default function LoNuevoPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [toast, setToast] = useState<ToastState>(null);
+  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
 
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -320,16 +313,14 @@ export default function LoNuevoPage() {
 
   function handleAddToCart(producto: Producto) {
     if (checkingAuth) {
-      setToast({
-        type: "error",
+      setAuthAlert({
         message:
           "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
       });
       return;
     }
     if (!isLoggedIn) {
-      setToast({
-        type: "error",
+      setAuthAlert({
         message: "Debes iniciar sesión para agregar productos al carrito.",
       });
       return;
@@ -345,25 +336,22 @@ export default function LoNuevoPage() {
 
     addItem(variante as any, productoInfo as any, 1, imagenUrl);
 
-    setToast({
-      type: "success",
-      message: "El producto se añadió al carrito.",
-    });
+    setAuthAlert({
+    message: "El producto se añadió al carrito.",
+  });
   }
 
   function handleToggleFavorite(producto: Producto) {
     if (checkingAuth) {
-      setToast({
-        type: "error",
+      setAuthAlert({
         message:
           "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
       });
       return;
     }
     if (!isLoggedIn) {
-      setToast({
-        type: "error",
-        message: "Debes iniciar sesión para guardar productos favoritos.",
+      setAuthAlert({
+        message: "Debes iniciar sesión para guardar productos en favoritos.",
       });
       return;
     }
@@ -381,8 +369,7 @@ export default function LoNuevoPage() {
 
     toggleFavorite(favItem);
 
-    setToast({
-      type: "success",
+    setAuthAlert({
       message: alreadyFav
         ? "El producto se quitó de favoritos."
         : "Producto guardado en favoritos.",
@@ -685,6 +672,29 @@ export default function LoNuevoPage() {
           </div>
         </section>
       </main>
+
+      {/* Modal de autenticación / avisos importantes */}
+      {authAlert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
+            <div className="flex items-start gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
+                <p className="text-gray-700">{authAlert.message}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAuthAlert(null)}
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

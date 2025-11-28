@@ -24,6 +24,7 @@ const links = [
   { href: "/admin/categorias", label: "Categorias" },
   { href: "/admin/historial-precios", label: "Historial de precios" },
   { href: "/admin/home-hero", label: "Portada" },
+  { href: "/admin/programa-puntos", label: "Programa de puntos" },
 ];
 
 export function AdminMenu({ user, onLogout }: Props) {

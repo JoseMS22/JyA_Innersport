@@ -12,11 +12,18 @@ type ToastState = {
   message: string;
 } | null;
 
+type UserMe = {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function FavoritesPage() {
-  const { favorites, removeFavorite } = useFavorites();
+  const { favorites, removeFavorite, setUserId } = useFavorites();
   const { addItem } = useCart();
   const router = useRouter();
 
@@ -25,25 +32,41 @@ export default function FavoritesPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [toast, setToast] = useState<ToastState>(null);
+  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
 
-  // Verificar sesión para permitir agregar al carrito
+  type AuthAlertState = {
+  message: string;
+} | null;
+
+  // ✅ Verificar sesión y sincronizar userId para cargar favoritos siempre
   useEffect(() => {
     async function checkAuth() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
           credentials: "include",
         });
-        setIsLoggedIn(res.ok);
+
+        if (!res.ok) {
+          setIsLoggedIn(false);
+          setUserId(null);
+          return;
+        }
+
+        const data: UserMe = await res.json();
+        setIsLoggedIn(true);
+        setUserId(data.id); // 👈 Esto hace que favoritos se carguen bien al refrescar
       } catch {
         setIsLoggedIn(false);
+        setUserId(null);
       } finally {
         setCheckingAuth(false);
       }
     }
-    checkAuth();
-  }, []);
 
-  // Auto-ocultar toast
+    checkAuth();
+  }, [setUserId]);
+
+  // Auto ocultar toast
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(null), 2500);
@@ -52,8 +75,7 @@ export default function FavoritesPage() {
 
   const handleAddFavoriteToCart = (fav: (typeof favorites)[number]) => {
     if (checkingAuth) {
-      setToast({
-        type: "error",
+      setAuthAlert({
         message:
           "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
       });
@@ -61,8 +83,7 @@ export default function FavoritesPage() {
     }
 
     if (!isLoggedIn) {
-      setToast({
-        type: "error",
+      setAuthAlert({
         message: "Debes iniciar sesión para agregar productos al carrito.",
       });
       return;
@@ -70,6 +91,9 @@ export default function FavoritesPage() {
 
     const variante = {
       id: fav.id,
+      sku: undefined,
+      color: fav.color ?? null,
+      talla: fav.talla ?? null,
       precio_actual: fav.price,
     };
 
@@ -81,10 +105,9 @@ export default function FavoritesPage() {
 
     addItem(variante as any, producto as any, 1, fav.imagenUrl ?? null);
 
-    setToast({
-      type: "success",
-      message: "El producto se añadió al carrito desde favoritos.",
-    });
+    setAuthAlert({
+    message: "El producto se añadió al carrito.",
+  });
   };
 
   return (
@@ -127,25 +150,39 @@ export default function FavoritesPage() {
                   {fav.brand && (
                     <p className="text-xs text-gray-500">{fav.brand}</p>
                   )}
+                  {(fav.color || fav.talla) && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {fav.color && <>Color: {fav.color}</>}
+                      {fav.color && fav.talla && " · "}
+                      {fav.talla && <>Talla: {fav.talla}</>}
+                    </p>
+                  )}
                   <p className="mt-1 text-sm text-[#6b21a8] font-semibold">
                     ₡{fav.price.toLocaleString("es-CR")}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {/* Botón agregar al carrito con emoji */}
                   <button
                     type="button"
                     onClick={() => handleAddFavoriteToCart(fav)}
-                    className="rounded-lg bg-[#a855f7] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#7e22ce]"
+                    title="Agregar al carrito"
+                    aria-label="Agregar al carrito"
+                    className="flex items-center justify-center rounded-lg bg-[#a855f7] px-3 py-1.5 text-white hover:bg-[#7e22ce] text-lg"
                   >
-                    Agregar al carrito
+                    🛒
                   </button>
+
+                  {/* Botón eliminar con emoji */}
                   <button
                     type="button"
                     onClick={() => removeFavorite(fav.id)}
-                    className="text-xs font-medium text-red-600 hover:text-red-700"
+                    title="Eliminar de favoritos"
+                    aria-label="Eliminar de favoritos"
+                    className="flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 text-lg"
                   >
-                    Quitar
+                    🗑️
                   </button>
                 </div>
               </div>
@@ -154,7 +191,7 @@ export default function FavoritesPage() {
         )}
       </main>
 
-      {/* Toast flotante */}
+      {/* Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 z-50">
           <div
@@ -183,6 +220,27 @@ export default function FavoritesPage() {
                   Iniciar sesión
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {authAlert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
+            <div className="flex items-start gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
+                <p className="text-gray-700">{authAlert.message}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAuthAlert(null)}
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+              >
+                Aceptar
+              </button>
             </div>
           </div>
         </div>
