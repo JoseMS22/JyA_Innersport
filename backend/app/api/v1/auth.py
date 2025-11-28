@@ -166,27 +166,23 @@ def logout(
 ):
     """
     Elimina la cookie de sesión (access_token).
-    No requiere autenticación estricta - si no hay sesión, simplemente limpia la cookie.
     """
     ip_address = get_client_ip(request)
     
     try:
-        # Intentar obtener usuario actual para auditoría
         token = request.cookies.get("access_token")
         current_user = None
         
         if token:
             try:
-                # Intentar decodificar sin lanzar excepciones
                 from app.core.security import _decode_token
                 payload = _decode_token(token)
                 user_id = int(payload.get("sub", 0))
                 if user_id > 0:
                     current_user = db.query(Usuario).filter(Usuario.id == user_id).first()
             except:
-                pass  # Si falla, simplemente no registramos auditoría
+                pass
         
-        # 🔹 Registrar auditoría solo si hay usuario
         if current_user:
             registrar_auditoria(
                 db=db,
@@ -199,13 +195,12 @@ def logout(
             )
             
             logger.info(f"Logout: {current_user.correo} desde IP {ip_address}")
-            audit_logger.info(f"LOGOUT | Usuario: {current_user.correo} | IP: {ip_address}")
         
-        # 🔹 SIEMPRE eliminar la cookie, aunque no haya usuario
+        # 🔹 CRÍTICO: Eliminar la cookie correctamente
         response.delete_cookie(
             key="access_token",
             path="/",
-            domain=None,
+            domain=None,  # ✅ Asegúrate que sea None, no una cadena vacía
             samesite="lax",
         )
         
