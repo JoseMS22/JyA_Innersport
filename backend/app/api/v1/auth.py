@@ -162,41 +162,67 @@ def login(
 def logout(
     request: Request,
     response: Response,
-    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Elimina la cookie de sesión (access_token).
+    No requiere autenticación estricta - si no hay sesión, simplemente limpia la cookie.
     """
     ip_address = get_client_ip(request)
     
     try:
-        # 🔹 Registrar auditoría
-        registrar_auditoria(
-            db=db,
-            usuario_id=current_user.id,
-            accion="LOGOUT",
-            entidad="Usuario",
-            entidad_id=current_user.id,
-            detalles=f"Logout de {current_user.correo}",
-            ip_address=ip_address,
-        )
+        # Intentar obtener usuario actual para auditoría
+        token = request.cookies.get("access_token")
+        current_user = None
         
-        logger.info(f"Logout: {current_user.correo} desde IP {ip_address}")
-        audit_logger.info(f"LOGOUT | Usuario: {current_user.correo} | IP: {ip_address}")
+        if token:
+            try:
+                # Intentar decodificar sin lanzar excepciones
+                from app.core.security import _decode_token
+                payload = _decode_token(token)
+                user_id = int(payload.get("sub", 0))
+                if user_id > 0:
+                    current_user = db.query(Usuario).filter(Usuario.id == user_id).first()
+            except:
+                pass  # Si falla, simplemente no registramos auditoría
         
+        # 🔹 Registrar auditoría solo si hay usuario
+        if current_user:
+            registrar_auditoria(
+                db=db,
+                usuario_id=current_user.id,
+                accion="LOGOUT",
+                entidad="Usuario",
+                entidad_id=current_user.id,
+                detalles=f"Logout de {current_user.correo}",
+                ip_address=ip_address,
+            )
+            
+            logger.info(f"Logout: {current_user.correo} desde IP {ip_address}")
+            audit_logger.info(f"LOGOUT | Usuario: {current_user.correo} | IP: {ip_address}")
+        
+        # 🔹 SIEMPRE eliminar la cookie, aunque no haya usuario
         response.delete_cookie(
-            "access_token",
-            httponly=True,
-            samesite="lax",
-            secure=False,
+            key="access_token",
             path="/",
+            domain=None,
+            samesite="lax",
         )
+        
+        print(f"[DEBUG] Cookie access_token eliminada para IP {ip_address}")
+        
         return {"message": "Sesión cerrada correctamente."}
         
     except Exception as e:
         logger.error(f"Error en logout: {str(e)}")
-        raise
+        # Aún así, intentar eliminar la cookie
+        response.delete_cookie(
+            key="access_token",
+            path="/",
+            domain=None,
+            samesite="lax",
+        )
+        return {"message": "Sesión cerrada correctamente."}
 
 
 # =========================

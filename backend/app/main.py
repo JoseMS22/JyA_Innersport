@@ -45,13 +45,14 @@ app = FastAPI(
     description="API REST para tienda virtual con sistema POS integrado",
 )
 
-# CORS
+# 🔹 CORS - CONFIGURACIÓN CRÍTICA PARA COOKIES
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=True,  # 🔴 CRÍTICO: Permite enviar cookies
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 🔴 IMPORTANTE: Expone todos los headers
 )
 
 
@@ -276,6 +277,7 @@ async def startup_event():
     logger.info(f"🌐 CORS habilitado para: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"🔐 JWT expira en: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutos")
     logger.info(f"📧 Email desde: {settings.EMAIL_FROM_ADDRESS}")
+    logger.info(f"🍪 COOKIE_SECURE: {settings.COOKIE_SECURE}")
     logger.info("=" * 70)
     
     # Verificar conexión a BD al iniciar
