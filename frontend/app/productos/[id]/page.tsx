@@ -125,39 +125,38 @@ export default function ProductDetailPage() {
         // 3. Cargar inventarios de todas las variantes activas
         const variantesActivas = variantes.filter((v) => v.activo);
         const inventariosPromises = variantesActivas.map(async (variante) => {
-        const invRes = await fetch(
-          `${API_BASE}/api/v1/public/inventario?variante_id=${variante.id}`
-        );
-
-        let invData: any[] = [];
-
-        if (invRes.ok) {
-          const raw = await invRes.json();
-          invData = Array.isArray(raw) ? raw : [];
-        } else {
-          console.error(
-            "Error cargando inventario para variante",
-            variante.id,
-            invRes.status
+          const invRes = await fetch(
+            `${API_BASE}/api/v1/public/inventario?variante_id=${variante.id}`
           );
-          invData = [];
-        }
 
-        return {
-          variante_id: variante.id,
-          inventarios: invData.map((inv: any) => ({
-            sucursal_id: inv.sucursal_id,
-            // el backend ya manda sucursal_nombre plano
-            sucursal_nombre: inv.sucursal_nombre || "Sucursal",
-            cantidad: inv.cantidad,
-          })),
-          total_stock: invData.reduce(
-            (sum: number, inv: any) => sum + (inv.cantidad || 0),
-            0
-          ),
-        };
-      });
+          let invData: any[] = [];
 
+          if (invRes.ok) {
+            const raw = await invRes.json();
+            invData = Array.isArray(raw) ? raw : [];
+          } else {
+            console.error(
+              "Error cargando inventario para variante",
+              variante.id,
+              invRes.status
+            );
+            invData = [];
+          }
+
+          return {
+            variante_id: variante.id,
+            inventarios: invData.map((inv: any) => ({
+              sucursal_id: inv.sucursal_id,
+              // el backend ya manda sucursal_nombre plano
+              sucursal_nombre: inv.sucursal_nombre || "Sucursal",
+              cantidad: inv.cantidad,
+            })),
+            total_stock: invData.reduce(
+              (sum: number, inv: any) => sum + (inv.cantidad || 0),
+              0
+            ),
+          };
+        });
 
         const inventariosData = await Promise.all(inventariosPromises);
         const inventariosMap = inventariosData.reduce((acc, inv) => {
