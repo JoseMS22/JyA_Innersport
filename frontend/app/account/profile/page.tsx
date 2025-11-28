@@ -1,3 +1,4 @@
+// frontend/app/account/profile/page.tsx
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
@@ -5,20 +6,15 @@ import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { apiFetch } from "@/lib/api";
 
-type Direccion = {
-  provincia: string;
-  canton: string;
-  distrito: string;
-  detalle?: string | null;
-  telefono?: string | null;
-};
-
 type UserProfile = {
   id: number;
   nombre: string;
   correo: string;
   telefono?: string | null;
-  direccion?: Direccion | null;
+  rol: string;
+  activo: boolean;
+  email_verificado: boolean;
+  created_at: string;
 };
 
 export default function ProfilePage() {
@@ -35,11 +31,6 @@ export default function ProfilePage() {
   const [form, setForm] = useState({
     nombre: "",
     telefono: "",
-    provincia: "",
-    canton: "",
-    distrito: "",
-    detalle: "",
-    telefono_direccion: "",
   });
 
   // Cargar perfil al entrar
@@ -49,17 +40,10 @@ export default function ProfilePage() {
         setErrorMsg(null);
         const data = await apiFetch("/api/v1/auth/me");
 
-        const p: UserProfile = data;
-
-        setProfile(p);
+        setProfile(data);
         setForm({
-          nombre: p.nombre ?? "",
-          telefono: p.telefono ?? "",
-          provincia: p.direccion?.provincia ?? "",
-          canton: p.direccion?.canton ?? "",
-          distrito: p.direccion?.distrito ?? "",
-          detalle: p.direccion?.detalle ?? "",
-          telefono_direccion: p.direccion?.telefono ?? "",
+          nombre: data.nombre ?? "",
+          telefono: data.telefono ?? "",
         });
       } catch (err: any) {
         setErrorMsg(
@@ -74,9 +58,15 @@ export default function ProfilePage() {
     loadProfile();
   }, []);
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  // Auto-hide mensajes
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => setSuccessMsg(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
@@ -93,7 +83,7 @@ export default function ProfilePage() {
         body: JSON.stringify(form),
       });
 
-      setSuccessMsg("Perfil actualizado correctamente.");
+      setSuccessMsg("Perfil actualizado correctamente");
     } catch (err: any) {
       setErrorMsg(
         err?.message ??
@@ -108,8 +98,13 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-[#fdf6e3]">
         <MainMenu />
-        <main className="max-w-3xl mx-auto px-4 py-10">
-          <p className="text-sm text-gray-600">Cargando tu perfil...</p>
+        <main className="max-w-3xl mx-auto px-4 py-10 pt-[140px]">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="inline-block w-12 h-12 border-4 border-[#a855f7] border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-gray-600">Cargando tu perfil...</p>
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -119,10 +114,19 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-[#fdf6e3]">
         <MainMenu />
-        <main className="max-w-3xl mx-auto px-4 py-10">
-          <p className="text-sm text-red-600">
-            No se pudo obtener tu perfil. Asegúrate de haber iniciado sesión.
-          </p>
+        <main className="max-w-3xl mx-auto px-4 py-10 pt-[140px]">
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">⚠️</div>
+            <p className="text-sm text-red-600 mb-4">
+              No se pudo obtener tu perfil. Asegúrate de haber iniciado sesión.
+            </p>
+            <button
+              onClick={() => router.push("/login")}
+              className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold rounded-xl"
+            >
+              Iniciar sesión
+            </button>
+          </div>
         </main>
       </div>
     );
@@ -133,179 +137,239 @@ export default function ProfilePage() {
       <MainMenu />
 
       <main className="max-w-3xl mx-auto px-4 py-8 pt-[140px]">
-        <h1 className="text-xl font-semibold text-[#6b21a8] mb-1">Mi perfil</h1>
-        <p className="text-xs text-gray-500 mb-6">
-          Aquí puedes ver y actualizar tu información básica y dirección de entrega.
-        </p>
+        {/* Breadcrumb */}
+        <div className="text-xs text-gray-500 mb-4">
+          <button
+            onClick={() => router.push("/")}
+            className="hover:text-[#6b21a8] hover:underline"
+          >
+            Inicio
+          </button>
+          <span className="mx-1">›</span>
+          <span className="text-gray-800 font-medium">Mi cuenta</span>
+        </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-5 space-y-4 text-sm"
-        >
-          {/* Datos de cuenta */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Nombre completo
-              </label>
-              <input
-                name="nombre"
-                value={form.nombre}
-                onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none 
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-                required
-              />
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-[#6b21a8] mb-1">
+            Mi cuenta
+          </h1>
+          <p className="text-xs text-gray-500">
+            Gestiona tu información personal y preferencias
+          </p>
+        </div>
+
+        {/* Grid de tarjetas */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* Tarjeta: Información personal */}
+          <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[#f3e8ff] flex items-center justify-center text-2xl">
+                👤
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Información personal
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Nombre y datos de contacto
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Correo electrónico
-              </label>
-              <input
-                value={profile.correo}
-                readOnly
-                className="w-full rounded-lg border px-3 py-2 bg-gray-50 
-                           text-gray-500 cursor-not-allowed border-[#e5e7eb]"
-              />
-              <p className="mt-1 text-[10px] text-gray-400">
-                El correo no puede modificarse desde aquí.
-              </p>
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4 text-sm">
+              {/* Nombre */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Nombre completo
+                </label>
+                <input
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border px-3 py-2 outline-none 
+                             border-[#e5e7eb] focus:border-[#a855f7]
+                             text-gray-800 placeholder-gray-400"
+                  required
+                />
+              </div>
+
+              {/* Teléfono */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Teléfono
+                </label>
+                <input
+                  name="telefono"
+                  value={form.telefono}
+                  onChange={handleChange}
+                  maxLength={20}
+                  className="w-full rounded-lg border px-3 py-2 outline-none
+                             border-[#e5e7eb] focus:border-[#a855f7]
+                             text-gray-800 placeholder-gray-400"
+                />
+              </div>
+
+              {/* Correo (solo lectura) */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Correo electrónico
+                </label>
+                <input
+                  value={profile.correo}
+                  readOnly
+                  className="w-full rounded-lg border px-3 py-2 bg-gray-50 
+                             text-gray-500 cursor-not-allowed border-[#e5e7eb]"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  {profile.email_verificado ? (
+                    <>
+                      <span className="text-emerald-600 text-xs">✓</span>
+                      <span className="text-xs text-emerald-600">
+                        Correo verificado
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-amber-600 text-xs">⚠</span>
+                      <span className="text-xs text-amber-600">
+                        Correo pendiente de verificación
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Mensajes */}
+              {errorMsg && (
+                <div className="text-xs text-red-600 whitespace-pre-line p-3 bg-red-50 rounded-lg border border-red-200">
+                  {errorMsg}
+                </div>
+              )}
+
+              {successMsg && (
+                <div className="text-xs text-emerald-700 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                  {successMsg}
+                </div>
+              )}
+
+              {/* Botón guardar */}
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium px-4 py-2 text-sm disabled:opacity-60"
+              >
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </form>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Teléfono</label>
-              <input
-                name="telefono"
-                value={form.telefono}
-                onChange={handleChange}
-                maxLength={20}
-                className="w-full rounded-lg border px-3 py-2 outline-none
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-              />
+          {/* Tarjeta: Direcciones */}
+          <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[#fef3c7] flex items-center justify-center text-2xl">
+                📍
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Mis direcciones
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Gestiona tus direcciones de envío
+                </p>
+              </div>
             </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Administra las direcciones donde recibirás tus pedidos. Puedes
+              tener varias direcciones y elegir cuál usar en cada compra.
+            </p>
+
+            <button
+              onClick={() => router.push("/account/addresses")}
+              className="w-full rounded-lg border-2 border-[#a855f7] text-[#a855f7] hover:bg-[#f3e8ff] font-medium px-4 py-2 text-sm transition-colors"
+            >
+              Ver mis direcciones →
+            </button>
           </div>
+        </div>
 
-          <hr className="my-2" />
-
-          {/* Dirección */}
-          <h2 className="text-xs font-semibold text-gray-500 uppercase">
-            Dirección de entrega
+        {/* Sección de acciones importantes */}
+        <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">
+            Seguridad y configuración
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Provincia</label>
-              <input
-                name="provincia"
-                value={form.provincia}
-                onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Cantón</label>
-              <input
-                name="canton"
-                value={form.canton}
-                onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Distrito</label>
-              <input
-                name="distrito"
-                value={form.distrito}
-                onChange={handleChange}
-                className="w-full rounded-lg border px-3 py-2 outline-none
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Teléfono de entrega
-              </label>
-              <input
-                name="telefono_direccion"
-                value={form.telefono_direccion}
-                onChange={handleChange}
-                maxLength={20}
-                className="w-full rounded-lg border px-3 py-2 outline-none
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">
-              Detalles de dirección
-            </label>
-            <textarea
-              name="detalle"
-              value={form.detalle}
-              onChange={handleChange}
-              rows={2}
-              className="w-full rounded-lg border px-3 py-2 outline-none
-                         border-[#e5e7eb] focus:border-[#a855f7]
-                         text-gray-800 placeholder-gray-400"
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="text-xs text-red-600 whitespace-pre-line">
-              {errorMsg}
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="text-xs text-emerald-700">{successMsg}</div>
-          )}
-
-          <div className="flex items-center justify-between pt-2">
+          <div className="space-y-3">
+            {/* Cambiar contraseña */}
             <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium px-4 py-2 text-xs disabled:opacity-60"
+              onClick={() => router.push("/change-password")}
+              className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-[#a855f7] hover:bg-[#faf5ff] transition-all text-left"
             >
-              {saving ? "Guardando cambios..." : "Guardar cambios"}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#f3e8ff] flex items-center justify-center text-xl">
+                  🔒
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Cambiar contraseña
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Actualiza tu contraseña para mayor seguridad
+                  </p>
+                </div>
+              </div>
+              <span className="text-gray-400">→</span>
             </button>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => router.push("/change-password")}
-                className="rounded-lg bg-[#6b21a8] hover:bg-[#7e22ce] text-white font-medium px-4 py-2 text-xs"
-              >
-                Cambiar contraseña
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/account/delete")}
-                className="rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 text-xs"
-              >
-                Eliminar cuenta
-              </button>
-            </div>
+            {/* Eliminar cuenta */}
+            <button
+              onClick={() => router.push("/account/delete")}
+              className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-red-500 hover:bg-red-50 transition-all text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-xl">
+                  ⚠️
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-600">
+                    Eliminar mi cuenta
+                  </p>
+                  <p className="text-xs text-red-500">
+                    Eliminar permanentemente tu cuenta y datos
+                  </p>
+                </div>
+              </div>
+              <span className="text-red-400">→</span>
+            </button>
           </div>
-        </form>
+        </div>
+
+        {/* Info de cuenta */}
+        <div className="mt-6 p-4 bg-white/70 rounded-xl border border-[#e5e7eb]">
+          <h3 className="text-sm font-semibold text-[#6b21a8] mb-2">
+            ℹ️ Información de tu cuenta
+          </h3>
+          <div className="text-xs text-gray-600 space-y-1">
+            <p>
+              <span className="font-medium">Rol:</span>{" "}
+              <span className="uppercase text-[#a855f7]">{profile.rol}</span>
+            </p>
+            <p>
+              <span className="font-medium">Estado:</span>{" "}
+              {profile.activo ? (
+                <span className="text-emerald-600">✓ Activa</span>
+              ) : (
+                <span className="text-red-600">✗ Inactiva</span>
+              )}
+            </p>
+            <p>
+              <span className="font-medium">Miembro desde:</span>{" "}
+              {new Date(profile.created_at).toLocaleDateString("es-CR")}
+            </p>
+          </div>
+        </div>
       </main>
-    </div>
-  );
+    </div>
+  );
 }
