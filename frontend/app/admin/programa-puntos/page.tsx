@@ -296,31 +296,6 @@ export default function ProgramaPuntosAdminPage() {
 
               <div>
                 <p className="font-semibold text-gray-800 text-[11px] mb-1">
-                  % máximo de descuento por puntos
-                </p>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="1"
-                  value={form.porcentaje_max_descuento}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      porcentaje_max_descuento: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#a855f7]"
-                  placeholder="Ej. 30 = hasta 30% de la compra"
-                />
-                <p className="mt-1 text-[10px] text-gray-500">
-                  Porcentaje máximo de la compra que puede cubrirse con puntos.
-                  Déjalo vacío para sin tope porcentual.
-                </p>
-              </div>
-
-              <div>
-                <p className="font-semibold text-gray-800 text-[11px] mb-1">
                   Tope de descuento por compra (colones)
                 </p>
                 <input
