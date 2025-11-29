@@ -1,3 +1,4 @@
+# backend/app/core/config.py
 import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings
@@ -26,12 +27,10 @@ class Settings(BaseSettings):
     EMAIL_FROM_ADDRESS: str = "onboarding@resend.dev"  # default ok
     FRONTEND_BASE_URL: str = "http://localhost:3000"
 
-    # 🔹 Cookies
-    # En desarrollo normalmente False (HTTP), en producción lo pones True detrás de HTTPS
-    COOKIE_SECURE: bool = bool(os.getenv("COOKIE_SECURE", "").lower() == "true")
+    # 🔹 Cookies - IMPORTANTE: False en desarrollo local
+    COOKIE_SECURE: bool = False  # Cambiar a True solo en producción con HTTPS
 
     # Redis / Celery
-    # Estos valores se sobrescriben con lo que tengas en el .env
     REDIS_URL: str = "redis://redis:6379/0"
     CELERY_BROKER_URL: str = "redis://redis:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
@@ -39,7 +38,7 @@ class Settings(BaseSettings):
     ACCOUNT_DELETION_GRACE_DAYS: int = int(os.getenv("ACCOUNT_DELETION_GRACE_DAYS", "7"))
 
     class Config:
-        env_file = ".env"          # esto se usa si hubiera un .env dentro de /app
+        env_file = ".env"
         env_file_encoding = "utf-8"
 
 
