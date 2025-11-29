@@ -115,6 +115,11 @@ def registrar_movimiento_puntos(
     """
     Registra un movimiento de puntos (earn / redeem / adjust)
     y actualiza el saldo del usuario.
+
+    Convenciones:
+      - earn  -> puntos siempre positivos (suma)
+      - redeem -> puntos siempre negativos (resta)
+      - adjust -> puede ser + o -, pero no 0
     """
     tipo = tipo.lower()
     if tipo not in ("earn", "redeem", "adjust"):
@@ -122,13 +127,21 @@ def registrar_movimiento_puntos(
 
     saldo = obtener_o_crear_saldo(db, usuario_id)
 
-    # Para 'earn' se espera puntos positivos,
-    # para 'redeem' normalmente se envía ya en negativo,
-    # pero aquí podemos normalizar:
-    if tipo == "earn" and puntos < 0:
-        puntos = abs(puntos)
-    if tipo in ("redeem", "adjust") and puntos == 0:
-        raise ValueError("Los puntos no pueden ser cero en un movimiento.")
+    if tipo == "earn":
+        # aseguramos que siempre sume
+        if puntos < 0:
+            puntos = abs(puntos)
+
+    elif tipo == "redeem":
+        if puntos == 0:
+            raise ValueError("Los puntos a redimir no pueden ser cero.")
+        # aseguramos que SIEMPRE reste
+        if puntos > 0:
+            puntos = -puntos
+
+    elif tipo == "adjust":
+        if puntos == 0:
+            raise ValueError("Los puntos no pueden ser cero en un ajuste.")
 
     nuevo_saldo = saldo.saldo + puntos
 
@@ -249,7 +262,11 @@ def calcular_limite_redencion(
         }
 
     # Puntos necesarios para usar ese máximo
-    puntos_necesarios = int((descuento_maximo / valor_por_punto).to_integral_value(rounding="ROUND_CEILING"))
+    puntos_necesarios = int(
+        (descuento_maximo / valor_por_punto).to_integral_value(
+            rounding="ROUND_CEILING"
+        )
+    )
 
     return {
         "puede_usar_puntos": True,
@@ -258,3 +275,55 @@ def calcular_limite_redencion(
         "puntos_necesarios_para_maximo": puntos_necesarios,
         "saldo_puntos": saldo.saldo,
     }
+
+
+# =========================
+# GANAR PUNTOS POR COMPRA
+# =========================
+
+def registrar_puntos_por_compra(
+    db: Session,
+    *,
+    usuario_id: int,
+    total_compra_colones: Decimal,
+    order_id: Optional[int] = None,
+) -> int:
+    """
+    Calcula y ACUMULA puntos según la config activa.
+    Se usa normalmente al confirmar una compra.
+    Devuelve la cantidad de puntos ganados.
+    """
+    config = obtener_config_activa(db)
+
+    # si el programa está inactivo o mal configurado, no hace nada
+    if not config.activo:
+        return 0
+
+    if not config.puntos_por_colon or config.puntos_por_colon <= 0:
+        return 0
+
+    total = Decimal(total_compra_colones)
+
+    # puntos = total * puntos_por_colon  (ej: 10000 * 0.01 = 100)
+    puntos_dec = total * Decimal(config.puntos_por_colon)
+    puntos = int(
+        puntos_dec.to_integral_value(
+            rounding="ROUND_FLOOR"  # siempre hacia abajo para no regalar de más
+        )
+    )
+
+    if puntos <= 0:
+        return 0
+
+    # reutilizamos registrar_movimiento_puntos para actualizar saldo y movimiento
+    registrar_movimiento_puntos(
+        db,
+        usuario_id=usuario_id,
+        tipo="earn",
+        puntos=puntos,
+        descripcion=f"Puntos por compra de ₡{int(total)}",
+        order_id=order_id,
+    )
+
+    # devolvemos cuántos puntos se otorgaron
+    return puntos

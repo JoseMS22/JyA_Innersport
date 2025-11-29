@@ -4,11 +4,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCart } from "../context/cartContext";
+import { useRouter } from "next/navigation";
+import { MainMenu } from "@/components/MainMenu"; // 👈 IMPORTANTE
 
 type PuntosInfo = {
   puede_usar_puntos: boolean;
   motivo: string | null;
-  descuento_maximo_colones: string; // viene como string desde el backend (Decimal)
+  descuento_maximo_colones: string;
   puntos_necesarios_para_maximo: number;
   saldo_puntos: number;
 };
@@ -23,9 +25,9 @@ export default function CartPage() {
   const [loadingPuntos, setLoadingPuntos] = useState(false);
   const [errorPuntos, setErrorPuntos] = useState<string | null>(null);
 
+  const router = useRouter();
   const hasItems = items.length > 0;
 
-  // 🔹 Cargar info de puntos SOLO si hay items en el carrito
   useEffect(() => {
     if (!hasItems) {
       setPuntosInfo(null);
@@ -35,26 +37,17 @@ export default function CartPage() {
     async function fetchPuntos() {
       try {
         setLoadingPuntos(true);
-        setErrorPuntos(null);
-
         const res = await fetch(
           `${API_BASE_URL}/api/v1/cart/me/puntos/limite`,
-          {
-            credentials: "include",
-          }
+          { credentials: "include" }
         );
 
-        if (!res.ok) {
-          throw new Error("No se pudo obtener la información de puntos.");
-        }
+        if (!res.ok) throw new Error();
 
         const data = (await res.json()) as PuntosInfo;
         setPuntosInfo(data);
-      } catch (err: any) {
-        console.error(err);
-        setErrorPuntos(
-          err?.message ?? "No se pudo obtener la información de puntos."
-        );
+      } catch {
+        setErrorPuntos("No se pudo obtener la información de puntos.");
       } finally {
         setLoadingPuntos(false);
       }
@@ -63,29 +56,14 @@ export default function CartPage() {
     fetchPuntos();
   }, [hasItems]);
 
-  // 👀 Regla: si el programa está inactivo, NO mostrar el bloque
-  const mostrarBloquePuntos =
-    hasItems &&
-    puntosInfo &&
-    !(
-      !puntosInfo.puede_usar_puntos &&
-      puntosInfo.motivo === "El programa de puntos está inactivo."
-    );
-
-  function formatColonAmount(value: number | string) {
-    const num = typeof value === "string" ? Number(value) : value;
-    if (isNaN(num)) return "₡0";
-    return `₡${num.toLocaleString("es-CR")}`;
-  }
-
   return (
     <div className="min-h-screen bg-[#fdf6e3]">
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <MainMenu /> {/* 👈 AÑADIDO */}
+
+      <main className="max-w-4xl mx-auto px-4 py-8 pt-[140px]">
         <div className="text-xs text-gray-500 mb-4">
-          <Link href="/" className="hover:underline">
-            Inicio
-          </Link>{" "}
-          <span className="mx-1">›</span>{" "}
+          <Link href="/" className="hover:underline">Inicio</Link>
+          <span className="mx-1">›</span>
           <span className="text-gray-800 font-medium">Carrito</span>
         </div>
 
@@ -105,7 +83,6 @@ export default function CartPage() {
 
         {hasItems && (
           <div className="grid gap-6 md:grid-cols-[2fr,1fr]">
-            {/* Lista de items */}
             <div className="space-y-4">
               {items.map((item) => (
                 <div
@@ -114,9 +91,11 @@ export default function CartPage() {
                 >
                   <div>
                     <p className="font-medium text-sm">{item.name}</p>
+
                     {item.brand && (
                       <p className="text-xs text-gray-500">{item.brand}</p>
                     )}
+
                     {(item.color || item.talla) && (
                       <p className="text-xs text-gray-500 mt-0.5">
                         {item.color && <>Color: {item.color}</>}
@@ -124,6 +103,7 @@ export default function CartPage() {
                         {item.talla && <>Talla: {item.talla}</>}
                       </p>
                     )}
+
                     <p className="mt-1 text-sm text-[#6b21a8] font-semibold">
                       ₡{item.price.toLocaleString("es-CR")}
                     </p>
@@ -132,43 +112,37 @@ export default function CartPage() {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <button
-                        type="button"
                         onClick={() =>
                           updateQuantity(item.id, item.quantity - 1)
                         }
-                        className="h-8 w-8 rounded border bg-white text-lg leading-none hover:bg-gray-100"
+                        className="h-8 w-8 rounded border bg-white text-lg hover:bg-gray-100"
                       >
                         -
                       </button>
+
                       <input
                         type="number"
                         min={1}
                         value={item.quantity}
                         onChange={(e) =>
-                          updateQuantity(
-                            item.id,
-                            Number(e.target.value) || 1
-                          )
+                          updateQuantity(item.id, Number(e.target.value) || 1)
                         }
                         className="w-16 rounded border px-2 py-1 text-center text-sm"
                       />
+
                       <button
-                        type="button"
                         onClick={() =>
                           updateQuantity(item.id, item.quantity + 1)
                         }
-                        className="h-8 w-8 rounded border bg-white text-lg leading-none hover:bg-gray-100"
+                        className="h-8 w-8 rounded border bg-white text-lg hover:bg-gray-100"
                       >
                         +
                       </button>
                     </div>
 
                     <button
-                      type="button"
                       onClick={() => removeItem(item.id)}
-                      title="Eliminar del carrito"
-                      aria-label="Eliminar del carrito"
-                      className="flex items-center justify-center rounded-lg border border-red-200 px-3 py-1.5 text-base text-red-600 hover:bg-red-50 hover:text-red-700"
+                      className="flex items-center justify-center rounded-lg border border-red-200 px-3 py-1.5 text-red-600 hover:bg-red-50"
                     >
                       🗑️
                     </button>
@@ -177,9 +151,9 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Resumen */}
             <div className="space-y-4 rounded-lg border bg-white p-4">
               <h2 className="text-lg font-semibold">Resumen</h2>
+
               <div className="flex items-center justify-between text-sm">
                 <span>Subtotal</span>
                 <span className="font-medium">
@@ -187,66 +161,7 @@ export default function CartPage() {
                 </span>
               </div>
 
-              {/* 🔹 Bloque de puntos: solo se muestra si el programa NO está inactivo */}
-              {mostrarBloquePuntos && (
-                <div className="mt-3 rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-3 text-xs space-y-1">
-                  <p className="font-semibold text-gray-800">
-                    Programa de puntos
-                  </p>
-
-                  {loadingPuntos && (
-                    <p className="text-gray-500 text-[11px]">
-                      Cargando información de puntos...
-                    </p>
-                  )}
-
-                  {errorPuntos && (
-                    <p className="text-red-600 text-[11px]">
-                      {errorPuntos}
-                    </p>
-                  )}
-
-                  {!loadingPuntos && !errorPuntos && puntosInfo && (
-                    <>
-                      <p className="text-gray-700">
-                        Saldo:{" "}
-                        <span className="font-semibold">
-                          {puntosInfo.saldo_puntos} pts
-                        </span>
-                      </p>
-
-                      {!puntosInfo.puede_usar_puntos && puntosInfo.motivo && (
-                        <p className="text-[11px] text-gray-500">
-                          {puntosInfo.motivo}
-                        </p>
-                      )}
-
-                      {puntosInfo.puede_usar_puntos && (
-                        <div className="space-y-1 text-[11px] text-gray-600">
-                          <p>
-                            Descuento máximo con puntos en esta compra:{" "}
-                            <span className="font-semibold">
-                              {formatColonAmount(
-                                puntosInfo.descuento_maximo_colones
-                              )}
-                            </span>
-                          </p>
-                          <p>
-                            Puntos necesarios para ese máximo:{" "}
-                            <span className="font-semibold">
-                              {puntosInfo.puntos_necesarios_para_maximo} pts
-                            </span>
-                          </p>
-                          {/* Aquí después puedes agregar el input/botón para decidir cuántos puntos usar */}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
               <button
-                type="button"
                 onClick={clearCart}
                 className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
               >
@@ -254,7 +169,7 @@ export default function CartPage() {
               </button>
 
               <button
-                type="button"
+                onClick={() => router.push("/checkout")}
                 className="w-full rounded-lg bg-[#a855f7] px-4 py-2 text-sm font-medium text-white hover:bg-[#7e22ce]"
               >
                 Proceder al pago

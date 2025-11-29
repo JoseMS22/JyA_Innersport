@@ -14,15 +14,18 @@ from app.schemas.programa_puntos import (
     SaldoPuntosOut,
     MovimientoPuntosOut,
     LimiteRedencionOut,
+    ConfirmarCompraIn,
+    ConfirmarCompraOut,
 )
 from app.services.programa_puntos_service import (
     obtener_config_activa,
     actualizar_config,
     obtener_o_crear_saldo,
     calcular_limite_redencion,
+    registrar_puntos_por_compra,
+    registrar_movimiento_puntos,
 )
-# ajusta este import según dónde tengas la función:
-from app.core.security import get_current_user  
+from app.core.security import get_current_user
 
 
 router = APIRouter(prefix="/puntos", tags=["Programa de puntos"])
@@ -150,4 +153,118 @@ def get_limite_redencion(
         descuento_maximo_colones=data["descuento_maximo_colones"],
         puntos_necesarios_para_maximo=data["puntos_necesarios_para_maximo"],
         saldo_puntos=data["saldo_puntos"],
+    )
+
+
+# ============================
+# CONFIRMAR COMPRA (CLIENTE)
+# ============================
+
+@router.post("/me/confirmar-compra", response_model=ConfirmarCompraOut)
+def confirmar_compra_con_puntos(
+    data: ConfirmarCompraIn,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """
+    Endpoint pensado para usarse desde el checkout:
+
+    - Recibe el total bruto de la compra (antes de puntos).
+    - Opcionalmente recibe cuántos puntos quiere usar el cliente.
+    - Valida contra las reglas del programa (mínimo, % máximo, tope por compra).
+    - Registra movimiento de redención (redeem) si aplica.
+    - Registra los puntos GANADOS por el monto efectivamente pagado.
+    - Devuelve totales y saldo final de puntos.
+
+    La pasarela de pago real no se implementa aquí: se asume pago APROBADO.
+    """
+    config = obtener_config_activa(db)
+
+    if not config.activo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El programa de puntos está inactivo.",
+        )
+
+    if data.total_compra <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El total de la compra debe ser mayor que cero.",
+        )
+
+    total_bruto = Decimal(data.total_compra)
+
+    # -----------------------------
+    # 1) Aplicar puntos (redención)
+    # -----------------------------
+    descuento_aplicado = Decimal("0")
+    puntos_redimidos = 0
+
+    valor_por_punto = Decimal(config.valor_colon_por_punto or 0)
+
+    if data.puntos_a_usar > 0 and valor_por_punto > 0:
+        # Calculamos el límite permitido según configuración
+        limite = calcular_limite_redencion(
+            db,
+            usuario_id=usuario.id,
+            total_compra_colones=total_bruto,
+        )
+
+        if limite["puede_usar_puntos"]:
+            # Descuento máximo que se puede aplicar según reglas
+            max_descuento = limite["descuento_maximo_colones"]
+
+            # Descuento que el usuario está pidiendo con esos puntos
+            descuento_solicitado = (
+                Decimal(data.puntos_a_usar) * valor_por_punto
+            )
+
+            # Tomamos el mínimo entre lo solicitado y el máximo permitido
+            descuento_aplicado = min(descuento_solicitado, max_descuento)
+
+            if descuento_aplicado > 0:
+                # Puntos que realmente vamos a descontar
+                puntos_redimidos = int(
+                    (descuento_aplicado / valor_por_punto).to_integral_value(
+                        rounding="ROUND_FLOOR"
+                    )
+                )
+
+                if puntos_redimidos > 0:
+                    # Registrar movimiento NEGATIVO (redeem)
+                    registrar_movimiento_puntos(
+                        db,
+                        usuario_id=usuario.id,
+                        tipo="redeem",
+                        puntos=puntos_redimidos,
+                        descripcion=f"Redención de puntos en compra de ₡{int(total_bruto)}",
+                        order_id=data.order_id,
+                    )
+
+    # Total después de aplicar puntos (no dejar que sea negativo)
+    total_despues_puntos = total_bruto - descuento_aplicado
+    if total_despues_puntos < 0:
+        total_despues_puntos = Decimal("0")
+
+    # --------------------------------
+    # 2) Otorgar puntos por la compra
+    # --------------------------------
+    # Normalmente se otorgan puntos solo sobre lo efectivamente pagado
+    puntos_ganados = registrar_puntos_por_compra(
+        db,
+        usuario_id=usuario.id,
+        total_compra_colones=total_despues_puntos,
+        order_id=data.order_id,
+    )
+
+    # Saldo final de puntos
+    saldo_final = obtener_o_crear_saldo(db, usuario.id)
+
+    return ConfirmarCompraOut(
+        total_bruto=total_bruto,
+        descuento_aplicado=descuento_aplicado,
+        total_final=total_despues_puntos,
+        puntos_ganados=puntos_ganados,
+        puntos_redimidos=puntos_redimidos,
+        saldo_puntos_final=saldo_final.saldo,
     )

@@ -50,3 +50,22 @@ class LimiteRedencionOut(BaseModel):
     descuento_maximo_colones: Decimal
     puntos_necesarios_para_maximo: int
     saldo_puntos: int
+
+
+# ============================
+# DTOs para confirmar compra
+# ============================
+
+class ConfirmarCompraIn(BaseModel):
+    total_compra: Decimal          # total BRUTO de la compra (sin puntos)
+    puntos_a_usar: int = 0         # puntos que el cliente quiere utilizar
+    order_id: Optional[int] = None # opcional, si luego enlazas con Pedido
+
+
+class ConfirmarCompraOut(BaseModel):
+    total_bruto: Decimal
+    descuento_aplicado: Decimal
+    total_final: Decimal
+    puntos_ganados: int
+    puntos_redimidos: int
+    saldo_puntos_final: int

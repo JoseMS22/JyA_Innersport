@@ -1,5 +1,9 @@
 # backend/app/models/__init__.py
 
+from .usuario import Usuario
+from .direccion import Direccion
+from .categoria import Categoria
+from .producto import Producto
 from .producto_categoria import ProductoCategoria
 from .media import Media
 from .variante import Variante
@@ -17,6 +21,8 @@ from .programa_puntos import (
     MovimientoPuntosUsuario,
 )
 from .metodo_envio import MetodoEnvio  # 🆕 NUEVO
+from .pedido import Pedido
+from .pago import Pago
 
 __all__ = [
     "Usuario",
@@ -39,5 +45,7 @@ __all__ = [
     "ProgramaPuntosConfig",
     "SaldoPuntosUsuario",
     "MovimientoPuntosUsuario",
-    "MetodoEnvio",  # 🆕 NUEVO
+    "MetodoEnvio",
+    "Pedido",
+    "Pago",
 ]
