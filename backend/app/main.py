@@ -3,13 +3,45 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 import time
+import os
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
+
+# Routers de autenticación y auditoría
 from app.api.v1.auth import router as auth_router
 from app.api.v1.audit import router as audit_router
+
+# Routers de catálogo y productos
+from app.api.v1.categorias import router as categorias_router
+from app.api.v1.productos import router as productos_router
+from app.api.v1.variantes import router as variantes_router
+# Routers de carrrito y favoritos
+from app.api.v1 import cart as cart_router
+from app.api.v1 import favorites as favoritos_router
+
+# Routers de sucursales e inventario
+from app.api.v1.sucursales import router as sucursales_router
+from app.api.v1.inventario import router as inventario_router
+
+# Routers de catálogo público
+from app.api.v1.catalogo import router as catalogo_router
+from app.api.v1.public_inventario import router as inventario_publico_router
+
+# Router de configuración
+from app.api.v1.home_hero import router as home_hero_router
+
+# programa de puntos
+from app.api.v1 import programa_puntos as programa_puntos_router
+# 🆕 US-19: Routers de direcciones y envío
+from app.api.v1.direcciones import router as direcciones_router
+from app.api.v1.envio import router as envio_router
+
+#  Routers de pedidos y pagos
+from app.api.v1.pedidos import router as pedidos_router
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -21,13 +53,14 @@ app = FastAPI(
     description="API REST para tienda virtual con sistema POS integrado",
 )
 
-# CORS
+# 🔹 CORS - CONFIGURACIÓN CRÍTICA PARA COOKIES
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=True,  # 🔴 CRÍTICO: Permite enviar cookies
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 🔴 IMPORTANTE: Expone todos los headers
 )
 
 
@@ -87,7 +120,7 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
-    Maneja excepciones no capturadas y las registra en el log.
+    Maneja excepcciones no capturadas y las registra en el log.
     Cumple con RNF17 (Registro y Monitoreo de Errores).
     """
     from app.core.request_utils import get_client_ip
@@ -110,12 +143,53 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # =========================
-# RUTAS
+# ARCHIVOS ESTÁTICOS (MEDIA)
 # =========================
 
+MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
+
+# =========================
+# RUTAS DE LA API
+# =========================
+
+# Autenticación y auditoría
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Autenticación"])
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["Auditoría"])
 
+# Catálogo y productos
+app.include_router(categorias_router, prefix="/api/v1/categorias", tags=["Categorías"])
+app.include_router(productos_router, prefix="/api/v1/productos", tags=["Productos"])
+app.include_router(variantes_router, prefix="/api/v1/variantes", tags=["Variantes"])
+
+# Sucursales e inventario
+app.include_router(sucursales_router, prefix="/api/v1/sucursales", tags=["Sucursales"])
+app.include_router(inventario_router, prefix="/api/v1/inventario", tags=["Inventario"])
+# Carrito y favoritos
+app.include_router(cart_router.router, prefix="/api/v1")
+app.include_router(favoritos_router.router, prefix="/api/v1")
+# 🆕 Catálogo con filtros avanzados
+# Catálogo público
+app.include_router(catalogo_router, prefix="/api/v1", tags=["Catálogo"])
+app.include_router(inventario_publico_router, prefix="/api/v1", tags=["Inventario Público"])
+
+# Configuración
+app.include_router(home_hero_router, prefix="/api/v1", tags=["Home Hero"])
+# Programa de puntos
+app.include_router(programa_puntos_router.router, prefix="/api/v1")
+
+# 🆕 Checkout / pedidos
+app.include_router(pedidos_router, prefix="/api/v1/pedidos", tags=["Pedidos"])
+
+# 🆕 US-19: Direcciones y envío
+app.include_router(direcciones_router, prefix="/api/v1/direcciones", tags=["Direcciones"])
+app.include_router(envio_router, prefix="/api/v1/envio", tags=["Envío"])
+
+
+# =========================
+# ENDPOINTS RAÍZ
+# =========================
 
 @app.get("/")
 def read_root():
@@ -219,6 +293,7 @@ async def startup_event():
     logger.info(f"🌐 CORS habilitado para: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"🔐 JWT expira en: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutos")
     logger.info(f"📧 Email desde: {settings.EMAIL_FROM_ADDRESS}")
+    logger.info(f"🍪 COOKIE_SECURE: {settings.COOKIE_SECURE}")
     logger.info("=" * 70)
     
     # Verificar conexión a BD al iniciar

@@ -7,6 +7,13 @@ import { Logo } from "@/components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
 
+type UserMe = {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -15,44 +22,54 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-  e.preventDefault();
-  setErrorMsg(null);
-  setLoading(true);
+    e.preventDefault();
+    setErrorMsg(null);
+    setLoading(true);
 
-  const formData = new FormData(e.currentTarget);
-  const payload = {
-    correo: formData.get("correo") as string,
-    password: formData.get("password") as string,
-  };
+    const payload = {
+      correo: email,
+      password: password,
+    };
 
-  try {
-    await apiFetch("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    try {
+      // 1) Login normal
+      await apiFetch("/api/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
 
-    // Si todo bien → home
-    router.push("/");
-  } catch (err: any) {
-    const msg = err?.message ?? "Error al iniciar sesión";
+      // 2) Consultar /me para saber el rol
+      const me = (await apiFetch("/api/v1/auth/me", {
+        method: "GET",
+      })) as UserMe;
 
-    if (typeof msg === "string" && msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")) {
-      // msg viene como: "CUENTA_PENDIENTE_ELIMINACION;2026-01-01T12:00:00+00:00"
-      const [, deletionIso] = msg.split(";", 2);
+      if (me.rol === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? "Error al iniciar sesión";
 
-      const params = new URLSearchParams();
-      params.set("correo", payload.correo);
-      if (deletionIso) params.set("deletion", deletionIso);
+      if (
+        typeof msg === "string" &&
+        msg.startsWith("CUENTA_PENDIENTE_ELIMINACION;")
+      ) {
+        const [, deletionIso] = msg.split(";", 2);
 
-      router.push(`/account/reactivate?${params.toString()}`);
-      return;
+        const params = new URLSearchParams();
+        params.set("correo", payload.correo);
+        if (deletionIso) params.set("deletion", deletionIso);
+
+        router.push(`/account/reactivate?${params.toString()}`);
+        return;
+      }
+
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
     }
-
-    setErrorMsg(msg);
-  } finally {
-    setLoading(false);
   }
-}
 
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center px-4">
@@ -86,7 +103,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Contraseña con ojo */}
+          {/* Contraseña */}
           <PasswordInput
             label="Contraseña"
             value={password}
