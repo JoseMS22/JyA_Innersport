@@ -70,7 +70,8 @@ def _decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError:
+    except JWTError as e:
+        print(f"[DEBUG] Error decodificando token: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado",
@@ -91,10 +92,16 @@ def get_current_user(
 
     # 1) Verificar que existe el token en cookie
     token = request.cookies.get("access_token")
+    
+    # 🔹 DEBUG: Imprimir todas las cookies recibidas
+    print(f"[DEBUG] Cookies recibidas: {request.cookies}")
+    print(f"[DEBUG] Token extraído: {token}")
+    
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No se encontró token de autenticación.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # 2) Decodificar token
@@ -108,7 +115,15 @@ def get_current_user(
         )
 
     # 3) Cargar usuario desde la base de datos
-    user = db.query(Usuario).filter(Usuario.id == int(sub)).first()
+    try:
+        user_id = int(sub)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Identificador de usuario inválido.",
+        )
+    
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

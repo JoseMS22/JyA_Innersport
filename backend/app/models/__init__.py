@@ -12,8 +12,24 @@ from .historial_precio import HistorialPrecio
 from .sucursal import Sucursal
 from .inventario import Inventario
 from .movimiento_inventario import MovimientoInventario
-from .categoria_relacion import categoria_categoria  # si quieres exponerla
-from .home_hero import HomeHeroConfig  # noqa
+from .categoria_relacion import categoria_categoria
+from .home_hero import HomeHeroConfig
+from .metodo_envio import MetodoEnvio  # 🆕 NUEVO
 
-
-__all__ = ["Usuario", "Direccion", "AuditoriaUsuario"]
+__all__ = [
+    "Usuario",
+    "Direccion",
+    "AuditoriaUsuario",
+    "Categoria",
+    "Producto",
+    "ProductoCategoria",
+    "Media",
+    "Variante",
+    "HistorialPrecio",
+    "Sucursal",
+    "Inventario",
+    "MovimientoInventario",
+    "categoria_categoria",
+    "HomeHeroConfig",
+    "MetodoEnvio",  # 🆕 NUEVO
+]
