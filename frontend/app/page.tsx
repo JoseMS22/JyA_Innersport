@@ -562,20 +562,31 @@ export default function HomePage() {
       {/* HERO VIDEO SUPERIOR   */}
       {/* ===================== */}
 
-      <section className="w-full overflow-hidden pt-[120px]">
-        <div className="w-full h-[40vh] sm:h-[50vh] md:h-[83vh] bg-black flex items-center justify-center overflow-hidden">
+      <section className="relative w-full pt-[130px]">
+        {/* contenedor del hero tipo Ray-Ban */}
+        <div
+          className="
+      relative w-full 
+      h-[60vh] md:h-[80vh] lg:h-[90vh]  /* alto según viewport */
+      min-h-[480px]                     /* nunca menos de 480px */
+      max-h-[900px]                     /* por si la pantalla es muuuy alta */
+      overflow-hidden
+      bg-black                          /* color de fondo detrás del video */
+    "
+        >
           {heroConfig && heroConfig.video_url ? (
             <video
-              className="
-          w-full h-full
-          object-contain      /* móvil: que NO se recorte */
-          md:object-cover     /* en pantallas medianas+ sí se recorta tipo hero */
-        "
               src={buildMediaUrl(heroConfig.video_url)}
               autoPlay
               muted
               loop
               playsInline
+              preload="metadata"
+              className="
+          absolute inset-0
+          w-full h-full
+          object-cover       /* 👈 clave: siempre cubrir, nada de contain */
+        "
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -587,14 +598,13 @@ export default function HomePage() {
         </div>
       </section>
 
-
       {/* ===================== */}
       {/* DOS IMÁGENES VERTICALES */}
       {/* ===================== */}
 
       <section className="w-full py-6">
         <div className="grid md:grid-cols-2 gap-2">
-          <div className="w-full h-[55vh] min-h-[700px] bg-gray-200 flex items-center justify-center overflow-hidden">
+          <div className="w-full aspect-[4/5] bg-gray-200 overflow-hidden flex items-center justify-center">
             {heroConfig && heroConfig.banner1_url ? (
               <img
                 src={buildMediaUrl(heroConfig.banner1_url)}
@@ -608,7 +618,7 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="w-full h-[55vh] min-h-[700px] bg-gray-200 flex items-center justify-center overflow-hidden">
+          <div className="w-full aspect-[4/5] bg-gray-200 overflow-hidden flex items-center justify-center">
             {heroConfig && heroConfig.banner2_url ? (
               <img
                 src={buildMediaUrl(heroConfig.banner2_url)}

@@ -16,6 +16,7 @@ class Categoria(Base):
     principal = Column(Boolean, default=False)
     secundaria = Column(Boolean, default=False)
 
+    slug = Column(String(255), nullable=False, unique=True, index=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

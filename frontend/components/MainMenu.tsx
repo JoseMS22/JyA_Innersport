@@ -19,12 +19,14 @@ type UserMe = {
 
 type CategoriaMenu = {
   id: number;
+  slug: string;              // 👈 NUEVO
   nombre: string;
   principal: boolean;
   secundaria: boolean;
   productos_count?: number;
   secundarias: CategoriaMenu[];
 };
+
 
 
 export function MainMenu() {
@@ -53,6 +55,16 @@ export function MainMenu() {
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
   const [menuCategorias, setMenuCategorias] = useState<CategoriaMenu[]>([]);
+
+  // 👉 helper para construir URLs de categorías
+  function categoriaUrl(principalSlug: string, secundariaSlug?: string) {
+    if (secundariaSlug) {
+      // /categorias/ropa-deportiva/mujer
+      return `/categorias/${principalSlug}/${secundariaSlug}`;
+    }
+    // /categorias/ropa-deportiva
+    return `/categorias/${principalSlug}`;
+  }
 
 
   // Detectar scroll → barra compacta
@@ -171,7 +183,16 @@ export function MainMenu() {
     }
   }
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => {
+    if (!pathname) return false;
+
+    if (href.startsWith("/categorias/")) {
+      return pathname === href || pathname.startsWith(href + "/");
+    }
+
+    return pathname === href;
+  };
+
 
 
 
@@ -200,21 +221,20 @@ export function MainMenu() {
     setProfileMenuOpen((prev) => !prev);
   }
 
+  function navigateFromMobile(href: string) { setMobileMenuOpen(false); router.push(href); }
 
-  // Navegar desde menú móvil
-  function navigateFromMobile(href: string) {
+
+  function goToCategoria(slug: string) {
+    router.push(categoriaUrl(slug));
+  }
+
+  function goToCategoriaFromMobile(slug: string) {
     setMobileMenuOpen(false);
-    router.push(href);
+    router.push(categoriaUrl(slug));
   }
 
-  function goToCategoria(id: number) {
-    router.push(`/?categoria=${id}`);
-  }
 
-  function goToCategoriaFromMobile(id: number) {
-    setMobileMenuOpen(false);
-    router.push(`/?categoria=${id}`);
-  }
+
 
 
   const navItemClass = (active?: boolean) =>
@@ -379,11 +399,13 @@ export function MainMenu() {
                   <div key={cat.id} className="relative group">
                     <button
                       type="button"
-                      className={navItemClass(false)}
-                      onClick={() => router.push(`/?categoria=${cat.id}`)}
+                      className={navItemClass(isActive(categoriaUrl(cat.slug)))}
+                      onClick={() => router.push(categoriaUrl(cat.slug))}
                     >
                       {cat.nombre}
                     </button>
+
+
 
                     {cat.secundarias && cat.secundarias.length > 0 && (
                       <div
@@ -396,21 +418,24 @@ export function MainMenu() {
                       >
                         <button
                           type="button"
-                          onClick={() => router.push(`/?categoria=${cat.id}`)}
+                          onClick={() => router.push(categoriaUrl(cat.slug))}
                           className="block w-full text-left px-4 py-2 text-[11px] text-[#6b21a8] hover:bg-[#f3e8ff]"
                         >
                           Ver todo
                         </button>
+
+
                         {cat.secundarias.map((sub) => (
                           <button
                             key={sub.id}
                             type="button"
-                            onClick={() => router.push(`/?categoria=${sub.id}`)}
+                            onClick={() => router.push(categoriaUrl(cat.slug, sub.slug))}
                             className="block w-full text-left px-4 py-2 text-[11px] text-gray-700 hover:bg-[#f3e8ff]"
                           >
                             {sub.nombre}
                           </button>
                         ))}
+
                       </div>
                     )}
                   </div>
@@ -592,7 +617,7 @@ export function MainMenu() {
                   <li key={cat.id} className="flex flex-col">
                     <button
                       className={mobileItemClass}
-                      onClick={() => navigateFromMobile(`/?categoria=${cat.id}`)}
+                      onClick={() => navigateFromMobile(categoriaUrl(cat.slug))}
                     >
                       {cat.nombre}
                     </button>
@@ -604,8 +629,11 @@ export function MainMenu() {
                             key={sub.id}
                             className="w-full pl-8 pr-4 py-2 text-left text-[#6b21a8] text-[13px] border-b border-[#f3e8ff] hover:bg-[#f3e8ff]"
                             onClick={() =>
-                              navigateFromMobile(`/?categoria=${sub.id}`)
+                              navigateFromMobile(categoriaUrl(cat.slug, sub.slug))
                             }
+
+
+
                           >
                             {sub.nombre}
                           </button>
