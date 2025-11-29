@@ -1,3 +1,4 @@
+# backend/app/services/home_hero.py
 from sqlalchemy.orm import Session
 from typing import Optional
 

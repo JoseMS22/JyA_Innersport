@@ -1,4 +1,4 @@
-// frontend/app/page.tsx
+// #frontend/app/page.tsx
 
 "use client";
 
@@ -6,7 +6,6 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "../components/MainMenu";
 import { SearchBar } from "../components/SearchBar";
-import { useCart } from "./context/cartContext";
 import { useFavorites } from "./context/favoritesContext";
 
 // ======================
@@ -70,10 +69,13 @@ type ToastState = {
   message: string;
 } | null;
 
+// Alert de auth
+type AuthAlertState = {
+  message: string;
+} | null;
+
 type ProductoNuevoCardProps = {
   producto: Producto;
-  isFavorite: (id: number) => boolean;
-  onToggleFavorite: (producto: Producto) => void;
   onAddToCart: (producto: Producto) => void;
   onOpen: () => void;
 };
@@ -84,8 +86,6 @@ function formatoPrecio(precio: number) {
 
 function ProductoNuevoCard({
   producto,
-  isFavorite,
-  onToggleFavorite,
   onAddToCart,
   onOpen,
 }: ProductoNuevoCardProps) {
@@ -183,23 +183,6 @@ function ProductoNuevoCard({
           )}
         </div>
 
-        {/* Corazón favoritos */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite(producto);
-          }}
-          className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-sm shadow hover:bg-white"
-        >
-          <span
-            className={
-              isFavorite(producto.id) ? "text-red-500" : "text-gray-500"
-            }
-          >
-            {isFavorite(producto.id) ? "♥" : "♡"}
-          </span>
-        </button>
       </div>
 
       {/* 🔹 TEXTO: marca + nombre + precio */}
@@ -233,13 +216,12 @@ function ProductoNuevoCard({
 export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const { addItem } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [toast, setToast] = useState<ToastState>(null);
+  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
 
   // Estados catálogo principal
   const [loading, setLoading] = useState(true);
@@ -377,6 +359,12 @@ export default function HomePage() {
         const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
           credentials: "include",
         });
+
+      if (!res.ok) {
+        setIsLoggedIn(false);
+        return;
+      }
+
         setIsLoggedIn(res.ok);
       } catch {
         setIsLoggedIn(false);
@@ -460,82 +448,75 @@ export default function HomePage() {
   }
 
   function handleAddToCart(producto: Producto) {
-    if (checkingAuth) {
-      setToast({
-        type: "error",
-        message:
-          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
-      });
-      return;
-    }
-
-    if (!isLoggedIn) {
-      setToast({
-        type: "error",
-        message: "Debes iniciar sesión para agregar productos al carrito.",
-      });
-      return;
-    }
-
-    const variante = {
-      id: producto.id,
-      precio_actual: producto.precio_minimo,
-    };
-
-    const productoInfo = {
-      id: producto.id,
-      nombre: producto.nombre,
-    };
-
-    const imagenUrl = buildMediaUrl(producto.imagen_principal);
-
-    addItem(variante as any, productoInfo as any, 1, imagenUrl);
-
-    setToast({
-      type: "success",
-      message: "El producto se añadió al carrito.",
+  if (checkingAuth) {
+    setAuthAlert({
+      message:
+        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
     });
+    return;
   }
+
+  if (!isLoggedIn) {
+    setAuthAlert({
+      message: "Debes iniciar sesión para agregar productos al carrito.",
+    });
+    return;
+  }
+
+  // Construimos una variante mínima para el carrito
+  const variante = {
+    id: producto.id,
+    sku: "CATALOGO",
+    color: null,
+    talla: null,
+    precio_actual: producto.precio_minimo,
+  };
+
+  const productoInfo = {
+    id: producto.id,
+    nombre: producto.nombre,
+  };
+
+  const imagenUrl = buildMediaUrl(producto.imagen_principal);
+
+  setAuthAlert({
+    message: "El producto se añadió al carrito.",
+  });
+}
 
   function handleToggleFavorite(producto: Producto) {
-    if (checkingAuth) {
-      setToast({
-        type: "error",
-        message:
-          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
-      });
-      return;
-    }
-
-    if (!isLoggedIn) {
-      setToast({
-        type: "error",
-        message: "Debes iniciar sesión para guardar productos favoritos.",
-      });
-      return;
-    }
-
-    const alreadyFav = isFavorite(producto.id);
-
-    const favItem = {
-      id: producto.id,
-      productoId: producto.id,
-      name: producto.nombre,
-      brand: producto.marca || "Innersport",
-      price: producto.precio_minimo,
-      imagenUrl: buildMediaUrl(producto.imagen_principal),
-    };
-
-
-    toggleFavorite(favItem);
-
-    setToast({
-      type: "success",
-      message: alreadyFav
-        ? "El producto se quitó de favoritos."
-        : "Producto guardado en favoritos.",
+  if (checkingAuth) {
+    setAuthAlert({
+      message:
+        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
     });
+    return;
   }
+
+  if (!isLoggedIn) {
+    setAuthAlert({
+      message: "Debes iniciar sesión para guardar productos en favoritos.",
+    });
+    return;
+  }
+
+  const alreadyFav = isFavorite(producto.id);
+
+  const favItem = {
+    id: producto.id,
+    productoId: producto.id,
+    name: producto.nombre,
+    brand: producto.marca || "Innersport",
+    price: producto.precio_minimo,
+    imagenUrl: buildMediaUrl(producto.imagen_principal),
+  };
+
+  setAuthAlert({
+    message: alreadyFav
+      ? "El producto se quitó de favoritos."
+      : "Producto guardado en favoritos.",
+  });
+}
 
   const hayFiltrosActivos = Object.entries(filtrosActivos).some(
     ([key, value]) => value && key !== "ordenar_por"
@@ -695,8 +676,6 @@ export default function HomePage() {
                   <ProductoNuevoCard
                     key={producto.id}
                     producto={producto}
-                    isFavorite={isFavorite}
-                    onToggleFavorite={handleToggleFavorite}
                     onAddToCart={handleAddToCart}
                     onOpen={() => router.push(`/productos/${producto.id}`)}
                   />
@@ -721,6 +700,28 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {authAlert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
+            <div className="flex items-start gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
+                <p className="text-gray-700">{authAlert.message}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAuthAlert(null)}
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

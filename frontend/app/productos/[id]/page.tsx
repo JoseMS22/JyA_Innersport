@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
+import { useCart } from "../../context/cartContext";
+import { useFavorites } from "../../context/favoritesContext";
 import { RecommendedFooter } from "@/components/RecommendedFooter";
 
 const API_BASE =
@@ -63,21 +65,30 @@ type InventarioDisponibilidad = {
   total_stock: number;
 };
 
+type ToastState = {
+  type: "success" | "error";
+  message: string;
+} | null;
+
+type AuthAlertState = {
+  message: string;
+} | null;
+
 // 🎨 Mapa de colores para hexadecimales
 const COLOR_HEX_MAP: Record<string, string> = {
   // Básicos
-  "Negro": "#000000",
-  "Blanco": "#FFFFFF",
-  "Gris": "#808080",
-  "Azul": "#0066CC",
-  "Rojo": "#FF0000",
-  "Verde": "#00AA00",
-  "Amarillo": "#FFD700",
-  "Rosa": "#FF69B4",
-  "Morado": "#9933FF",
-  "Púrpura": "#9933FF",
-  "Naranja": "#FF8C00",
-  
+  Negro: "#000000",
+  Blanco: "#FFFFFF",
+  Gris: "#808080",
+  Azul: "#0066CC",
+  Rojo: "#FF0000",
+  Verde: "#00AA00",
+  Amarillo: "#FFD700",
+  Rosa: "#FF69B4",
+  Morado: "#9933FF",
+  Púrpura: "#9933FF",
+  Naranja: "#FF8C00",
+
   // Variaciones
   "Azul marino": "#000080",
   "Azul cielo": "#87CEEB",
@@ -87,32 +98,42 @@ const COLOR_HEX_MAP: Record<string, string> = {
   "Rosa claro": "#FFB6C1",
   "Gris oscuro": "#404040",
   "Gris claro": "#D3D3D3",
-  "Beige": "#F5F5DC",
-  "Café": "#8B4513",
-  "Crema": "#FFFDD0",
-  "Turquesa": "#40E0D0",
-  "Coral": "#FF7F50",
-  "Lavanda": "#E6E6FA",
+  Beige: "#F5F5DC",
+  Café: "#8B4513",
+  Crema: "#FFFDD0",
+  Turquesa: "#40E0D0",
+  Coral: "#FF7F50",
+  Lavanda: "#E6E6FA",
 };
 
 function getColorHex(colorName: string | null): string {
   if (!colorName) return "#E5E7EB";
-  
+
   const normalized = colorName.trim();
   return COLOR_HEX_MAP[normalized] || "#E5E7EB";
 }
 
 export default function ProductDetailPage() {
+  const { addItem } = useCart();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const router = useRouter();
   const params = useParams();
   const productoId = params.id as string;
 
+  // Estados de la página
+  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
   const [loading, setLoading] = useState(true);
   const [producto, setProducto] = useState<ProductoDetalle | null>(null);
   const [inventarios, setInventarios] =
     useState<Record<number, InventarioDisponibilidad>>({});
+  // Estado de autenticación
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [toast, setToast] = useState<ToastState>(null);
 
-  const [selectedVariante, setSelectedVariante] = useState<Variante | null>(null);
+  const [selectedVariante, setSelectedVariante] = useState<Variante | null>(
+    null
+  );
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedTalla, setSelectedTalla] = useState<string>("");
   const [selectedMarca, setSelectedMarca] = useState<string>("");
@@ -121,11 +142,38 @@ export default function ProductDetailPage() {
 
   // 🆕 Estado para el carrusel hover
   const [isHoveringImage, setIsHoveringImage] = useState(false);
-  const [carouselInterval, setCarouselInterval] = useState<NodeJS.Timeout | null>(null);
+  const [carouselInterval, setCarouselInterval] =
+    useState<NodeJS.Timeout | null>(null);
 
   const [showZoom, setShowZoom] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ✅ Verificar sesión
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+          credentials: "include",
+        });
+        setIsLoggedIn(res.ok);
+      } catch {
+        setIsLoggedIn(false);
+      } finally {
+        setCheckingAuth(false);
+      }
+    }
+
+    checkAuth();
+  }, []);
+
+  // Auto ocultar toast
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // Cargar producto
   useEffect(() => {
     async function cargarProducto() {
       setLoading(true);
@@ -292,9 +340,72 @@ export default function ProductDetailPage() {
     return `₡${precio.toLocaleString("es-CR")}`;
   }
 
+  function handleToggleFavorite() {
+    if (checkingAuth) {
+      setAuthAlert({
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setAuthAlert({
+        message: "Debes iniciar sesión para guardar productos en favoritos.",
+      });
+      return;
+    }
+
+    if (!producto || !selectedVariante) {
+      setAuthAlert({
+        message: "Selecciona color y talla antes de guardar en favoritos.",
+      });
+      return;
+    }
+
+    const yaEraFavorito = isFavorite(selectedVariante.id);
+
+    const favItem = {
+      id: selectedVariante.id,
+      productoId: producto.id,
+      name: producto.nombre,
+      brand: selectedVariante.marca || undefined,
+      price: selectedVariante.precio_actual,
+      imagenUrl: null,
+      color: selectedVariante.color ?? (selectedColor || null),
+      talla: selectedVariante.talla ?? (selectedTalla || null),
+    };
+
+    toggleFavorite(favItem);
+
+    setAuthAlert({
+      message: yaEraFavorito
+        ? "El producto se quitó de favoritos."
+        : "Producto guardado en favoritos.",
+    });
+  }
+
+  const isCurrentFavorite =
+    selectedVariante ? isFavorite(selectedVariante.id) : false;
+
   function handleAddToCart() {
-    if (!selectedVariante) {
-      alert("Por favor selecciona una variante");
+    if (checkingAuth) {
+      setAuthAlert({
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+    if (!isLoggedIn) {
+      setAuthAlert({
+        message: "Debes iniciar sesión para agregar productos al carrito.",
+      });
+      return;
+    }
+    if (!selectedVariante || !producto) {
+      setAuthAlert({
+        message: "Por favor selecciona una variante válida.",
+      });
       return;
     }
 
@@ -302,18 +413,57 @@ export default function ProductDetailPage() {
       inventarios[selectedVariante.id]?.total_stock || 0;
 
     if (stockDisponible === 0) {
-      alert("Esta variante no tiene stock disponible");
+      setAuthAlert({
+        message: "Esta variante no tiene stock disponible.",
+      });
       return;
     }
 
     if (cantidad > stockDisponible) {
-      alert(`Solo hay ${stockDisponible} unidades disponibles`);
+      setAuthAlert({
+        message: `Solo hay ${stockDisponible} unidades disponibles.`,
+      });
       return;
     }
 
+    // Construimos los objetos mínimos que espera el contexto
+    const varianteForCart = {
+      id: selectedVariante.id,
+      sku: selectedVariante.sku,
+      color: selectedVariante.color,
+      talla: selectedVariante.talla,
+      precio_actual: selectedVariante.precio_actual,
+    };
+
+    const productoForCart = producto
+      ? {
+          id: producto.id,
+          nombre: producto.nombre,
+          brand: selectedVariante.marca || undefined,
+        }
+      : null;
+
+    const imagenes = [...producto.media].sort((a, b) => a.orden - b.orden);
+    const imagenActual = imagenes[selectedImageIndex] || imagenes[0];
+
+    const imagenUrl = imagenActual ? buildMediaUrl(imagenActual.url) : null;
+
+    // El contexto se encarga de llamar al backend o usar localStorage
+    addItem(
+      varianteForCart as any,
+      productoForCart as any,
+      cantidad,
+      imagenUrl
+    );
+
+    // Lógica original del main (alert) – la conservamos para no perder nada
     alert(
       `Agregado al carrito: ${cantidad} x ${producto?.nombre} (${selectedVariante.sku})`
     );
+
+    setAuthAlert({
+      message: "El producto se añadió al carrito.",
+    });
   }
 
   function incrementCantidad() {
@@ -578,7 +728,7 @@ export default function ProductDetailPage() {
                   {coloresDisponibles.map((color) => {
                     const hexColor = getColorHex(color);
                     const isWhite = hexColor === "#FFFFFF";
-                    
+
                     return (
                       <button
                         key={color}
@@ -596,7 +746,7 @@ export default function ProductDetailPage() {
                           }`}
                           style={{ backgroundColor: hexColor }}
                         />
-                        
+
                         {/* Checkmark cuando está seleccionado */}
                         {selectedColor === color && (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -617,7 +767,7 @@ export default function ProductDetailPage() {
                             </svg>
                           </div>
                         )}
-                        
+
                         {/* Tooltip */}
                         <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                           {color}
@@ -741,6 +891,26 @@ export default function ProductDetailPage() {
                 )}
               </button>
 
+              {/* Botón favoritos */}
+              <button
+                type="button"
+                onClick={handleToggleFavorite}
+                disabled={!selectedVariante}
+                className="mt-2 w-full py-2 border rounded-lg text-xs font-medium flex items-center justify-center gap-2 text-[#6b21a8] hover:bg-[#f5e9ff] disabled:opacity-50"
+              >
+                <span>
+                  {selectedVariante && isFavorite(selectedVariante.id)
+                    ? "♥"
+                    : "♡"}
+                </span>
+                <span>
+                  {selectedVariante && isFavorite(selectedVariante.id)
+                    ? "Quitar de favoritos"
+                    : "Guardar en favoritos"}
+                </span>
+              </button>
+
+              {/* Información adicional */}
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <div className="flex items-center gap-1">
                   <span>✓</span>
@@ -766,6 +936,52 @@ export default function ProductDetailPage() {
           isOpen={showZoom}
           onClose={() => setShowZoom(false)}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div
+            className={`flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg text-xs border ${
+              toast.type === "success"
+                ? "bg-white/95 border-[#22c55e]/40 text-[#166534]"
+                : "bg-white/95 border-[#f97316]/40 text-[#9a3412]"
+            }`}
+          >
+            <span className="text-lg">
+              {toast.type === "success" ? "✅" : "⚠️"}
+            </span>
+            <div className="flex flex-col">
+              <span className="font-semibold">
+                {toast.type === "success"
+                  ? "Acción realizada"
+                  : "No se pudo completar"}
+              </span>
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {authAlert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
+            <div className="flex items-start gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
+                <p className="text-gray-700">{authAlert.message}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAuthAlert(null)}
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
