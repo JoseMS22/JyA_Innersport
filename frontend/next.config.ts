@@ -1,32 +1,42 @@
-// frontend/next.config.js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Configuración para desarrollo local
-  async headers() {
-    return [
+// frontend/next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      // Backend local - IMPORTANTE para desarrollo
       {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Credentials',
-            value: 'true',
-          },
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: 'http://localhost:8000',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET,DELETE,PATCH,POST,PUT',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Cookie',
-          },
-        ],
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+        pathname: '/media/**',
       },
-    ];
+      // Backend en producción (ajusta según tu dominio cuando despliegues)
+      {
+        protocol: 'https',
+        hostname: 'api.tudominio.com',
+        pathname: '/media/**',
+      },
+      // Placeholders externos (para imágenes de prueba)
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+      // CDNs comunes (si usas Cloudinary o AWS S3)
+      {
+        protocol: 'https',
+        hostname: '**.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.amazonaws.com',
+      },
+    ],
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

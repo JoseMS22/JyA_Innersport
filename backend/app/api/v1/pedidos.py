@@ -91,18 +91,28 @@ def obtener_detalle_pedido(
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    # Construir lista de productos desde los items del pedido
+    # 🔧 CORREGIDO: Construir lista de productos con imagen desde media
     productos = []
     for item in pedido.items:
+        # Obtener la imagen del producto desde la relación media
+        imagen_url = ""
+        if item.producto and hasattr(item.producto, 'media'):
+            # Buscar la primera imagen (puedes filtrar por tipo o posición si existe)
+            medias = item.producto.media
+            if medias and len(medias) > 0:
+                # Tomar la primera media disponible
+                imagen_url = medias[0].url if hasattr(medias[0], 'url') else ""
+        
         productos.append({
             "id": item.id,
             "nombre": item.producto.nombre if item.producto else "Producto eliminado",
-            "imagen_url": item.producto.imagen_url if item.producto else "",
+            "imagen_url": imagen_url,
             "precio_unitario": float(item.precio_unitario),
             "cantidad": item.cantidad,
             "subtotal": float(item.subtotal)
         })
     
+    # 🔧 CORREGIDO: Usar campos reales del modelo Direccion
     # Datos de dirección de envío
     direccion_data = {}
     if pedido.direccion_envio:
@@ -110,9 +120,12 @@ def obtener_detalle_pedido(
             "provincia": pedido.direccion_envio.provincia,
             "canton": pedido.direccion_envio.canton,
             "distrito": pedido.direccion_envio.distrito,
-            "direccion_exacta": pedido.direccion_envio.direccion_exacta,
+            "detalle": pedido.direccion_envio.detalle,  # ✅ Campo correcto
+            "pais": pedido.direccion_envio.pais or "Costa Rica",
+            "codigo_postal": pedido.direccion_envio.codigo_postal or "",
             "telefono": pedido.direccion_envio.telefono or "",
-            "nombre_contacto": pedido.direccion_envio.nombre_contacto or ""
+            "nombre": pedido.direccion_envio.nombre or "",  # ✅ Campo correcto
+            "referencia": pedido.direccion_envio.referencia or ""
         }
     
     # Verificar si puede cancelar (dentro de 24 horas y estado permitido)
