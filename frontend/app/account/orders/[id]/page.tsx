@@ -1,8 +1,9 @@
+//frontend/app/account/orders/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import { ProductImage } from "@/components/ProductImage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -19,9 +20,12 @@ interface Direccion {
   provincia: string;
   canton: string;
   distrito: string;
-  direccion_exacta: string;
+  detalle: string;
+  pais: string;
+  codigo_postal: string;
   telefono: string;
-  nombre_contacto: string;
+  nombre: string;
+  referencia: string;
 }
 
 interface PedidoDetalle {
@@ -48,6 +52,7 @@ const ESTADOS_CONFIG: Record<string, { label: string; color: string; bgColor: st
   ENVIADO: { label: "Enviado", color: "text-indigo-700", bgColor: "bg-indigo-100" },
   ENTREGADO: { label: "Entregado", color: "text-green-700", bgColor: "bg-green-100" },
   CANCELADO: { label: "Cancelado", color: "text-red-700", bgColor: "bg-red-100" },
+  PAGADO: { label: "Pagado", color: "text-green-700", bgColor: "bg-green-100" },
 };
 
 export default function OrderDetailPage() {
@@ -199,8 +204,8 @@ export default function OrderDetailPage() {
                 {pedido.productos.map((producto) => (
                   <div key={producto.id} className="flex items-start space-x-4 pb-4 border-b last:border-b-0 last:pb-0">
                     <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                      <Image
-                        src={producto.imagen_url || "/placeholder.png"}
+                      <ProductImage
+                        src={producto.imagen_url}
                         alt={producto.nombre}
                         fill
                         className="object-cover"
@@ -228,12 +233,15 @@ export default function OrderDetailPage() {
               </h2>
 
               <div className="space-y-2 text-sm">
-                <p className="font-medium text-gray-900">{pedido.direccion_envio.nombre_contacto}</p>
+                <p className="font-medium text-gray-900">{pedido.direccion_envio.nombre}</p>
                 <p className="text-gray-600">{pedido.direccion_envio.telefono}</p>
                 <p className="text-gray-600">
                   {pedido.direccion_envio.provincia}, {pedido.direccion_envio.canton}, {pedido.direccion_envio.distrito}
                 </p>
-                <p className="text-gray-600">{pedido.direccion_envio.direccion_exacta}</p>
+                <p className="text-gray-600">{pedido.direccion_envio.detalle}</p>
+                {pedido.direccion_envio.referencia && (
+                  <p className="text-gray-500 text-xs">Referencia: {pedido.direccion_envio.referencia}</p>
+                )}
               </div>
             </div>
 

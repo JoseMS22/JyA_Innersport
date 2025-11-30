@@ -39,7 +39,16 @@ class Pedido(Base):
         index=True,
     )
 
+    # 🆕 Campos adicionales para checkout mejorado
+    subtotal = Column(Numeric(10, 2), nullable=False, default=0)
+    costo_envio = Column(Numeric(10, 2), nullable=True, default=0)
+    descuento_puntos = Column(Numeric(10, 2), nullable=True, default=0)
     total = Column(Numeric(10, 2), nullable=False)
+    
+    # 🆕 Campos para programa de puntos y envío
+    puntos_ganados = Column(Integer, nullable=True, default=0)
+    metodo_envio = Column(String(50), nullable=True)
+    numero_pedido = Column(String(50), nullable=True, unique=True, index=True)
 
     # estados posibles
     # CREADO, PAGO_PENDIENTE, PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CERRADO, CANCELADO
@@ -75,6 +84,12 @@ class Pedido(Base):
     direccion_envio = relationship("Direccion")
     pagos = relationship(
         "Pago",
+        back_populates="pedido",
+        cascade="all, delete-orphan",
+    )
+    # 🆕 RELACIÓN CRÍTICA: items del pedido
+    items = relationship(
+        "PedidoItem",
         back_populates="pedido",
         cascade="all, delete-orphan",
     )
