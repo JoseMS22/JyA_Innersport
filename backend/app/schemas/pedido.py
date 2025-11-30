@@ -1,11 +1,10 @@
 # backend/app/schemas/pedido.py
 from decimal import Decimal
 from datetime import datetime
-from typing import List
+from typing import List, Optional, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from typing import Literal
 
 class PedidoItemResumen(BaseModel):
     variante_id: int
@@ -15,13 +14,14 @@ class PedidoItemResumen(BaseModel):
     precio_unitario: Decimal
     subtotal: Decimal
 
-    # Pydantic v2: viene desde SQLAlchemy
     model_config = ConfigDict(from_attributes=True)
 
 
 class PedidoCreateFromCart(BaseModel):
     direccion_envio_id: int
     metodo_pago: str
+    # Si en otra rama agregaste más campos (metodo_envio, usar_puntos, etc.)
+    # se pueden sumar aquí luego.
 
 
 class PedidoRead(BaseModel):
@@ -33,13 +33,17 @@ class PedidoRead(BaseModel):
     estado: str
     fecha_creacion: datetime
 
+    # Cancelación
+    cancelado: bool = False
+    motivo_cancelacion: Optional[str] = None
+    fecha_cancelacion: Optional[datetime] = None
+
     items: List[PedidoItemResumen]
 
     pago_estado: str
     pago_metodo: str
     pago_referencia: str
 
-    # Pydantic v2
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,9 +53,14 @@ class PedidoHistorialOut(BaseModel):
     estado: str
     fecha_creacion: datetime
     sucursal_id: int | None
+    cancelado: bool = False
 
-    # Pydantic v2
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================
+# Cambio de estado (ADMIN)
+# ============================
 
 class PedidoEstadoUpdate(BaseModel):
     """
@@ -75,3 +84,42 @@ class PedidoEstadoResponse(BaseModel):
     fecha_actualizacion: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================
+# Schemas para cancelación
+# ============================
+
+class CancelarPedidoRequest(BaseModel):
+    """
+    Request para cancelar un pedido
+    """
+    motivo: str = Field(
+        ...,
+        min_length=10,
+        max_length=500,
+        description="Motivo de la cancelación (mínimo 10 caracteres)",
+    )
+
+
+class ImpactoCancelacionResponse(BaseModel):
+    """
+    Información sobre el impacto de cancelar un pedido
+    """
+    puede_cancelar: bool
+    motivo_bloqueo: Optional[str] = None
+    advertencias: List[str] = Field(default_factory=list)
+    impacto_stock: bool = False
+    mensaje: str
+
+
+class CancelarPedidoResponse(BaseModel):
+    """
+    Respuesta después de cancelar un pedido
+    """
+    success: bool
+    mensaje: str
+    pedido_id: int
+    nuevo_estado: str
+    stock_reintegrado: bool = False
+    items_reintegrados: int = 0

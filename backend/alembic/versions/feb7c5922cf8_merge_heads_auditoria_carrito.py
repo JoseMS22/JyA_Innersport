@@ -1,7 +1,7 @@
 """merge heads auditoria + carrito
 
 Revision ID: feb7c5922cf8
-Revises: 3e63549241d2, XXXXXXXXXXXX
+Revises: 3e63549241d2, 45441ff363fc
 Create Date: 2025-11-29 05:55:36.009028
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'feb7c5922cf8'
-down_revision: Union[str, None] = ('3e63549241d2', 'XXXXXXXXXXXX')
+down_revision: Union[str, None] = ('3e63549241d2', '45441ff363fc')
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

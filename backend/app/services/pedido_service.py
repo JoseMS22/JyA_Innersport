@@ -1,12 +1,14 @@
 # backend/app/services/pedido_service.py
 from decimal import Decimal
 from typing import List
+import time
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.carrito import Carrito, CarritoItem
 from app.models.pedido import Pedido
+from app.models.pedido_item import PedidoItem
 from app.models.pago import Pago
 from app.models.direccion import Direccion
 from app.models.sucursal import Sucursal
@@ -154,13 +156,13 @@ def crear_pedido_desde_carrito(
             detail="La dirección seleccionada no es válida.",
         )
 
-    # 3) Calcular total
-    total = Decimal("0")
+    # 3) Calcular subtotal
+    subtotal = Decimal("0")
     items_resumen: List[PedidoItemResumen] = []
 
     for item in carrito.items:
-        subtotal = item.precio_unitario * item.cantidad
-        total += subtotal
+        subtotal_item = item.precio_unitario * item.cantidad
+        subtotal += subtotal_item
 
         items_resumen.append(
             PedidoItemResumen(
@@ -169,7 +171,7 @@ def crear_pedido_desde_carrito(
                 nombre_producto=item.variante.producto.nombre,
                 cantidad=item.cantidad,
                 precio_unitario=item.precio_unitario,
-                subtotal=subtotal,
+                subtotal=subtotal_item,
             )
         )
 
@@ -181,24 +183,66 @@ def crear_pedido_desde_carrito(
     )
 
     if not sucursal:
-        # Aquí decides la regla de negocio: de momento levantamos error.
+        # Regla de negocio: de momento levantamos error si ninguna sucursal puede atender
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No hay sucursal con stock suficiente para atender el pedido.",
         )
 
-    # 5) Crear Pedido (ya con sucursal_id)
+    # 5) Calcular costo de envío según método seleccionado
+    metodos_envio = {
+        "Envío Estándar": Decimal("3700.00"),    # 5-7 días hábiles
+        "Envío Express": Decimal("5800.00"),     # 2-3 días hábiles
+        "Envío Mismo Día": Decimal("8000.00"),   # Mismo día (solo GAM)
+    }
+
+    # Obtener método de envío desde data o usar estándar por defecto
+    metodo_seleccionado = getattr(data, "metodo_envio", "Envío Estándar")
+    costo_envio = metodos_envio.get(metodo_seleccionado, Decimal("3700.00"))
+    metodo_envio = metodo_seleccionado
+
+    # 6) Calcular descuento por puntos (si aplica en el futuro)
+    descuento_puntos = Decimal("0.00")
+    # TODO: Implementar lógica de puntos si data.usar_puntos
+
+    # 7) Calcular puntos ganados (1 punto por cada ₡100)
+    puntos_ganados = int(subtotal / 100)
+
+    # 8) Calcular total
+    total = subtotal + costo_envio - descuento_puntos
+
+    # 9) Crear Pedido (con sucursal, envío, puntos, etc.)
+    timestamp = int(time.time() * 1000)
     pedido = Pedido(
         cliente_id=usuario_id,
         direccion_envio_id=direccion.id,
-        total=total,
-        estado="PAGADO",  # por ahora pagado directamente
-        sucursal_id=sucursal.id,  # 👈 IMPORTANTE
+        subtotal=subtotal,                  # ✅ Subtotal sin envío
+        costo_envio=costo_envio,            # ✅ Costo de envío calculado
+        descuento_puntos=descuento_puntos,  # ✅ Descuentos
+        total=total,                        # ✅ Total con envío
+        puntos_ganados=puntos_ganados,      # ✅ Puntos ganados
+        estado="PAGADO",
+        metodo_envio=metodo_envio,          # ✅ Método seleccionado
+        numero_pedido=f"ORD-{usuario_id}-{timestamp}",
+        sucursal_id=sucursal.id,            # ✅ Sucursal asignada
     )
     db.add(pedido)
     db.flush()  # para obtener pedido.id
 
-    # 6) Crear Pago simulado
+    # 10) Crear PedidoItems en la base de datos
+    for item in carrito.items:
+        subtotal_item = item.precio_unitario * item.cantidad
+        pedido_item = PedidoItem(
+            pedido_id=pedido.id,
+            variante_id=item.variante_id,
+            producto_id=item.variante.producto_id,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio_unitario,
+            subtotal=subtotal_item,
+        )
+        db.add(pedido_item)
+
+    # 11) Crear Pago simulado
     pago = Pago(
         pedido_id=pedido.id,
         monto=total,
@@ -208,14 +252,14 @@ def crear_pedido_desde_carrito(
     )
     db.add(pago)
 
-    # 7) Marcar carrito como cerrado
+    # 12) Marcar carrito como cerrado
     carrito.estado = "COMPLETADO"
 
     db.commit()
     db.refresh(pedido)
     db.refresh(pago)
 
-    # 8) Enviar correo de confirmación de pedido (estado PAGADO)
+    # 13) Enviar correo de confirmación de pedido (estado PAGADO)
     try:
         cliente = pedido.cliente
         to_email = getattr(cliente, "correo", None) or getattr(cliente, "email", None)
@@ -234,7 +278,7 @@ def crear_pedido_desde_carrito(
     except Exception as e:
         print(f"Error enviando correo de pedido {pedido.id}: {e}")
 
-    # 9) Construir respuesta
+    # 14) Construir respuesta
     return PedidoRead(
         id=pedido.id,
         cliente_id=pedido.cliente_id,

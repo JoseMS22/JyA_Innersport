@@ -2,6 +2,7 @@
 
 from .usuario import Usuario
 from .direccion import Direccion
+from .auditoria import AuditoriaUsuario  # 🔧 AGREGAR ESTA LÍNEA
 from .categoria import Categoria
 from .producto import Producto
 from .producto_categoria import ProductoCategoria
@@ -20,15 +21,16 @@ from .programa_puntos import (
     SaldoPuntosUsuario,
     MovimientoPuntosUsuario,
 )
-from .metodo_envio import MetodoEnvio  # 🆕 NUEVO
+from .metodo_envio import MetodoEnvio
 from .pedido import Pedido
+from .pedido_item import PedidoItem  # 🆕 AGREGAR ESTA LÍNEA
 from .pago import Pago
 from .auditoria import AuditoriaUsuario
 
 __all__ = [
     "Usuario",
     "Direccion",
-    "AuditoriaUsuario",
+    "AuditoriaUsuario",  # Ya estaba en __all__, solo faltaba importarlo arriba
     "Categoria",
     "Producto",
     "ProductoCategoria",
@@ -48,5 +50,6 @@ __all__ = [
     "MovimientoPuntosUsuario",
     "MetodoEnvio",
     "Pedido",
+    "PedidoItem",  # 🆕 AGREGAR ESTA LÍNEA
     "Pago",
 ]

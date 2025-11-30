@@ -6,6 +6,8 @@ from sqlalchemy import (
     Numeric,
     String,
     DateTime,
+    Boolean,
+    Text,
     func,
 )
 from sqlalchemy.orm import relationship
@@ -37,6 +39,7 @@ class Pedido(Base):
         index=True,
     )
 
+    # 🏬 Sucursal a la que se asigna el pedido
     sucursal_id = Column(
         Integer,
         ForeignKey("sucursal.id", ondelete="RESTRICT"),
@@ -44,12 +47,32 @@ class Pedido(Base):
         index=True,
     )
 
+    # 💳 Campos adicionales para checkout mejorado
+    subtotal = Column(Numeric(10, 2), nullable=False, default=0)
+    costo_envio = Column(Numeric(10, 2), nullable=True, default=0)
+    descuento_puntos = Column(Numeric(10, 2), nullable=True, default=0)
 
     total = Column(Numeric(10, 2), nullable=False)
 
-    # estados posibles (puedes usar constantes si quieres)
+    # 🆕 Campos para programa de puntos y envío
+    puntos_ganados = Column(Integer, nullable=True, default=0)
+    metodo_envio = Column(String(50), nullable=True)
+    numero_pedido = Column(String(50), nullable=True, unique=True, index=True)
+
+    # estados posibles (usados actualmente)
     # PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CANCELADO
     estado = Column(String(20), nullable=False, default="PAGADO")
+
+    # Campos de cancelación
+    cancelado = Column(Boolean, nullable=False, default=False, index=True)
+    motivo_cancelacion = Column(Text, nullable=True)
+    fecha_cancelacion = Column(DateTime(timezone=True), nullable=True)
+    cancelado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     fecha_creacion = Column(
         DateTime(timezone=True),
@@ -66,12 +89,19 @@ class Pedido(Base):
     # relaciones
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     vendedor = relationship("Usuario", foreign_keys=[vendedor_id])
+    cancelado_por = relationship("Usuario", foreign_keys=[cancelado_por_id])
     direccion_envio = relationship("Direccion")
-
     sucursal = relationship("Sucursal")
 
     pagos = relationship(
         "Pago",
+        back_populates="pedido",
+        cascade="all, delete-orphan",
+    )
+
+    # items del pedido
+    items = relationship(
+        "PedidoItem",
         back_populates="pedido",
         cascade="all, delete-orphan",
     )
