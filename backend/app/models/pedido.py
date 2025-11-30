@@ -6,6 +6,8 @@ from sqlalchemy import (
     Numeric,
     String,
     DateTime,
+    Boolean,
+    Text,
     func,
 )
 from sqlalchemy.orm import relationship
@@ -39,9 +41,20 @@ class Pedido(Base):
 
     total = Column(Numeric(10, 2), nullable=False)
 
-    # estados posibles (puedes usar constantes si quieres)
+    # estados posibles
     # CREADO, PAGO_PENDIENTE, PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CERRADO, CANCELADO
     estado = Column(String(20), nullable=False, default="PAGADO")
+
+    # Campos de cancelación
+    cancelado = Column(Boolean, nullable=False, default=False, index=True)
+    motivo_cancelacion = Column(Text, nullable=True)
+    fecha_cancelacion = Column(DateTime(timezone=True), nullable=True)
+    cancelado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     fecha_creacion = Column(
         DateTime(timezone=True),
@@ -58,6 +71,7 @@ class Pedido(Base):
     # relaciones
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     vendedor = relationship("Usuario", foreign_keys=[vendedor_id])
+    cancelado_por = relationship("Usuario", foreign_keys=[cancelado_por_id])
     direccion_envio = relationship("Direccion")
     pagos = relationship(
         "Pago",
