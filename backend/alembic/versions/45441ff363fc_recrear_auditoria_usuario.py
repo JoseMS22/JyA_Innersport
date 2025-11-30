@@ -1,6 +1,6 @@
 """recrear auditoria_usuario
 
-Revision ID: XXXXXXXXXXXX
+Revision ID: 45441ff363fc
 Revises: 27c763ee3a6d
 Create Date: 2025-11-29 XX:XX:XX.XXXXXX
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "XXXXXXXXXXXX"        # <-- deja el que generó Alembic
+revision: str = "45441ff363fc"        # <-- deja el que generó Alembic
 down_revision: Union[str, None] = "27c763ee3a6d"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
