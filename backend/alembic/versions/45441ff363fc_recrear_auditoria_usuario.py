@@ -9,15 +9,23 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import inspect  # 👈 añadido
 
 # revision identifiers, used by Alembic.
-revision: str = "XXXXXXXXXXXX"        # <-- deja el que generó Alembic
+revision: str = "XXXXXXXXXXXX"        # deja el mismo ID que ya tenía el archivo
 down_revision: Union[str, None] = "27c763ee3a6d"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Hacemos la migración idempotente: si la tabla ya existe, la borramos primero
+    bind = op.get_bind()
+    inspector = inspect(bind)
+
+    if inspector.has_table("auditoria_usuario"):
+        op.drop_table("auditoria_usuario")
+
     # Volvemos a crear la tabla de auditoría de usuario
     op.create_table(
         "auditoria_usuario",
@@ -49,7 +57,12 @@ def upgrade() -> None:
         ["usuario_id"],
         unique=False,
     )
-    op.create_index("ix_auditoria_usuario_id", "auditoria_usuario", ["id"], unique=False)
+    op.create_index(
+        "ix_auditoria_usuario_id",
+        "auditoria_usuario",
+        ["id"],
+        unique=False,
+    )
     op.create_index(
         "ix_auditoria_usuario_fecha",
         "auditoria_usuario",

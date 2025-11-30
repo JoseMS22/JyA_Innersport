@@ -23,6 +23,7 @@ from .programa_puntos import (
 from .metodo_envio import MetodoEnvio  # 🆕 NUEVO
 from .pedido import Pedido
 from .pago import Pago
+from .auditoria import AuditoriaUsuario
 
 __all__ = [
     "Usuario",

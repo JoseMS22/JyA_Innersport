@@ -5,6 +5,7 @@ from typing import List
 
 from pydantic import BaseModel, ConfigDict
 
+from typing import Literal
 
 class PedidoItemResumen(BaseModel):
     variante_id: int
@@ -27,6 +28,7 @@ class PedidoRead(BaseModel):
     id: int
     cliente_id: int
     direccion_envio_id: int
+    sucursal_id: int | None
     total: Decimal
     estado: str
     fecha_creacion: datetime
@@ -46,6 +48,30 @@ class PedidoHistorialOut(BaseModel):
     total: Decimal
     estado: str
     fecha_creacion: datetime
+    sucursal_id: int | None
 
     # Pydantic v2
+    model_config = ConfigDict(from_attributes=True)
+
+class PedidoEstadoUpdate(BaseModel):
+    """
+    Payload de entrada para cambiar el estado del pedido.
+    """
+    estado: Literal[
+        "PAGADO",
+        "EN_PREPARACION",
+        "ENVIADO",
+        "ENTREGADO",
+        "CANCELADO",
+    ]
+
+
+class PedidoEstadoResponse(BaseModel):
+    """
+    Respuesta simplificada cuando se actualiza el estado.
+    """
+    id: int
+    estado: str
+    fecha_actualizacion: datetime
+
     model_config = ConfigDict(from_attributes=True)

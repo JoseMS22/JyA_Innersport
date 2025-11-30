@@ -12,8 +12,10 @@ from app.schemas.pedido import (
     PedidoCreateFromCart,
     PedidoRead,
     PedidoHistorialOut,   # ⬅️ nuevo import
+    PedidoEstadoUpdate,      # ⬅️ nuevo
+    PedidoEstadoResponse, 
 )
-from app.services.pedido_service import crear_pedido_desde_carrito
+from app.services.pedido_service import crear_pedido_desde_carrito, actualizar_estado_pedido
 
 router = APIRouter()
 
@@ -47,3 +49,24 @@ def listar_mis_pedidos(
         .all()
     )
     return pedidos
+
+@router.patch("/{pedido_id}/estado", response_model=PedidoEstadoResponse)
+def cambiar_estado_pedido(
+    pedido_id: int,
+    data: PedidoEstadoUpdate,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cambia el estado de un pedido y envía un correo al cliente.
+
+    ⚠️ IMPORTANTE:
+    Más adelante deberías restringir este endpoint solo a usuarios
+    con rol de ADMIN / VENDEDOR o similar.
+    """
+    return actualizar_estado_pedido(
+        db=db,
+        pedido_id=pedido_id,
+        nuevo_estado=data.estado,
+        usuario_actual=current_user,
+    )

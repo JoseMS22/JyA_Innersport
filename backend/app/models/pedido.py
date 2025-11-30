@@ -37,10 +37,18 @@ class Pedido(Base):
         index=True,
     )
 
+    sucursal_id = Column(
+        Integer,
+        ForeignKey("sucursal.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+
+
     total = Column(Numeric(10, 2), nullable=False)
 
     # estados posibles (puedes usar constantes si quieres)
-    # CREADO, PAGO_PENDIENTE, PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CERRADO, CANCELADO
+    # PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CANCELADO
     estado = Column(String(20), nullable=False, default="PAGADO")
 
     fecha_creacion = Column(
@@ -59,6 +67,9 @@ class Pedido(Base):
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     vendedor = relationship("Usuario", foreign_keys=[vendedor_id])
     direccion_envio = relationship("Direccion")
+
+    sucursal = relationship("Sucursal")
+
     pagos = relationship(
         "Pago",
         back_populates="pedido",
