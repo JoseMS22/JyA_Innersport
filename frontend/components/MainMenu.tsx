@@ -210,10 +210,6 @@ export function MainMenu() {
     router.push(categoriaUrl(slug));
   }
 
-  function goToCategoria(slug: string) {
-    router.push(categoriaUrl(slug));
-  }
-
   function goToCategoriaFromMobile(slug: string) {
     setMobileMenuOpen(false);
     router.push(categoriaUrl(slug));
