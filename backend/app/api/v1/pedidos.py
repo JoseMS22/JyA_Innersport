@@ -1,9 +1,9 @@
 # backend/app/api/v1/pedidos.py
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.core.security import get_current_user
@@ -31,6 +31,10 @@ from app.services.cancelar_pedido_service import (
 
 router = APIRouter()
 
+def require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+  if current_user.rol != "ADMIN":
+      raise HTTPException(status_code=403, detail="Solo administradores")
+  return current_user
 
 def get_client_ip(request: Request) -> str:
     """Obtiene la IP del cliente desde el request"""
@@ -39,6 +43,42 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+@router.get("/admin", response_model=List[PedidoHistorialOut])
+def listar_pedidos_admin(
+    estado: Optional[str] = Query(None, description="Estado del pedido"),
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(require_admin),
+):
+    """
+    Lista pedidos para el panel admin.
+    - Puede filtrar por estado (PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CANCELADO)
+    - Si `estado` es None -> trae todos.
+    """
+    query = (
+        db.query(Pedido)
+        .options(joinedload(Pedido.sucursal))  # 👈 para traer también la sucursal
+        .order_by(Pedido.fecha_creacion.desc())
+    )
+
+    if estado:
+        query = query.filter(Pedido.estado == estado)
+
+    pedidos = query.all()
+
+    # 👇 Construimos la respuesta incluyendo sucursal_nombre
+    return [
+        PedidoHistorialOut(
+            id=p.id,
+            total=p.total,
+            estado=p.estado,
+            fecha_creacion=p.fecha_creacion,
+            sucursal_id=p.sucursal_id,
+            sucursal_nombre=p.sucursal.nombre if p.sucursal else None,
+            cancelado=p.cancelado,
+            numero_pedido=p.numero_pedido,
+        )
+        for p in pedidos
+    ]
 
 @router.post("/checkout", response_model=PedidoRead)
 def crear_pedido_checkout(
@@ -106,14 +146,12 @@ def obtener_detalle_pedido(
     """
     Obtener detalles completos de un pedido específico
     """
-    pedido = (
-        db.query(Pedido)
-        .filter(
-            Pedido.id == pedido_id,
-            Pedido.cliente_id == current_user.id,
-        )
-        .first()
-    )
+    query = db.query(Pedido).filter(Pedido.id == pedido_id)
+
+    if current_user.rol != "ADMIN":
+        query = query.filter(Pedido.cliente_id == current_user.id)
+
+    pedido = query.first()
 
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")

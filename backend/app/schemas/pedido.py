@@ -20,6 +20,7 @@ class PedidoItemResumen(BaseModel):
 class PedidoCreateFromCart(BaseModel):
     direccion_envio_id: int
     metodo_pago: str
+    metodo_envio: Optional[str] = None
     # Si en otra rama agregaste más campos (metodo_envio, usar_puntos, etc.)
     # se pueden sumar aquí luego.
 
@@ -28,8 +29,13 @@ class PedidoRead(BaseModel):
     id: int
     cliente_id: int
     direccion_envio_id: int
-    sucursal_id: int | None
+    sucursal_id: int | None = None
+
+    subtotal: Decimal
+    costo_envio: Decimal
+    descuento_puntos: Decimal
     total: Decimal
+
     estado: str
     fecha_creacion: datetime
 
@@ -37,6 +43,9 @@ class PedidoRead(BaseModel):
     cancelado: bool = False
     motivo_cancelacion: Optional[str] = None
     fecha_cancelacion: Optional[datetime] = None
+
+    metodo_envio: Optional[str] = None
+    numero_pedido: Optional[str] = None
 
     items: List[PedidoItemResumen]
 
@@ -47,13 +56,16 @@ class PedidoRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+
 class PedidoHistorialOut(BaseModel):
     id: int
     total: Decimal
     estado: str
     fecha_creacion: datetime
     sucursal_id: int | None
+    sucursal_nombre: Optional[str] = None 
     cancelado: bool = False
+    numero_pedido: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

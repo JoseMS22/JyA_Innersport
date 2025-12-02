@@ -51,3 +51,5 @@ class MovimientoInventario(Base):
 
     variante = relationship("Variante")
     sucursal = relationship("Sucursal")
+
+    usuario = relationship("Usuario")

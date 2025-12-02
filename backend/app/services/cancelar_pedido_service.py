@@ -152,7 +152,7 @@ def reintegrar_stock_pedido(
     
     # Asumimos que hay una sucursal principal (ID 1) o la primera disponible
     # En producción, esto debería venir de una configuración
-    sucursal_id = 1
+    sucursal_id = pedido.sucursal_id or 1
     
     for item in carrito.items:
         try:

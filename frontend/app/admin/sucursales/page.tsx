@@ -10,6 +10,7 @@ type Sucursal = {
   nombre: string;
   direccion?: string | null;
   telefono?: string | null;
+  provincia?: string | null;
   activo: boolean;
   created_at?: string;
 };
@@ -18,12 +19,14 @@ type SucursalFormState = {
   nombre: string;
   direccion: string;
   telefono: string;
+  provincia: string;
 };
 
 const EMPTY_FORM: SucursalFormState = {
   nombre: "",
   direccion: "",
   telefono: "",
+  provincia: "",
 };
 
 type ConfirmMode = "activar" | "desactivar" | null;
@@ -86,6 +89,7 @@ export default function AdminSucursalesPage() {
       nombre: sucursal.nombre ?? "",
       direccion: sucursal.direccion ?? "",
       telefono: sucursal.telefono ?? "",
+      provincia: sucursal.provincia ?? "",
     });
     setEditingId(sucursal.id);
     setIsEditOpen(true);
@@ -112,6 +116,7 @@ export default function AdminSucursalesPage() {
         nombre: form.nombre.trim(),
         direccion: form.direccion.trim() || null,
         telefono: form.telefono.trim() || null,
+        provincia: form.provincia.trim() || null,
       };
 
       await apiFetch("/api/v1/sucursales", {
@@ -141,6 +146,7 @@ export default function AdminSucursalesPage() {
         nombre: form.nombre.trim(),
         direccion: form.direccion.trim() || null,
         telefono: form.telefono.trim() || null,
+        provincia: form.provincia.trim() || null,
       };
 
       await apiFetch(`/api/v1/sucursales/${editingId}`, {
@@ -201,9 +207,9 @@ export default function AdminSucursalesPage() {
       console.error(err);
       setError(
         err?.message ??
-          (confirmMode === "desactivar"
-            ? "Error al desactivar la sucursal"
-            : "Error al activar la sucursal")
+        (confirmMode === "desactivar"
+          ? "Error al desactivar la sucursal"
+          : "Error al activar la sucursal")
       );
       setConfirmLoading(false);
     }
@@ -232,7 +238,7 @@ export default function AdminSucursalesPage() {
         </div>
         <button
           onClick={openCreateModal}
-          className="text-xs px-3 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold hover:bg-[#7e22ce] shadow-sm"
+          className="text-xs px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8] font-semibold border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm"
         >
           + Nueva sucursal
         </button>
@@ -286,6 +292,9 @@ export default function AdminSucursalesPage() {
                     Nombre
                   </th>
                   <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">
+                    Provincia
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">
                     Dirección
                   </th>
                   <th className="px-3 py-2 text-left font-semibold hidden md:table-cell">
@@ -306,9 +315,8 @@ export default function AdminSucursalesPage() {
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1 text-[11px]">
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            suc.activo ? "bg-emerald-500" : "bg-gray-300"
-                          }`}
+                          className={`w-2 h-2 rounded-full ${suc.activo ? "bg-emerald-500" : "bg-gray-300"
+                            }`}
                         />
                         <span
                           className={
@@ -328,10 +336,16 @@ export default function AdminSucursalesPage() {
                         <span className="font-semibold text-gray-800">
                           {suc.nombre}
                         </span>
-                        <span className="text-[11px] text-gray-400 md:hidden">
-                          {suc.direccion || "Sin dirección registrada"}
-                        </span>
                       </div>
+                    </td>
+
+                    {/* Dirección */}
+                    <td className="px-3 py-2 hidden sm:table-cell text-gray-600">
+                      {suc.provincia || (
+                        <span className="text-gray-400 text-[11px]">
+                          Sin provincia registrada
+                        </span>
+                      )}
                     </td>
 
                     {/* Dirección */}
@@ -354,36 +368,46 @@ export default function AdminSucursalesPage() {
 
                     {/* Acciones */}
                     <td className="px-3 py-2">
-                      <div className="flex justify-end gap-1 flex-wrap">
+                      <div className="flex justify-end gap-2 flex-wrap">
+                        {/* Ver inventario */}
                         <button
                           onClick={() => handleVerInventario(suc.id)}
-                          className="px-2 py-1 rounded-full bg-sky-50 text-[11px] text-sky-700 hover:bg-sky-100 border border-sky-100"
+                          title="Ver inventario"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 text-sm"
                         >
-                          Ver inventario
+                          📦
                         </button>
+
+                        {/* Editar */}
                         <button
                           onClick={() => openEditModal(suc)}
-                          className="px-2 py-1 rounded-full bg-amber-50 text-[11px] text-amber-700 hover:bg-amber-100 border border-amber-100"
+                          title="Editar sucursal"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 text-sm"
                         >
-                          Editar
+                          ✏️
                         </button>
+
+                        {/* Activar / Desactivar */}
                         {suc.activo ? (
                           <button
                             onClick={() => openConfirmDesactivar(suc)}
-                            className="px-2 py-1 rounded-full bg-red-50 text-[11px] text-red-700 hover:bg-red-100 border border-red-100"
+                            title="Desactivar sucursal"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-sm"
                           >
-                            Desactivar
+                            🗑️
                           </button>
                         ) : (
                           <button
                             onClick={() => openConfirmActivar(suc)}
-                            className="px-2 py-1 rounded-full bg-emerald-50 text-[11px] text-emerald-700 hover:bg-emerald-100 border border-emerald-100"
+                            title="Activar sucursal"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 text-sm"
                           >
-                            Activar
+                            ✅
                           </button>
                         )}
                       </div>
                     </td>
+
                   </tr>
                 ))}
               </tbody>
@@ -495,6 +519,20 @@ function SucursalForm({
 
       <div>
         <label className="block mb-1 font-medium text-gray-700">
+          Provincia (opcional)
+        </label>
+        <input
+          type="text"
+          value={form.provincia}
+          onChange={(e) => setForm({ ...form, provincia: e.target.value })}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-[#a855f7]"
+          placeholder="Ej. San José"
+        />
+      </div>
+
+
+      <div>
+        <label className="block mb-1 font-medium text-gray-700">
           Dirección
         </label>
         <textarea
@@ -528,10 +566,11 @@ function SucursalForm({
         <button
           type="submit"
           disabled={saving}
-          className="px-3 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold text-xs hover:bg-[#7e22ce] disabled:opacity-60"
+          className="px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8] font-semibold text-xs border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd] disabled:opacity-60"
         >
           {saving ? "Guardando..." : actionLabel}
         </button>
+
       </div>
     </form>
   );
@@ -599,19 +638,18 @@ function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold text-white ${
-              isDesactivar
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
-            } disabled:opacity-60`}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold text-white ${isDesactivar
+              ? "bg-red-600 hover:bg-red-700"
+              : "bg-emerald-600 hover:bg-emerald-700"
+              } disabled:opacity-60`}
           >
             {loading
               ? isDesactivar
                 ? "Desactivando..."
                 : "Activando..."
               : isDesactivar
-              ? "Sí, desactivar"
-              : "Sí, activar"}
+                ? "Sí, desactivar"
+                : "Sí, activar"}
           </button>
         </div>
       </div>

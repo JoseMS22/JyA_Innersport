@@ -105,71 +105,94 @@ export default function InventarioSucursalPage() {
               </thead>
 
               <tbody>
-                {items.map((i) => (
-                  <tr key={i.id} className="border-b hover:bg-gray-50">
-                    {/* Producto */}
-                    <td className="px-3 py-3">
-                      <span className="font-medium text-gray-800">
-                        {i.variante?.producto?.nombre ??
-                          `Variante #${i.variante.id}`}
-                      </span>
-                    </td>
+                {items.map((i) => {
+                  const isLowStock =
+                    i.min_stock != null && i.cantidad <= i.min_stock;
 
-                    {/* Color */}
-                    <td className="px-3 py-3 text-gray-700">
-                      {i.variante.color || "-"}
-                    </td>
-
-                    {/* Talla */}
-                    <td className="px-3 py-3 text-gray-700">
-                      {i.variante.talla || "-"}
-                    </td>
-
-                    {/* Stock */}
-                    <td className="px-3 py-3 text-center font-bold text-[#6b21a8]">
-                      {i.cantidad}
-                    </td>
-
-                    {/* Mínimo */}
-                    <td
-                      className={`px-3 py-3 text-center font-semibold ${
-                        i.min_stock != null && i.cantidad < i.min_stock
-                          ? "text-red-600"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {i.min_stock ?? "-"}
-                    </td>
-
-                    {/* ACCIONES */}
-                    <td className="px-3 py-3 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedVariante(i.variante.id);
-                            setCurrentCantidad(i.cantidad);
-                            setCurrentMinStock(i.min_stock);
-                            setShowAjuste(true);
-                          }}
-                          className="px-2 py-1 text-xs rounded bg-[#a855f7] text-white hover:bg-[#7e22ce]"
+                  return (
+                    <tr key={i.id} className="border-b hover:bg-gray-50">
+                      {/* Producto */}
+                      <td className="px-3 py-3">
+                        <span
+                          className={`font-medium ${isLowStock ? "text-red-600" : "text-gray-800"
+                            }`}
                         >
-                          Ajustar
-                        </button>
+                          {i.variante?.producto?.nombre ??
+                            `Variante #${i.variante.id}`}
+                        </span>
+                      </td>
 
-                        <button
-                          onClick={() => {
-                            setSelectedVariante(i.variante.id);
-                            setShowMovimientos(true);
-                          }}
-                          className="px-2 py-1 text-xs rounded bg-gray-800 text-white hover:bg-black"
-                        >
-                          Movimientos
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Color */}
+                      <td
+                        className={`px-3 py-3 ${isLowStock ? "text-red-600" : "text-gray-700"
+                          }`}
+                      >
+                        {i.variante.color || "-"}
+                      </td>
+
+                      {/* Talla */}
+                      <td
+                        className={`px-3 py-3 ${isLowStock ? "text-red-600" : "text-gray-700"
+                          }`}
+                      >
+                        {i.variante.talla || "-"}
+                      </td>
+
+                      {/* Stock */}
+                      <td
+                        className={`px-3 py-3 text-center font-bold ${isLowStock ? "text-red-600" : "text-[#6b21a8]"
+                          }`}
+                      >
+                        {i.cantidad}
+                      </td>
+
+                      {/* Mínimo */}
+                      <td
+                        className={`px-3 py-3 text-center font-semibold ${isLowStock ? "text-red-600" : "text-gray-700"
+                          }`}
+                      >
+                        {i.min_stock ?? "-"}
+                      </td>
+
+                      {/* ACCIONES */}
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedVariante(i.variante.id);
+                              setCurrentCantidad(i.cantidad);
+                              setCurrentMinStock(i.min_stock);
+                              setShowAjuste(true);
+                            }}
+                            title="Ajustar stock"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] rounded-full 
+               bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+               hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-colors"
+                          >
+                            <span>🛠️</span>
+                            <span>Ajustar</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedVariante(i.variante.id);
+                              setShowMovimientos(true);
+                            }}
+                            title="Ver movimientos de stock"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] rounded-full
+               bg-gray-100 text-gray-700 border border-gray-200
+               hover:bg-gray-200 hover:border-gray-300 transition-colors"
+                          >
+                            <span>🔄</span>
+                            <span>Movimientos</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
+
             </table>
           </div>
         )}

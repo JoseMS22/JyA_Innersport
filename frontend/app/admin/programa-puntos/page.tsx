@@ -323,7 +323,12 @@ export default function ProgramaPuntosAdminPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold text-xs hover:bg-[#7e22ce] disabled:opacity-60"
+                className="px-3 py-1.5 rounded-full 
+             bg-[#f5f3ff] text-[#6b21a8] 
+             border border-[#a855f7]/40 
+             shadow-sm text-xs font-semibold
+             hover:bg-[#ede9fe]
+             disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {saving ? "Guardando..." : "Guardar configuración"}
               </button>

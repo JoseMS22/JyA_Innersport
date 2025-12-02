@@ -130,7 +130,7 @@ def send_pedido_estado_email(
         },
     )
 
-    pedido_url = f"{settings.FRONTEND_BASE_URL}/mis-pedidos/{pedido_id}"
+    pedido_url = f"{settings.FRONTEND_BASE_URL}/account/orders/{pedido_id}"
 
     html_content = f"""
     <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f3f4f6; padding: 24px;">

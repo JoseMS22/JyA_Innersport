@@ -7,7 +7,7 @@ class SucursalBase(BaseModel):
     nombre: str
     direccion: Optional[str] = None
     telefono: Optional[str] = None
-    provincia: str
+    provincia: Optional[str] = None
 
 
 class SucursalCreate(SucursalBase):
@@ -18,7 +18,7 @@ class SucursalUpdate(BaseModel):
     nombre: Optional[str] = None
     direccion: Optional[str] = None
     telefono: Optional[str] = None
-    provincia: str
+    provincia: Optional[str] = None
     activo: Optional[bool] = None
 
 

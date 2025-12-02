@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "../components/MainMenu";
 import { SearchBar } from "../components/SearchBar";
 import { useFavorites } from "./context/favoritesContext";
+import { useCart } from "./context/cartContext";
+
 
 // ======================
 // Tipos del catálogo real (API)
@@ -200,6 +202,16 @@ function ProductoNuevoCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            onOpen();
+          }}
+          className="mt-3 w-full text-center text-white bg-[#a855f7] hover:bg-[#7e22ce] py-2 text-[12px] rounded-lg"
+        >
+          Ver detalles
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
             onAddToCart(producto);
           }}
           disabled={!producto.tiene_stock}
@@ -217,6 +229,7 @@ export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { addItem } = useCart();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -360,10 +373,10 @@ export default function HomePage() {
           credentials: "include",
         });
 
-      if (!res.ok) {
-        setIsLoggedIn(false);
-        return;
-      }
+        if (!res.ok) {
+          setIsLoggedIn(false);
+          return;
+        }
 
         setIsLoggedIn(res.ok);
       } catch {
@@ -448,75 +461,78 @@ export default function HomePage() {
   }
 
   function handleAddToCart(producto: Producto) {
-  if (checkingAuth) {
-    setAuthAlert({
-      message:
-        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+    if (checkingAuth) {
+      setAuthAlert({
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setAuthAlert({
+        message: "Debes iniciar sesión para agregar productos al carrito.",
+      });
+      return;
+    }
+
+    // Variante mínima (igual que en CatalogoPage)
+    const variante = {
+      id: producto.id, // 👈 aquí asumes que el backend entiende esto como variante
+      precio_actual: producto.precio_minimo,
+    };
+
+    const productoInfo = {
+      id: producto.id,
+      nombre: producto.nombre,
+    };
+
+    const imagenUrl = buildMediaUrl(producto.imagen_principal);
+
+    // 👉 Aquí SÍ lo mandamos al contexto del carrito
+    addItem(variante as any, productoInfo as any, 1, imagenUrl);
+
+    // Feedback al usuario
+    setToast({
+      type: "success",
+      message: "El producto se añadió al carrito.",
     });
-    return;
   }
 
-  if (!isLoggedIn) {
-    setAuthAlert({
-      message: "Debes iniciar sesión para agregar productos al carrito.",
-    });
-    return;
-  }
-
-  // Construimos una variante mínima para el carrito
-  const variante = {
-    id: producto.id,
-    sku: "CATALOGO",
-    color: null,
-    talla: null,
-    precio_actual: producto.precio_minimo,
-  };
-
-  const productoInfo = {
-    id: producto.id,
-    nombre: producto.nombre,
-  };
-
-  const imagenUrl = buildMediaUrl(producto.imagen_principal);
-
-  setAuthAlert({
-    message: "El producto se añadió al carrito.",
-  });
-}
 
   function handleToggleFavorite(producto: Producto) {
-  if (checkingAuth) {
+    if (checkingAuth) {
+      setAuthAlert({
+        message:
+          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      });
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setAuthAlert({
+        message: "Debes iniciar sesión para guardar productos en favoritos.",
+      });
+      return;
+    }
+
+    const alreadyFav = isFavorite(producto.id);
+
+    const favItem = {
+      id: producto.id,
+      productoId: producto.id,
+      name: producto.nombre,
+      brand: producto.marca || "Innersport",
+      price: producto.precio_minimo,
+      imagenUrl: buildMediaUrl(producto.imagen_principal),
+    };
+
     setAuthAlert({
-      message:
-        "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+      message: alreadyFav
+        ? "El producto se quitó de favoritos."
+        : "Producto guardado en favoritos.",
     });
-    return;
   }
-
-  if (!isLoggedIn) {
-    setAuthAlert({
-      message: "Debes iniciar sesión para guardar productos en favoritos.",
-    });
-    return;
-  }
-
-  const alreadyFav = isFavorite(producto.id);
-
-  const favItem = {
-    id: producto.id,
-    productoId: producto.id,
-    name: producto.nombre,
-    brand: producto.marca || "Innersport",
-    price: producto.precio_minimo,
-    imagenUrl: buildMediaUrl(producto.imagen_principal),
-  };
-
-  setAuthAlert({
-    message: alreadyFav
-      ? "El producto se quitó de favoritos."
-      : "Producto guardado en favoritos.",
-  });
-}
 
   const hayFiltrosActivos = Object.entries(filtrosActivos).some(
     ([key, value]) => value && key !== "ordenar_por"
