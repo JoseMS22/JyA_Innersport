@@ -2,7 +2,7 @@
 
 from .usuario import Usuario
 from .direccion import Direccion
-from .auditoria import AuditoriaUsuario
+from .auditoria import AuditoriaUsuario  # 🔧 AGREGAR ESTA LÍNEA
 from .categoria import Categoria
 from .producto import Producto
 from .producto_categoria import ProductoCategoria
@@ -12,14 +12,24 @@ from .historial_precio import HistorialPrecio
 from .sucursal import Sucursal
 from .inventario import Inventario
 from .movimiento_inventario import MovimientoInventario
-from .categoria_relacion import categoria_categoria
-from .home_hero import HomeHeroConfig
-from .metodo_envio import MetodoEnvio  # 🆕 NUEVO
+from .categoria_relacion import categoria_categoria  # si quieres exponerla
+from .home_hero import HomeHeroConfig  # noqa
+from .favoritos import Favorito
+from .carrito import Carrito, CarritoItem
+from .programa_puntos import (
+    ProgramaPuntosConfig,
+    SaldoPuntosUsuario,
+    MovimientoPuntosUsuario,
+)
+from .metodo_envio import MetodoEnvio
+from .pedido import Pedido
+from .pedido_item import PedidoItem  # 🆕 AGREGAR ESTA LÍNEA
+from .pago import Pago
 
 __all__ = [
     "Usuario",
     "Direccion",
-    "AuditoriaUsuario",
+    "AuditoriaUsuario",  # Ya estaba en __all__, solo faltaba importarlo arriba
     "Categoria",
     "Producto",
     "ProductoCategoria",
@@ -31,5 +41,14 @@ __all__ = [
     "MovimientoInventario",
     "categoria_categoria",
     "HomeHeroConfig",
-    "MetodoEnvio",  # 🆕 NUEVO
+    "Favorito",
+    "Carrito",
+    "CarritoItem",
+    "ProgramaPuntosConfig",
+    "SaldoPuntosUsuario",
+    "MovimientoPuntosUsuario",
+    "MetodoEnvio",
+    "Pedido",
+    "PedidoItem",  # 🆕 AGREGAR ESTA LÍNEA
+    "Pago",
 ]

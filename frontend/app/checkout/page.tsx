@@ -46,6 +46,14 @@ type NuevaDireccionForm = {
   predeterminada: boolean;
 };
 
+type LimitePuntos = {
+  puede_usar_puntos: boolean;
+  motivo: string | null;
+  descuento_maximo_colones: number;
+  puntos_necesarios_para_maximo: number;
+  saldo_puntos: number;
+};
+
 const PROVINCIAS = [
   "San José",
   "Alajuela",
@@ -74,6 +82,12 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // Puntos
+  const [puntosDisponibles, setPuntosDisponibles] = useState<number>(0);
+  const [puntosUsados, setPuntosUsados] = useState<number>(0);
+  const [descuento, setDescuento] = useState<number>(0);
+  const [limitePuntos, setLimitePuntos] = useState<LimitePuntos | null>(null);
+
   const [nuevaDireccion, setNuevaDireccion] = useState<NuevaDireccionForm>({
     nombre: "",
     provincia: "",
@@ -85,9 +99,13 @@ export default function CheckoutPage() {
     predeterminada: false,
   });
 
-  // Verificar sesión y cargar direcciones
+  // Nuevo: estado para bloquear botón mientras se procesa el pedido
+  const [procesandoPago, setProcesandoPago] = useState(false);
+
+  // ========= 1) Verificar sesión y cargar datos iniciales =========
   useEffect(() => {
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function checkAuth() {
@@ -102,12 +120,32 @@ export default function CheckoutPage() {
       }
 
       setIsLoggedIn(true);
-      await cargarDirecciones();
+
+      // Cargar datos del usuario
+      await Promise.all([cargarDirecciones(), cargarSaldoPuntos()]);
     } catch (err) {
       router.push("/login?redirect=/checkout");
     }
   }
 
+  // ========= 2) Cargar saldo de puntos =========
+  async function cargarSaldoPuntos() {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/puntos/me/saldo`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      // data.saldo viene del backend
+      setPuntosDisponibles(data.saldo || 0);
+    } catch (err) {
+      console.error("Error al cargar saldo de puntos", err);
+    }
+  }
+
+  // ========= 3) Cargar direcciones =========
   async function cargarDirecciones() {
     try {
       setLoading(true);
@@ -137,6 +175,7 @@ export default function CheckoutPage() {
     }
   }
 
+  // ========= 4) Calcular métodos de envío =========
   async function calcularEnvio(direccionId: number) {
     try {
       setCalculando(true);
@@ -172,8 +211,8 @@ export default function CheckoutPage() {
     await calcularEnvio(direccion.id);
   }
 
+  // ========= 5) Crear nueva dirección =========
   async function handleCrearDireccion() {
-    // Validación
     if (
       !nuevaDireccion.provincia ||
       !nuevaDireccion.canton ||
@@ -200,10 +239,8 @@ export default function CheckoutPage() {
         throw new Error(errorData.detail || "Error creando dirección");
       }
 
-      // Recargar direcciones
       await cargarDirecciones();
 
-      // Limpiar formulario y cerrar
       setMostrarFormulario(false);
       setNuevaDireccion({
         nombre: "",
@@ -222,23 +259,183 @@ export default function CheckoutPage() {
     }
   }
 
-  function handleContinuarPago() {
-    if (!direccionSeleccionada || !metodoSeleccionado) {
-      setError("Por favor selecciona una dirección y método de envío");
+  // ========= 6) Calcular límite de puntos en función del total de la compra =========
+  async function calcularLimitePuntos(totalCompra: number) {
+    try {
+      // Llama al endpoint que usa total_compra
+      const res = await fetch(
+        `${API_BASE}/api/v1/puntos/me/limite-redencion?total_compra=${totalCompra}`,
+        { credentials: "include" }
+      );
+
+      if (!res.ok) {
+        setLimitePuntos(null);
+        setPuntosUsados(0);
+        setDescuento(0);
+        return;
+      }
+
+      const data = await res.json();
+
+      const limite: LimitePuntos = {
+        puede_usar_puntos: data.puede_usar_puntos,
+        motivo: data.motivo,
+        descuento_maximo_colones: Number(data.descuento_maximo_colones),
+        puntos_necesarios_para_maximo: data.puntos_necesarios_para_maximo,
+        saldo_puntos: data.saldo_puntos,
+      };
+
+      setLimitePuntos(limite);
+      setPuntosDisponibles(limite.saldo_puntos || 0);
+
+      if (!limite.puede_usar_puntos) {
+        setPuntosUsados(0);
+        setDescuento(0);
+        return;
+      }
+
+      // Por defecto no aplica puntos aún, el usuario decide
+      setPuntosUsados(0);
+      setDescuento(0);
+    } catch (error) {
+      console.error("Error calculando límite de puntos", error);
+      setLimitePuntos(null);
+      setPuntosUsados(0);
+      setDescuento(0);
+    }
+  }
+
+  // ========= 7) Recalcular límite de puntos cuando haya dirección + envío =========
+  useEffect(() => {
+    if (direccionSeleccionada && metodoSeleccionado) {
+      const totalCompra =
+        total + Number(metodoSeleccionado?.costo ?? 0); // subtotal + envío
+      if (totalCompra > 0) {
+        calcularLimitePuntos(totalCompra);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direccionSeleccionada, metodoSeleccionado, total]);
+
+  // ========= 8) Confirmar pedido (simulado) + crear Pedido real =========
+  async function handleContinuarPago() {
+  if (!direccionSeleccionada || !metodoSeleccionado) {
+    setError("Por favor selecciona una dirección y método de envío");
+    return;
+  }
+
+  if (items.length === 0) {
+    setError("Tu carrito está vacío");
+    return;
+  }
+
+  try {
+    setProcesandoPago(true);
+    setError(null);
+
+    // 1️⃣ Crear Pedido real en el backend
+    const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        direccion_envio_id: direccionSeleccionada.id,
+        metodo_pago: "SIMULADO",
+      }),
+    });
+
+    if (!resPedido.ok) {
+      const errData = await resPedido.json().catch(() => null);
+      console.error("Error creando pedido:", errData);
+      setError(
+        errData?.detail ||
+          "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
+      );
       return;
     }
 
-    // Aquí implementarías la lógica de pago
-    // Por ahora solo mostramos un mensaje
+    const pedido = await resPedido.json(); // PedidoRead
+
+    // 2️⃣ Confirmar compra y procesar puntos (SIEMPRE, aunque puntosUsados sea 0)
+    let dataPuntos: any = null;
+    try {
+      const resPuntos = await fetch(
+        `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            total_compra: total + Number(metodoSeleccionado.costo),
+            puntos_a_usar: puntosUsados, // puede ser 0
+            // si luego el backend acepta order_id, aquí puedes enviar: order_id: pedido.id
+          }),
+        }
+      );
+
+      if (!resPuntos.ok) {
+        const err = await resPuntos.json().catch(() => null);
+        console.error("Error al confirmar puntos:", err);
+        // No rompemos el pedido, solo avisamos
+        alert(
+          "El pedido se creó correctamente, pero hubo un problema al registrar los puntos.\n" +
+            (err?.detail ? `Detalle: ${err.detail}` : "")
+        );
+      } else {
+        dataPuntos = await resPuntos.json();
+      }
+    } catch (e) {
+      console.error("Error de red al confirmar puntos:", e);
+      // Igual no rompemos la compra
+    }
+
+    // 3️⃣ Calcular totales mostrados al usuario
+    const descuentoAplicado = dataPuntos
+      ? Number(dataPuntos.descuento_aplicado || 0)
+      : 0;
+
+    const totalFinal = dataPuntos
+      ? Number(dataPuntos.total_final || 0)
+      : total + Number(metodoSeleccionado.costo) - descuentoAplicado;
+
+    const textoPuntos = dataPuntos
+      ? `
+Puntos usados: ${dataPuntos.puntos_redimidos}
+Puntos ganados: ${dataPuntos.puntos_ganados}
+Nuevo saldo de puntos: ${dataPuntos.saldo_puntos_final}`
+      : `
+Los puntos no pudieron registrarse correctamente en esta compra.`;
+
     alert(
-      `Pedido confirmado!\n\nEnvío a: ${direccionSeleccionada.detalle}\nMétodo: ${metodoSeleccionado.metodo_nombre}\nTotal: ₡${(total + metodoSeleccionado.costo).toLocaleString("es-CR")}`
+      `Pedido #${pedido.id} creado correctamente 🎉
+
+Subtotal: ₡${total.toLocaleString("es-CR")}
+Envío: ₡${Number(
+        metodoSeleccionado.costo
+      ).toLocaleString("es-CR")}
+Descuento aplicado: ₡${descuentoAplicado.toLocaleString("es-CR")}
+
+TOTAL FINAL: ₡${totalFinal.toLocaleString("es-CR")}
+${textoPuntos}
+`
     );
 
-    // Limpiar carrito y redirigir
+    // 4️⃣ Limpiar carrito y redirigir a pedidos
     clearCart();
-    router.push("/");
+    router.push("/account/orders");
+  } catch (err) {
+    console.error("Error finalizando compra", err);
+    setError("Hubo un problema al procesar el pago.");
+  } finally {
+    setProcesandoPago(false);
   }
+}
 
+  // ========= LOADING / CARRITO VACÍO =========
   if (loading) {
     return (
       <div className="min-h-screen bg-[#fdf6e3]">
@@ -253,7 +450,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Si no hay items en el carrito
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-[#fdf6e3]">
@@ -278,6 +474,22 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  // ========= UI PRINCIPAL =========
+  // Factor de conversión puntos → colones (si hay límite)
+  const factorPuntoEnColones =
+    limitePuntos && limitePuntos.puntos_necesarios_para_maximo > 0
+      ? limitePuntos.descuento_maximo_colones /
+        limitePuntos.puntos_necesarios_para_maximo
+      : 0;
+
+  const maxPuntosUsables =
+    limitePuntos && limitePuntos.puede_usar_puntos
+      ? Math.min(
+          limitePuntos.saldo_puntos,
+          limitePuntos.puntos_necesarios_para_maximo
+        )
+      : puntosDisponibles;
 
   return (
     <div className="min-h-screen bg-[#fdf6e3]">
@@ -308,10 +520,11 @@ export default function CheckoutPage() {
           Finalizar pedido
         </h1>
         <p className="text-sm text-gray-600 mb-6">
-          Selecciona tu dirección de envío y método de entrega
+          Selecciona tu dirección de envío, método de entrega y aplica tus
+          puntos.
         </p>
 
-        {/* Mensaje de error global */}
+        {/* Error global */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-2">
@@ -342,7 +555,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Sección de direcciones */}
+        {/* 1. Direcciones */}
         <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -551,7 +764,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Métodos de envío */}
+        {/* 2. Método de envío */}
         {direccionSeleccionada && (
           <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -643,11 +856,85 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* Resumen final */}
+        {/* 3. Usar puntos */}
+        <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            3. Usar puntos
+          </h2>
+
+          {!direccionSeleccionada || !metodoSeleccionado ? (
+            <p className="text-sm text-gray-500">
+              Primero selecciona una dirección y un método de envío para ver
+              cuánto puedes usar en puntos.
+            </p>
+          ) : !limitePuntos ? (
+            <p className="text-sm text-gray-500">Calculando límite...</p>
+          ) : !limitePuntos.puede_usar_puntos ? (
+            <p className="text-sm text-gray-500">
+              No puedes usar puntos en esta compra:{" "}
+              <span className="font-semibold">{limitePuntos.motivo}</span>
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600 mb-2">
+                Saldo actual:{" "}
+                <strong>{limitePuntos.saldo_puntos} puntos</strong>
+              </p>
+              <p className="text-xs text-gray-500 mb-3">
+                Máximo para esta compra:{" "}
+                <strong>
+                  ₡
+                  {limitePuntos.descuento_maximo_colones.toLocaleString(
+                    "es-CR"
+                  )}
+                </strong>{" "}
+                ({maxPuntosUsables} puntos)
+              </p>
+
+              <div className="flex gap-2 items-center mb-3">
+                <input
+                  type="number"
+                  min={0}
+                  max={maxPuntosUsables}
+                  value={puntosUsados}
+                  onChange={(e) => {
+                    const raw = Number(e.target.value) || 0;
+                    const val = Math.max(
+                      0,
+                      Math.min(raw, maxPuntosUsables || 0)
+                    );
+                    setPuntosUsados(val);
+                    setDescuento(val * factorPuntoEnColones);
+                  }}
+                  className="w-32 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                  placeholder="0 pts"
+                />
+
+                <button
+                  onClick={() => {
+                    const val = maxPuntosUsables || 0;
+                    setPuntosUsados(val);
+                    setDescuento(val * factorPuntoEnColones);
+                  }}
+                  className="px-3 py-2 bg-[#a855f7] text-white rounded-lg text-sm hover:bg-[#7e22ce]"
+                >
+                  Usar todos
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Descuento aplicado:{" "}
+                <strong>₡{descuento.toLocaleString("es-CR")}</strong>
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* 4. Resumen final */}
         {direccionSeleccionada && metodoSeleccionado && (
           <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              3. Resumen del pedido
+              4. Resumen del pedido
             </h2>
 
             {/* Desglose de costos */}
@@ -667,25 +954,35 @@ export default function CheckoutPage() {
                   ₡{Number(metodoSeleccionado.costo).toLocaleString("es-CR")}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Descuento por puntos:</span>
+                <span className="font-semibold text-green-600">
+                  - ₡{descuento.toLocaleString("es-CR")}
+                </span>
+              </div>
               <div className="border-t pt-2 mt-2 flex justify-between text-base">
-                <span className="font-bold">Total a pagar:</span>
+                <span className="font-bold">Total final:</span>
                 <span className="font-bold text-xl text-[#6b21a8]">
                   ₡
-                  {(total + Number(metodoSeleccionado.costo)).toLocaleString(
-                    "es-CR"
-                  )}
+                  {(
+                    total +
+                    Number(metodoSeleccionado.costo) -
+                    descuento
+                  ).toLocaleString("es-CR")}
                 </span>
               </div>
             </div>
 
-            {/* Información de envío */}
+            {/* Info envío */}
             <div className="bg-[#faf5ff] rounded-lg p-3 mb-4 text-xs">
               <div className="space-y-2">
                 <div>
                   <p className="font-semibold text-gray-700 mb-1">
                     📦 Envío a:
                   </p>
-                  <p className="text-gray-700">{direccionSeleccionada.detalle}</p>
+                  <p className="text-gray-700">
+                    {direccionSeleccionada.detalle}
+                  </p>
                   <p className="text-gray-600">
                     {direccionSeleccionada.distrito},{" "}
                     {direccionSeleccionada.canton},{" "}
@@ -721,10 +1018,15 @@ export default function CheckoutPage() {
             {/* Botón continuar */}
             <button
               onClick={handleContinuarPago}
-              className="w-full bg-[#a855f7] hover:bg-[#7e22ce] text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              disabled={procesandoPago}
+              className="w-full bg-[#a855f7] hover:bg-[#7e22ce] text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <span>Continuar al pago</span>
-              <span>→</span>
+              <span>
+                {procesandoPago
+                  ? "Procesando pedido..."
+                  : "Confirmar pedido (simulado)"}
+              </span>
+              {!procesandoPago && <span>→</span>}
             </button>
 
             <p className="text-xs text-gray-500 text-center mt-3">

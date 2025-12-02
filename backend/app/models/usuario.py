@@ -48,10 +48,38 @@ class Usuario(Base):
         nullable=False,
     )
 
+    # Relación con favoritos
+    favoritos = relationship(
+        "Favorito",
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
+    # Relación con carritos
+    carritos = relationship(
+        "Carrito",
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
     # ⚠️ CAMBIO: Relación 1:N con Direcciones (antes era 1:1)
     direcciones = relationship(
         "Direccion",
         back_populates="usuario",
         cascade="all, delete-orphan",
-        order_by="Direccion.predeterminada.desc(), Direccion.created_at.desc()"
+        order_by="Direccion.predeterminada.desc(), Direccion.created_at.desc()",
+    )
+
+    # Relación con saldo y movimientos de puntos
+    saldo_puntos = relationship(
+        "SaldoPuntosUsuario",
+        uselist=False,
+        back_populates="usuario",
+        cascade="all, delete-orphan",
+    )
+
+    movimientos_puntos = relationship(
+        "MovimientoPuntosUsuario",
+        back_populates="usuario",
+        cascade="all, delete-orphan",
     )
