@@ -98,7 +98,8 @@ function ProductoNuevoCard({
       onClick={onClick}
       className="bg-white rounded-3xl border overflow-hidden hover:shadow-lg transition cursor-pointer group flex flex-col h-full"
     >
-      <div className="relative h-80 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden">
+
+      <div className="relative h-64 sm:h-72 lg:h-80 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden">
         {producto.imagen_principal ? (
           <img
             src={buildMediaUrl(producto.imagen_principal)!}
@@ -510,15 +511,16 @@ export function CatalogoPage({
     "Fecha: reciente a antiguo(a)";
 
   const gridClasesProductos = mostrarFiltros
-    ? "grid gap-6 mb-6 sm:grid-cols-2 xl:grid-cols-3" // con filtros → 3 columnas
-    : "grid gap-6 mb-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"; // sin filtros → 4 columnas
+    ? "grid gap-5 mb-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" // con filtros → 3 columnas
+    : "grid gap-5 mb-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"; // sin filtros → 4 columnas
+
 
   return (
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
       {/* más ancho para que parezca sitio real de tienda */}
-      <main className="w-full max-w-[1400px] mx-auto px-4 pt-38 pb-10">
+      <main className="w-full max-w-[1400px] mx-auto px-4 pt-38 md:pt-36 lg:pt-40 pb-10">
         {/* Breadcrumb */}
         {/* Breadcrumb */}
         <div className="text-xs text-gray-500 mb-3 flex items-center flex-wrap gap-1">
@@ -585,7 +587,7 @@ export function CatalogoPage({
         {/* Encabezado */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-5xl font-bold text-[#6b21a8]">{titulo}</h1>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#6b21a8]">{titulo}</h1>
           </div>
         </div>
 
@@ -682,10 +684,10 @@ export function CatalogoPage({
         </div>
 
         {/* === PANTALLA PARTIDA EN DOS COLUMNAS === */}
-        <section className="grid grid-cols-12 gap-8 items-start mt-2">
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start mt-2">
           {/* Columna izquierda: filtros */}
           {mostrarFiltros && (
-            <aside className="col-span-3 text-sm bg-[#fdf6e3] p-1">
+            <aside className="col-span-1 lg:col-span-3 text-sm bg-[#fdf6e3] p-1">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-semibold text-gray-800 text-sm tracking-wide uppercase">
                   Filtrar
@@ -957,9 +959,9 @@ export function CatalogoPage({
           )}
 
           {/* Columna derecha: productos */}
-          <div className={mostrarFiltros ? "col-span-9" : "col-span-12"}>
+          <div className={mostrarFiltros ? "col-span-1 lg:col-span-9" : "col-span-1 lg:col-span-12"}>
             {loading ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+              <div className="grid gap-5 mb-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                 {[...Array(6)].map((_, i) => (
                   <div
                     key={i}

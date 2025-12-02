@@ -230,10 +230,14 @@ export default function AdminProductosPage() {
 
           <Link
             href="/admin/productos/nuevo"
-            className="text-xs px-4 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold hover:bg-[#7e22ce] text-center"
+            className="text-xs px-4 py-1.5 rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+             text-center transition-colors"
           >
             + Nuevo producto
           </Link>
+
         </div>
       </header>
 
@@ -341,26 +345,33 @@ export default function AdminProductosPage() {
 
                         {/* Acciones */}
                         <td className="px-3 py-3">
-                          <div className="flex justify-center gap-2">
+                          <div className="flex justify-center gap-2 flex-wrap">
                             <Link
                               href={`/admin/productos/${p.id}`}
-                              className="px-2 py-1 rounded bg-gray-800 text-white text-[11px] hover:bg-black"
+                              title="Ver y editar producto"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                 bg-sky-50 text-sky-700 border border-sky-100 text-[11px]
+                 hover:bg-sky-100 hover:border-sky-200 transition-colors"
                             >
-                              Ver / Editar
+                              <span>👁️</span>
+                              <span>Ver / editar</span>
                             </Link>
 
                             {p.activo && (
                               <button
-                                onClick={() =>
-                                  desactivarProducto(p.id)
-                                }
-                                className="px-2 py-1 rounded bg-red-50 text-red-600 text-[11px] border border-red-200 hover:bg-red-100"
+                                onClick={() => desactivarProducto(p.id)}
+                                title="Desactivar producto"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                   bg-red-50 text-red-700 border border-red-200 text-[11px]
+                   hover:bg-red-100 hover:border-red-300 transition-colors"
                               >
-                                Desactivar
+                                <span>🚫</span>
+                                <span>Desactivar</span>
                               </button>
                             )}
                           </div>
                         </td>
+
                       </tr>
                     );
                   })}

@@ -172,10 +172,18 @@ export default function HistorialPreciosDetalleProductoPage() {
                 {c.nombre}
               </span>
             ))}
-            <span className="px-2 py-0.5 rounded-full bg-gray-800 text-[10px] text-white">
+
+            <span
+              className={
+                producto.activo
+                  ? "px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] text-emerald-700 border border-emerald-100"
+                  : "px-2 py-0.5 rounded-full bg-gray-100 text-[10px] text-gray-500 border border-gray-200"
+              }
+            >
               {producto.activo ? "Producto activo" : "Producto inactivo"}
             </span>
           </div>
+
         </div>
 
         <button

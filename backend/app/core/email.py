@@ -80,3 +80,117 @@ def send_password_reset_email(to_email: str, reset_token: str):
         print(f"Error enviando correo de recuperación: {e}")
         # NO lanzamos excepción para no revelar si el correo existe
         # Solo logueamos el error
+
+ESTADO_PEDIDO_TEXTOS = {
+    "PAGADO": {
+        "titulo": "¡Hemos recibido tu pedido!",
+        "descripcion": "Tu pedido ha sido confirmado y estamos procesándolo para enviártelo lo antes posible.",
+        "mensaje_extra": "En cuanto esté listo para envío, te avisaremos por este mismo medio.",
+    },
+    "EN_PREPARACION": {
+        "titulo": "Estamos preparando tu pedido",
+        "descripcion": "Nuestro equipo está alistando tus productos con todo el cuidado que merecen.",
+        "mensaje_extra": "Te enviaremos otro correo cuando el pedido salga a camino.",
+    },
+    "ENVIADO": {
+        "titulo": "Tu pedido va en camino",
+        "descripcion": "Tu pedido ha sido enviado y llegará pronto a la dirección indicada.",
+        "mensaje_extra": "Si el transportista ofrece seguimiento, recibirás la información correspondiente.",
+    },
+    "ENTREGADO": {
+        "titulo": "Tu pedido ha sido entregado",
+        "descripcion": "Según nuestro sistema, tu pedido ya fue entregado.",
+        "mensaje_extra": "Esperamos que disfrutes tus productos. ¡Gracias por confiar en Innersport!",
+    },
+    "CANCELADO": {
+        "titulo": "Tu pedido ha sido cancelado",
+        "descripcion": "Tu pedido fue cancelado correctamente.",
+        "mensaje_extra": "Si no reconoces esta acción o tienes dudas, contáctanos para ayudarte.",
+    },
+}
+
+
+
+def send_pedido_estado_email(
+    to_email: str,
+    pedido_id: int,
+    nuevo_estado: str,
+):
+    """
+    Envía un correo al cliente cuando cambia el estado de su pedido.
+    Usa Resend (igual que los otros correos).
+    """
+
+    textos = ESTADO_PEDIDO_TEXTOS.get(
+        nuevo_estado,
+        {
+            "titulo": f"Actualización de tu pedido #{pedido_id}",
+            "descripcion": "Tu pedido ha cambiado de estado.",
+            "mensaje_extra": "",
+        },
+    )
+
+    pedido_url = f"{settings.FRONTEND_BASE_URL}/account/orders/{pedido_id}"
+
+    html_content = f"""
+    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f3f4f6; padding: 24px;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.12);">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #111827, #4b5563); padding: 20px 24px; color: #f9fafb;">
+          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; margin-bottom: 4px;">
+            Actualización de pedido
+          </div>
+          <h1 style="margin: 0; font-size: 20px; font-weight: 600;">
+            {textos['titulo']}
+          </h1>
+          <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.9;">
+            Pedido #{pedido_id}
+          </p>
+        </div>
+
+        <!-- Contenido principal -->
+        <div style="padding: 24px 24px 12px 24px;">
+          <p style="margin: 0 0 12px; font-size: 14px; color: #111827;">
+            {textos['descripcion']}
+          </p>
+          <p style="margin: 0 0 16px; font-size: 13px; color: #4b5563;">
+            {textos.get('mensaje_extra', '')}
+          </p>
+
+          <p style="margin: 16px 0 0; font-size: 13px; color: #6b7280;">
+            Puedes ver el detalle completo de este pedido en tu cuenta de Innersport.
+          </p>
+
+          <a href="{pedido_url}"
+             style="display: inline-block; margin-top: 16px; padding: 10px 22px; background-color: #111827; color: #ffffff; text-decoration: none; border-radius: 9999px; font-size: 13px; font-weight: 500;">
+            Ver detalles del pedido
+          </a>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f9fafb; padding: 14px 24px; text-align: center; font-size: 11px; color: #9ca3af;">
+          <p style="margin: 0 0 4px;">
+            Innersport · Este es un correo automático, por favor no lo respondas.
+          </p>
+          <p style="margin: 0;">
+            Si necesitas ayuda, contáctanos a través de nuestros canales oficiales.
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+
+    try:
+        response = resend.Emails.send({
+            "from": f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM_ADDRESS}>",
+            "to": to_email,
+            "subject": f"Innersport · Actualización de tu pedido #{pedido_id}",
+            "html": html_content,
+        })
+
+        if not response or "id" not in response:
+            raise Exception("Respuesta inválida de Resend")
+
+    except Exception as e:
+        print(f"[EMAIL PEDIDO] Error enviando correo de estado para pedido #{pedido_id}: {e}")

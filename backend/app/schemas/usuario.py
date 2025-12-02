@@ -115,3 +115,11 @@ class DeleteAccountRequest(BaseModel):
 class DeleteAccountResponse(BaseModel):
     detail: str
     deletion_scheduled_for: datetime | None = None
+
+class UsuarioMini(BaseModel):
+    id: int
+    nombre: str
+    rol: str
+
+    class Config:
+        from_attributes = True

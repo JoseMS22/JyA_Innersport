@@ -18,7 +18,7 @@ type UserMe = {
 
 type CategoriaMenu = {
   id: number;
-  slug: string;              // 👈 NUEVO
+  slug: string;
   nombre: string;
   principal: boolean;
   secundaria: boolean;
@@ -38,7 +38,7 @@ export function MainMenu() {
   // 👤 menú perfil invitado (desktop)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  // ☰ menú móvil
+  // ☰ menú móvil (lateral)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const router = useRouter();
@@ -53,13 +53,10 @@ export function MainMenu() {
 
   const [menuCategorias, setMenuCategorias] = useState<CategoriaMenu[]>([]);
 
-  // 👉 helper para construir URLs de categorías
   function categoriaUrl(principalSlug: string, secundariaSlug?: string) {
     if (secundariaSlug) {
-      // /categorias/ropa-deportiva/mujer
       return `/categorias/${principalSlug}/${secundariaSlug}`;
     }
-    // /categorias/ropa-deportiva
     return `/categorias/${principalSlug}`;
   }
 
@@ -90,13 +87,11 @@ export function MainMenu() {
         });
 
         if (!res.ok) {
-          console.log("Usuario no autenticado");
           setUser(null);
           setCartUserId(null);
           setFavUserId(null);
         } else {
           const data = await res.json();
-          console.log("Usuario autenticado:", data);
           setUser(data);
           setCartUserId(data.id);
           setFavUserId(data.id);
@@ -121,7 +116,6 @@ export function MainMenu() {
     if (mobileMenuOpen) {
       const originalStyle = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-
       return () => {
         document.body.style.overflow = originalStyle;
       };
@@ -144,7 +138,6 @@ export function MainMenu() {
         }
 
         const data = (await res.json()) as CategoriaMenu[];
-        console.log("Categorias menú desde backend:", data);
         setMenuCategorias(data);
       } catch (err) {
         console.error("Error cargando categorías de menú:", err);
@@ -154,7 +147,6 @@ export function MainMenu() {
     loadMenuCategorias();
   }, [API_BASE_URL]);
 
-  // Logout
   async function handleLogout() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
@@ -189,7 +181,6 @@ export function MainMenu() {
     return pathname === href;
   };
 
-
   function handleToggleSearch() {
     setSearchOpen((prev) => !prev);
   }
@@ -219,13 +210,14 @@ export function MainMenu() {
     router.push(categoriaUrl(slug));
   }
 
+  function goToCategoria(slug: string) {
+    router.push(categoriaUrl(slug));
+  }
+
   function goToCategoriaFromMobile(slug: string) {
     setMobileMenuOpen(false);
     router.push(categoriaUrl(slug));
   }
-
-
-
 
   const navItemClass = (active?: boolean) =>
     [
@@ -237,25 +229,25 @@ export function MainMenu() {
     ].join(" ");
 
   const mobileItemClass = `
-    w-full px-4 py-3 text-left text-[#6b21a8] 
-    border-b border-[#f3e8ff]
+    w-full px-3 py-2 text-left text-[#6b21a8]
+    rounded-xl
     hover:bg-[#f3e8ff]
-    transition-all
+    transition-colors
   `;
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <>
       {/* HEADER FIJO */}
       <header
-        className={`fixed top-0 left-0 right-0 z-40 border-b border-[#e5e7eb] bg-[#fdf7ee]/90 backdrop-blur transition-shadow ${
-          compact ? "shadow-sm" : ""
-        }`}
-      >
-        {/* Franja superior: logo */}
-        <div
-          className={`transition-all duration-300 overflow-hidden border-b border-[#e5e7eb]/60 ${
-            compact ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+        className={`fixed top-0 left-0 right-0 z-40 border-b border-[#e5e7eb] bg-[#fdf7ee]/90 backdrop-blur transition-shadow ${compact ? "shadow-sm" : ""
           }`}
+      >
+        {/* Franja superior: logo centrado + redes */}
+        <div
+          className={`transition-all duration-300 overflow-hidden border-b border-[#e5e7eb]/60 ${compact ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+            }`}
         >
           <div className="max-w-6xl mx-auto relative px-4 py-3 flex items-center justify-center">
             <Link href="/" className="flex items-center gap-3 mx-auto">
@@ -318,15 +310,24 @@ export function MainMenu() {
             <div className="flex items-center justify-between md:hidden">
               <button
                 type="button"
-                aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7]"
+                aria-label="Abrir menú"
+                onClick={() => setMobileMenuOpen(true)}
+                className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 bg-white hover:border-[#a855f7] hover:text-[#6b21a8] shadow-sm"
               >
-                {mobileMenuOpen ? (
-                  <span className="text-xl">&times;</span>
-                ) : (
-                  <span className="text-xl">&#9776;</span>
-                )}
+                {/* Icono hamburguesa igual estilo Admin */}
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 7h16M4 12h16M4 17h10"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
 
               <div className="flex items-center gap-3">
@@ -334,7 +335,7 @@ export function MainMenu() {
                   type="button"
                   aria-label="Buscar"
                   onClick={handleToggleSearch}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] text-[#a855f7] text-lg"
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] text-[#a855f7] text-lg bg-white"
                 >
                   🔍
                 </button>
@@ -342,7 +343,7 @@ export function MainMenu() {
                 <button
                   aria-label="Carrito"
                   onClick={() => router.push("/cart")}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative"
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative bg-white"
                 >
                   🛒
                   {totalItems > 0 && (
@@ -360,7 +361,7 @@ export function MainMenu() {
                 type="button"
                 aria-label="Buscar"
                 onClick={handleToggleSearch}
-                className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] text-[#a855f7] text-lg"
+                className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] text-[#a855f7] text-lg bg-white"
               >
                 🔍
               </button>
@@ -404,12 +405,14 @@ export function MainMenu() {
                           Ver todo
                         </button>
 
-
                         {cat.secundarias.map((sub) => (
                           <button
                             key={sub.id}
                             type="button"
-                            onClick={() => router.push(categoriaUrl(cat.slug, sub.slug))}
+                            onClick={() =>
+                              router.push(categoriaUrl(cat.slug, sub.slug))
+                            }
+
                             className="block w-full text-left px-4 py-2 text-[11px] text-gray-700 hover:bg-[#f3e8ff]"
                           >
                             {sub.nombre}
@@ -427,13 +430,12 @@ export function MainMenu() {
                   <button
                     aria-label="Perfil"
                     onClick={handleProfileClick}
-                    className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7]"
+                    className="hidden sm:flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] bg-white"
                   >
                     👤
                   </button>
                 )}
 
-                {/* 🔹 MENÚ PERFIL DESKTOP (aquí agregamos Historial de pedidos) */}
                 {!checking && profileMenuOpen && (
                   <div className="absolute right-10 top-full mt-2 w-44 rounded-xl border border-gray-200 bg-white shadow-lg py-2 text-xs z-50">
                     {user ? (
@@ -458,7 +460,6 @@ export function MainMenu() {
                           Direcciones
                         </button>
 
-                        {/* 🆕 NUEVO: Historial de pedidos */}
                         <button
                           onClick={() => {
                             setProfileMenuOpen(false);
@@ -466,7 +467,7 @@ export function MainMenu() {
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
                         >
-                          Historial de pedidos
+                          Mis pedidos
                         </button>
 
                         <button
@@ -498,7 +499,7 @@ export function MainMenu() {
                 <button
                   aria-label="Carrito"
                   onClick={() => router.push("/cart")}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative"
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 hover:border-[#a855f7] relative bg-white"
                 >
                   🛒
                   {totalItems > 0 && (
@@ -523,9 +524,7 @@ export function MainMenu() {
                     const query = q.trim();
                     if (!query) return;
 
-                    const params = new URLSearchParams(
-                      searchParams.toString()
-                    );
+                    const params = new URLSearchParams(searchParams.toString());
                     params.set("buscar", query);
                     params.delete("pagina");
 
@@ -547,110 +546,119 @@ export function MainMenu() {
         )}
       </header>
 
-      {/* MENÚ MÓVIL FULL SCREEN */}
+      {/* MENÚ MÓVIL LATERAL (estilo Admin) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-white/95 md:hidden overflow-y-auto">
-          <div className="px-4 pt-4 pb-8 flex flex-col min-h-full">
-            {/* Cabecera */}
-            <div className="flex items-center justify-between mb-6">
+        <>
+          {/* Overlay */}
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
+            onClick={closeMobileMenu}
+          />
+
+          {/* Sidebar */}
+          <aside
+            className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[80%] transform bg-white shadow-xl border-r border-gray-200 transition-transform duration-200 ease-out md:hidden ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+          >
+            {/* Header del sidebar */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#f5f3ff] flex items-center justify-center text-xs font-bold text-[#6b21a8]">
+                  {user?.nombre?.charAt(0) || "J"}
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-xs font-semibold text-gray-800">
+                    {user ? user.nombre : "Invitado"}
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
-                aria-label="Cerrar menú"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200"
+                onClick={closeMobileMenu}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500"
               >
-                <span className="text-xl">&times;</span>
+                <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M6 6l12 12M18 6l-12 12"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-
-              <button onClick={() => navigateFromMobile("/")}>
-                <Image
-                  src="/logo.png"
-                  alt="JYA Innersport"
-                  width={80}
-                  height={80}
-                />
-              </button>
-
-              <div className="w-9" />
             </div>
 
-            {/* Links */}
-            <nav className="flex-1 w-full">
-              <ul className="divide-y divide-gray-200 text-sm">
-                <li>
+            {/* Navegación */}
+            <nav className="px-3 py-3 space-y-1 text-sm overflow-y-auto max-h-[calc(100vh-180px)]">
+              <button
+                className={mobileItemClass}
+                onClick={() => navigateFromMobile("/nuevo")}
+              >
+                Lo nuevo
+              </button>
+
+              <button
+                className={mobileItemClass}
+                onClick={() => navigateFromMobile("/favorites")}
+              >
+                Favoritos
+              </button>
+
+              {menuCategorias.map((cat) => (
+                <div key={cat.id} className="space-y-1">
                   <button
                     className={mobileItemClass}
-                    onClick={() => navigateFromMobile("/nuevo")}
+                    onClick={() =>
+                      navigateFromMobile(categoriaUrl(cat.slug))
+                    }
                   >
-                    Lo nuevo
+                    {cat.nombre}
                   </button>
-                </li>
-                <li>
-                  <button
-                    className={mobileItemClass}
-                    onClick={() => navigateFromMobile("/favorites")}
-                  >
-                    Favoritos
-                  </button>
-                </li>
 
-                {menuCategorias.map((cat) => (
-                  <li key={cat.id} className="flex flex-col">
-                    <button
-                      className={mobileItemClass}
-                      onClick={() => navigateFromMobile(categoriaUrl(cat.slug))}
-                    >
-                      {cat.nombre}
-                    </button>
-
-                    {cat.secundarias && cat.secundarias.length > 0 && (
-                      <div className="bg-[#fdf7ff]">
-                        {cat.secundarias.map((sub) => (
-                          <button
-                            key={sub.id}
-                            className="w-full pl-8 pr-4 py-2 text-left text-[#6b21a8] text-[13px] border-b border-[#f3e8ff] hover:bg-[#f3e8ff]"
-                            onClick={() =>
-                              navigateFromMobile(categoriaUrl(cat.slug, sub.slug))
-                            }
-
-
-
-                          >
-                            {sub.nombre}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                  {cat.secundarias && cat.secundarias.length > 0 && (
+                    <div className="ml-2 rounded-xl bg-[#fdf7ff] border border-[#f3e8ff]">
+                      {cat.secundarias.map((sub) => (
+                        <button
+                          key={sub.id}
+                          className="w-full text-left px-4 py-2 text-[13px] text-[#6b21a8] border-b border-[#f3e8ff] last:border-b-0 hover:bg-[#f3e8ff]"
+                          onClick={() =>
+                            navigateFromMobile(
+                              categoriaUrl(cat.slug, sub.slug)
+                            )
+                          }
+                        >
+                          {sub.nombre}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </nav>
 
-            {/* Parte inferior: cuenta + redes */}
-            <div className="pt-6 mt-4 border-t border-gray-200 space-y-4 text-sm">
+            {/* Footer: cuenta + redes */}
+            <div className="mt-auto px-4 py-4 border-t border-gray-100 space-y-3 text-sm">
               {user ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-gray-600 text-xs mb-2">
-                    Hola, <span className="font-semibold">{user.nombre}</span>
-                  </p>
+                <div className="flex flex-col gap-2 text-xs">
                   <button
                     onClick={() => navigateFromMobile("/account/profile")}
                     className="text-left text-[#6b21a8]"
                   >
-                    Mi cuenta
+                    Perfil
                   </button>
                   <button
                     onClick={() => navigateFromMobile("/account/addresses")}
                     className="text-left text-[#6b21a8]"
                   >
-                    Mis direcciones
+                    Direcciones
                   </button>
-                  {/* 🆕 Historial de pedidos también en móvil */}
                   <button
                     onClick={() => navigateFromMobile("/account/orders")}
                     className="text-left text-[#6b21a8]"
                   >
-                    Historial de pedidos
+                    Mis pedidos
                   </button>
                   <button
                     onClick={handleLogout}
@@ -662,39 +670,43 @@ export function MainMenu() {
               ) : (
                 <button
                   onClick={() => navigateFromMobile("/login")}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-xs text-[#6b21a8]"
                 >
                   <span>👤</span>
                   <span>Registro / Inicio de sesión</span>
                 </button>
               )}
 
-              <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-4 pt-2 text-xs text-gray-500">
                 <Link
                   href="https://facebook.com/TU_PAGINA"
                   target="_blank"
-                  className="text-gray-600 hover:text-[#6b21a8]"
+                  className="hover:text-[#6b21a8]"
                 >
-                  F
+                  Facebook
                 </Link>
                 <Link
                   href="https://instagram.com/TU_PAGINA"
                   target="_blank"
-                  className="text-gray-600 hover:text-[#6b21a8]"
+                  className="hover:text-[#6b21a8]"
                 >
-                  IG
+                  Instagram
                 </Link>
                 <Link
                   href="https://tiktok.com/@TU_PAGINA"
                   target="_blank"
-                  className="text-gray-600 hover:text-[#6b21a8]"
+                  className="hover:text-[#6b21a8]"
                 >
-                  TT
+                  TikTok
                 </Link>
               </div>
+
+              <p className="text-[10px] text-gray-400">
+                JYA Innersport · Tienda virtual
+              </p>
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       )}
     </>
   );

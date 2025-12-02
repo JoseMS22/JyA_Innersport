@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 
 from app.db import get_db
 from app.core.security import get_current_user
@@ -11,6 +12,7 @@ from app.models.usuario import Usuario
 from app.models.carrito import Carrito, CarritoItem
 from app.models.variante import Variante
 from app.models.producto import Producto
+from app.models.inventario import Inventario
 from app.models.media import Media
 from app.schemas.cart import (
     CartItemFromApi,
@@ -45,7 +47,7 @@ def _get_or_create_open_cart(db: Session, user: Usuario) -> Carrito:
     return carrito
 
 
-def _build_cart_item_from_model(item: CarritoItem) -> CartItemFromApi:
+def _build_cart_item_from_model(db: Session, item: CarritoItem) -> CartItemFromApi:
     variante: Variante = item.variante
     producto: Producto = variante.producto
 
@@ -59,6 +61,13 @@ def _build_cart_item_from_model(item: CarritoItem) -> CartItemFromApi:
     precio_unitario = Decimal(item.precio_unitario)
     subtotal = precio_unitario * item.cantidad
 
+    stock_total = (
+        db.query(func.sum(Inventario.cantidad))
+        .filter(Inventario.variante_id == variante.id)
+        .scalar()
+    )
+    stock_disponible = int(stock_total or 0)
+
     return CartItemFromApi(
         variante_id=variante.id,
         producto_id=producto.id,
@@ -71,10 +80,11 @@ def _build_cart_item_from_model(item: CarritoItem) -> CartItemFromApi:
         precio_unitario=precio_unitario,
         subtotal=subtotal,
         imagen_url=imagen_url,
+        stock_disponible=stock_disponible,
     )
 
 
-def _build_cart_response(carrito: Optional[Carrito]) -> CartResponse:
+def _build_cart_response(db: Session, carrito: Optional[Carrito]) -> CartResponse:
     if not carrito or not carrito.items:
         return CartResponse(items=[], total_items=0, total=Decimal("0"))
 
@@ -83,7 +93,7 @@ def _build_cart_response(carrito: Optional[Carrito]) -> CartResponse:
     total_items = 0
 
     for item in carrito.items:
-        api_item = _build_cart_item_from_model(item)
+        api_item = _build_cart_item_from_model(db, item)
         items.append(api_item)
         total += api_item.subtotal
         total_items += api_item.cantidad
@@ -118,7 +128,7 @@ def get_cart(
         .first()
     )
 
-    return _build_cart_response(carrito)
+    return _build_cart_response(db, carrito)
 
 
 # =========================
@@ -154,6 +164,19 @@ def add_cart_item(
             detail="Esta variante no está activa.",
         )
 
+    stock_total_q = (
+        db.query(func.sum(Inventario.cantidad))
+        .filter(Inventario.variante_id == variante.id)
+        .scalar()
+    )
+    stock_total = int(stock_total_q or 0)
+
+    if stock_total <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este producto no tiene stock disponible.",
+        )
+
     carrito = _get_or_create_open_cart(db, current_user)
 
     # Buscar si ya existe un item con esa variante
@@ -167,8 +190,22 @@ def add_cart_item(
     )
 
     if item:
-        item.cantidad += payload.cantidad
+        nuevo_total = item.cantidad + payload.cantidad
+        if nuevo_total > stock_total:
+            item.cantidad = stock_total  # 👈 topado al stock
+        else:
+            item.cantidad = nuevo_total
     else:
+        cantidad = payload.cantidad
+        if cantidad > stock_total:
+            cantidad = stock_total
+
+        if cantidad <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No hay stock suficiente para agregar este producto.",
+            )
+
         precio_unitario = variante.precio_actual or 0
         item = CarritoItem(
             carrito_id=carrito.id,
@@ -194,7 +231,7 @@ def add_cart_item(
         .first()
     )
 
-    return _build_cart_response(carrito)
+    return _build_cart_response(db, carrito)
 
 
 # =========================
@@ -241,10 +278,27 @@ def update_cart_item(
             detail="El producto no está en tu carrito.",
         )
 
+    stock_total_q = (
+        db.query(func.sum(Inventario.cantidad))
+        .filter(Inventario.variante_id == variante_id)
+        .scalar()
+    )
+    stock_total = int(stock_total_q or 0)
+
     if payload.cantidad <= 0:
         db.delete(item)
     else:
-        item.cantidad = payload.cantidad
+        if stock_total <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Este producto no tiene stock disponible.",
+            )
+
+        nueva_cantidad = payload.cantidad
+        if nueva_cantidad > stock_total:
+            nueva_cantidad = stock_total
+
+        item.cantidad = nueva_cantidad
 
     db.commit()
 
@@ -260,7 +314,7 @@ def update_cart_item(
         .first()
     )
 
-    return _build_cart_response(carrito)
+    return _build_cart_response(db, carrito)
 
 
 # =========================
@@ -286,7 +340,7 @@ def delete_cart_item(
     )
     if not carrito:
         # devolver carrito vacío
-        return _build_cart_response(None)
+        return _build_cart_response(db, None)
 
     item = (
         db.query(CarritoItem)
@@ -313,7 +367,7 @@ def delete_cart_item(
         .first()
     )
 
-    return _build_cart_response(carrito)
+    return _build_cart_response(db, carrito)
 
 
 # =========================
@@ -338,7 +392,7 @@ def clear_cart(
     )
 
     if not carrito:
-        return _build_cart_response(None)
+        return _build_cart_response(db, None)
 
     # Borramos todos los items
     for item in list(carrito.items):
@@ -347,7 +401,7 @@ def clear_cart(
     db.commit()
 
     # Devolvemos carrito vacío
-    return _build_cart_response(None)
+    return _build_cart_response(db, None)
 
 @router.get("/me/puntos/limite", response_model=LimiteRedencionOut)
 def get_cart_points_limit(
@@ -378,7 +432,7 @@ def get_cart_points_limit(
     )
 
     # Reutilizamos el helper para tener un CartResponse con total y items
-    cart_response = _build_cart_response(carrito)
+    cart_response = _build_cart_response(db, carrito)
 
     # Si el carrito está vacío, no tiene sentido usar puntos
     if not cart_response.items or cart_response.total <= 0:

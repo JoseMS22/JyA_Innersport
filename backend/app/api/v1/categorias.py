@@ -47,7 +47,6 @@ def generar_slug_unico(db: Session, base_text: str, categoria_id: int | None = N
         i += 1
         slug = f"{base}-{i}"
 
-
 router = APIRouter()
 
 
@@ -91,6 +90,7 @@ def crear_categoria(
             detail="Una categoría secundaria debe tener al menos una categoría principal asociada.",
         )
 
+    slug = generar_slug_unico(db, data.nombre)
 
     slug = generar_slug_unico(db, data.nombre)
 
@@ -100,7 +100,7 @@ def crear_categoria(
         activo=True,
         principal=data.principal,
         secundaria=data.secundaria,
-        slug=slug,    # 👈
+        slug=slug,
     )
 
     db.add(categoria)
@@ -183,7 +183,7 @@ def get_categorias_menu(db: Session = Depends(get_db)):
                 secundarias_result.append(
                     CategoriaMenuRead(
                         id=sub.id,
-                        slug=sub.slug,           # 👈
+                        slug=sub.slug,
                         nombre=sub.nombre,
                         principal=sub.principal,
                         secundaria=sub.secundaria,
@@ -201,7 +201,7 @@ def get_categorias_menu(db: Session = Depends(get_db)):
         resultado.append(
             CategoriaMenuRead(
                 id=cat.id,
-                slug=cat.slug,           # 👈
+                slug=cat.slug,
                 nombre=cat.nombre,
                 principal=cat.principal,
                 secundaria=cat.secundaria,

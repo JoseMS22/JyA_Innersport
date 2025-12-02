@@ -116,7 +116,9 @@ def listar_movimientos(
     db: Session = Depends(get_db),
     staff: Usuario = Depends(get_current_staff_user),
 ):
-    query = db.query(MovimientoInventario)
+    query = db.query(MovimientoInventario).options(
+        joinedload(MovimientoInventario.usuario)  # 👈 cargar usuario
+    )
 
     if sucursal_id is not None:
         query = query.filter(MovimientoInventario.sucursal_id == sucursal_id)

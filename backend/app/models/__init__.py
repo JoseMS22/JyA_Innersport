@@ -25,6 +25,7 @@ from .metodo_envio import MetodoEnvio
 from .pedido import Pedido
 from .pedido_item import PedidoItem  # 🆕 AGREGAR ESTA LÍNEA
 from .pago import Pago
+from .auditoria import AuditoriaUsuario
 
 __all__ = [
     "Usuario",

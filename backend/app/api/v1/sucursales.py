@@ -46,6 +46,7 @@ def crear_sucursal(
         nombre=data.nombre,
         direccion=data.direccion,
         telefono=data.telefono,
+        provincia=data.provincia,
     )
     db.add(sucursal)
     db.commit()
@@ -99,6 +100,11 @@ def actualizar_sucursal(
 
     if data.telefono is not None:
         sucursal.telefono = data.telefono
+
+    # PUT actualizar_sucursal
+    if data.provincia is not None:
+        sucursal.provincia = data.provincia
+
 
     if data.activo is not None:
         sucursal.activo = data.activo

@@ -41,7 +41,7 @@ class CategoriaRelacionRead(BaseModel):
 # 🔹 Modelo completo que devuelve el endpoint
 class CategoriaRead(CategoriaBase):
     id: int
-    slug: str
+    slug: str 
     activo: bool
     principal: bool
     secundaria: bool
@@ -56,7 +56,7 @@ class CategoriaRead(CategoriaBase):
 
 class CategoriaMenuRead(BaseModel):
     id: int
-    slug: str
+    slug: str 
     nombre: str
     principal: bool
     secundaria: bool
