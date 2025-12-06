@@ -194,8 +194,15 @@ def obtener_detalle_pedido(
                 "precio_unitario": float(item.precio_unitario),
                 "cantidad": item.cantidad,
                 "subtotal": float(item.subtotal),
+                "impuesto": float(getattr(item, "impuesto", 0) or 0),
             }
         )
+
+        # Calcular impuesto total del pedido (suma de los ítems)
+    impuesto_total = sum(
+        float(getattr(it, "impuesto", 0) or 0) for it in pedido.items
+    )
+
 
     # Datos de dirección de envío
     direccion_data = {}
@@ -233,6 +240,7 @@ def obtener_detalle_pedido(
         "metodo_envio": pedido.metodo_envio or "Envío Estándar",
         "direccion_envio": direccion_data,
         "productos": productos,
+        "impuesto_total": impuesto_total,
         "puede_cancelar": puede_cancelar,
         "fecha_limite_cancelacion": fecha_limite.isoformat() if fecha_limite else None,
         "tiene_rma_activo": tiene_rma_activo,

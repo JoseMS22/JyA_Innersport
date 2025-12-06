@@ -11,7 +11,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Esta migración queda vacía porque 'slug' ya fue creada previamente
+
     pass
 
 

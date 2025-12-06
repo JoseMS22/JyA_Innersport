@@ -1,5 +1,5 @@
 # backend/app/services/pedido_service.py
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 import time
 
@@ -33,6 +33,20 @@ ALLOWED_PEDIDO_ESTADOS = {
     "CANCELADO",
 }
 
+IVA_RATE = Decimal("0.13")
+
+def calcular_impuesto_incluido_en_precio(monto_con_iva: Decimal) -> Decimal:
+    """
+    Calcula cuánto del monto corresponde a impuesto,
+    asumiendo que el precio YA incluye IVA.
+    """
+    if monto_con_iva <= 0:
+        return Decimal("0.00")
+
+    base = monto_con_iva / (Decimal("1.00") + IVA_RATE)
+    impuesto = monto_con_iva - base
+    # Redondeamos a 2 decimales
+    return impuesto.quantize(Decimal("0.01"))
 
 def elegir_sucursal_para_pedido(
     db: Session,
@@ -338,9 +352,12 @@ def crear_pedido_desde_carrito(
         db.add(pedido)
         db.flush()  # obtener id
 
-        # Crear PedidoItems para esta sucursal
+                # Crear PedidoItems para esta sucursal
         for item, cantidad_asignada in items_asignados:
             subtotal_item = item.precio_unitario * cantidad_asignada
+
+            # 🆕 Calcular impuesto del ítem (precio YA incluye IVA)
+            impuesto_item = calcular_impuesto_incluido_en_precio(subtotal_item)
 
             pedido_item = PedidoItem(
                 pedido_id=pedido.id,
@@ -349,6 +366,7 @@ def crear_pedido_desde_carrito(
                 cantidad=cantidad_asignada,
                 precio_unitario=item.precio_unitario,
                 subtotal=subtotal_item,
+                impuesto=impuesto_item,  # 🆕
             )
             db.add(pedido_item)
 
@@ -360,8 +378,10 @@ def crear_pedido_desde_carrito(
                     cantidad=cantidad_asignada,
                     precio_unitario=item.precio_unitario,
                     subtotal=subtotal_item,
+                    impuesto=impuesto_item,  # 🆕
                 )
             )
+
 
         # Crear pago simulado para este pedido
         pago = Pago(
