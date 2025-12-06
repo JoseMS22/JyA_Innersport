@@ -11,6 +11,14 @@ interface Movimiento {
   referencia?: string | null;
   observacion?: string | null;
   fecha: string;
+  usuario_id?: number | null;
+
+  // 👇 NUEVO
+  usuario?: {
+    id: number;
+    nombre: string;
+    rol: string;
+  } | null;
 }
 
 interface Props {
@@ -65,13 +73,12 @@ export function MovimientosModal({ varianteId, sucursalId, onClose }: Props) {
               <div key={m.id} className="border rounded p-2 bg-gray-50">
                 <div className="flex justify-between">
                   <span
-                    className={`font-bold ${
-                      m.tipo === "ENTRADA"
+                    className={`font-bold ${m.tipo === "ENTRADA"
                         ? "text-green-600"
                         : m.tipo === "AJUSTE"
-                        ? "text-blue-600"
-                        : "text-red-600"
-                    }`}
+                          ? "text-blue-600"
+                          : "text-red-600"
+                      }`}
                   >
                     {m.tipo}
                   </span>
@@ -96,6 +103,17 @@ export function MovimientosModal({ varianteId, sucursalId, onClose }: Props) {
                     Obs: {m.observacion}
                   </p>
                 )}
+
+                {m.usuario && (
+                  <p className="text-gray-600 text-[11px] mt-1">
+                    Registrado por:{" "}
+                    <span className="font-semibold">{m.usuario.nombre}</span>{" "}
+                    <span className="text-gray-500">
+                      ({m.usuario.rol})
+                    </span>
+                  </p>
+                )}
+
               </div>
             ))
           )}

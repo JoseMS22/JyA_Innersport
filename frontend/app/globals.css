@@ -147,3 +147,151 @@ a:hover {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+/* ============================= */
+/*   Ticket POS 80mm impresión   */
+/* ============================= */
+
+/* Elementos que no deben imprimirse */
+.no-print {
+  /* En pantalla no hacemos nada; se ocultan solo en @media print */
+}
+
+/* Estilos del ticket (también se ve bonito en pantalla) */
+.ticket {
+  max-width: 360px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 16px 12px;
+  color: #111827;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.ticket-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.ticket-store-name {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticket-store-sub {
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.ticket-store-info {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.ticket-section {
+  margin-top: 6px;
+}
+
+.ticket-separator {
+  border-bottom: 1px dashed #d1d5db;
+  margin: 6px 0;
+}
+
+.ticket-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.ticket-row span:last-child {
+  text-align: right;
+}
+
+.ticket-row-title {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.ticket-row-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #d1d5db;
+  font-weight: 700;
+}
+
+.ticket-row-small {
+  font-size: 10px;
+}
+
+.ticket-item {
+  margin-bottom: 4px;
+}
+
+.ticket-item-name {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ticket-item-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 10px;
+  color: #4b5563;
+}
+
+.ticket-footer {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 10px;
+  color: #4b5563;
+}
+
+.ticket-footer-note {
+  margin-top: 4px;
+  font-size: 9px;
+  color: #6b7280;
+}
+
+/* Reglas específicas de impresión para rollo 80mm */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Todo oculto por defecto */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Solo mostramos el ticket */
+  .ticket,
+  .ticket * {
+    visibility: visible;
+  }
+
+  .ticket {
+    margin: 0 auto;
+    width: 80mm;
+    border-radius: 0;
+    border: none;
+    padding: 4mm 3mm;
+  }
+
+  /* Cualquier cosa marcada como no-print desaparece */
+  .no-print {
+    display: none !important;
+  }
+}

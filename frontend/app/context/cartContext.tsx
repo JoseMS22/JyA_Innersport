@@ -20,6 +20,7 @@ type VarianteBasic = {
   color?: string | null;
   talla?: string | null;
   precio_actual?: number | string;
+  stockDisponible?: number; // 👈 stock de esa variante (para invitado)
 };
 
 type ProductoBasic = {
@@ -42,6 +43,7 @@ type CartItemFromApi = {
   precio_unitario: number | string;
   subtotal: number | string;
   imagen_url?: string | null;
+  stock_disponible?: number | null; // 👈 nombre esperado desde la API
 };
 
 type CartApiResponse = {
@@ -62,6 +64,7 @@ export type CartItem = {
   color?: string | null;
   talla?: string | null;
   imagenUrl?: string | null;
+  stockDisponible?: number | null; // 👈 stock máximo permitido
 };
 
 type CartContextType = {
@@ -98,6 +101,8 @@ function mapApiItemToCartItem(api: CartItemFromApi): CartItem {
     color: api.color ?? null,
     talla: api.talla ?? null,
     imagenUrl: api.imagen_url ?? null,
+    stockDisponible:
+      api.stock_disponible !== undefined ? api.stock_disponible : null,
   };
 }
 
@@ -138,35 +143,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, storageKey]);
 
   // Cargar carrito REAL desde el backend cuando haya usuario logueado
-useEffect(() => {
-  async function fetchCartFromServer() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/cart`, {
-        credentials: "include",
-      });
+  useEffect(() => {
+    async function fetchCartFromServer() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/cart`, {
+          credentials: "include",
+        });
 
-      // Si no hay sesión, no pisamos el carrito local (modo invitado)
-      if (res.status === 401 || res.status === 403) {
-        return;
+        // Si no hay sesión, no pisamos el carrito local (modo invitado)
+        if (res.status === 401 || res.status === 403) {
+          return;
+        }
+
+        if (!res.ok) {
+          console.error("Error cargando carrito desde backend:", res.status);
+          return;
+        }
+
+        const data: CartApiResponse = await res.json();
+        const mapped = data.items.map(mapApiItemToCartItem);
+        setItems(mapped);
+      } catch (err) {
+        console.error("Error fetch /api/v1/cart:", err);
       }
-
-      if (!res.ok) {
-        console.error("Error cargando carrito desde backend:", res.status);
-        return;
-      }
-
-      const data: CartApiResponse = await res.json();
-      const mapped = data.items.map(mapApiItemToCartItem);
-      setItems(mapped);
-    } catch (err) {
-      console.error("Error fetch /api/v1/cart:", err);
     }
-  }
 
-  fetchCartFromServer();
-  // lo dejamos depender de userId para que también se refresque
-  // cuando cambie (login/logout), pero ya no salimos si es null
-}, [userId]);
+    fetchCartFromServer();
+  }, [userId]);
 
   // ========= ACCIONES =========
 
@@ -180,11 +183,17 @@ useEffect(() => {
     if (userId === null) {
       setItems((prev) => {
         const existing = prev.find((i) => i.id === variante.id);
+
+        // determinamos el stock máximo disponible
+        const max =
+          variante.stockDisponible ??
+          existing?.stockDisponible ??
+          Infinity;
+
         if (existing) {
+          const newQty = Math.min(existing.quantity + quantity, max);
           return prev.map((i) =>
-            i.id === variante.id
-              ? { ...i, quantity: i.quantity + quantity }
-              : i
+            i.id === variante.id ? { ...i, quantity: newQty } : i
           );
         }
 
@@ -199,11 +208,13 @@ useEffect(() => {
           name,
           brand: producto.brand,
           price: isNaN(priceNumber) ? 0 : priceNumber,
-          quantity,
+          quantity: Math.min(quantity, max),
           sku: variante.sku,
           color: variante.color ?? null,
           talla: variante.talla ?? null,
           imagenUrl: imagenUrl ?? null,
+          stockDisponible:
+            max === Infinity ? variante.stockDisponible ?? null : max,
         };
 
         return [...prev, newItem];
@@ -246,13 +257,27 @@ useEffect(() => {
 
     // 🔹 Invitado → solo local
     if (userId === null) {
-      if (quantity <= 0) {
-        setItems((prev) => prev.filter((i) => i.id !== id));
-        return;
-      }
-      setItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity } : i))
-      );
+      setItems((prev) => {
+        const found = prev.find((i) => i.id === id);
+        if (!found) return prev;
+
+        if (quantity <= 0) {
+          return prev.filter((i) => i.id !== id);
+        }
+
+        const max =
+          found.stockDisponible !== undefined && found.stockDisponible !== null
+            ? found.stockDisponible
+            : Infinity;
+
+        let newQty = quantity;
+        if (newQty < 1) newQty = 1;
+        if (max !== Infinity && newQty > max) newQty = max;
+
+        return prev.map((i) =>
+          i.id === id ? { ...i, quantity: newQty } : i
+        );
+      });
       return;
     }
 
@@ -276,7 +301,7 @@ useEffect(() => {
       const mapped = data.items.map(mapApiItemToCartItem);
       setItems(mapped);
     } catch (err) {
-      console.error("Error llamando a PATCH /api/v1/cart/items/{id}:", err);
+      console.error("Error llamando a PATCH /cart/items/{id}:", err);
     }
   };
 
@@ -303,7 +328,7 @@ useEffect(() => {
       const mapped = data.items.map(mapApiItemToCartItem);
       setItems(mapped);
     } catch (err) {
-      console.error("Error llamando a DELETE /api/v1/cart/items/{id}:", err);
+      console.error("Error llamando a DELETE /cart/items/{id}:", err);
     }
   };
 
@@ -358,7 +383,9 @@ useEffect(() => {
     setUserId,
   };
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider value={value}>{children}</CartContext.Provider>
+  );
 }
 
 export function useCart() {

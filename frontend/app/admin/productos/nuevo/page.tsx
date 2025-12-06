@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   ChangeEvent,
+  useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
 
@@ -61,6 +62,10 @@ export default function NuevoProductoPage() {
       min_stock: "",
     },
   ]);
+
+  // Índice de variante que se está editando en el modal de detalles
+  const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
+
 
   // 📸 Imágenes con orden
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -142,6 +147,75 @@ export default function NuevoProductoPage() {
     setVariantes((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Agrupar variantes por color para mostrarlas en tarjetas
+  const varianteGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { color: string; indices: number[] }
+    >();
+
+    variantes.forEach((v, index) => {
+      const key = v.color || "__sin_color__";
+      if (!map.has(key)) {
+        map.set(key, {
+          color: v.color || "",
+          indices: [],
+        });
+      }
+      map.get(key)!.indices.push(index);
+    });
+
+    return Array.from(map.values());
+  }, [variantes]);
+
+  function addColorGroup() {
+    // Crea un grupo nuevo con una variante vacía
+    setVariantes((prev) => [
+      ...prev,
+      {
+        color: "",
+        talla: "",
+        sku: "",
+        barcode: "",
+        precio_actual: "",
+        stock_inicial: "",
+        min_stock: "",
+      },
+    ]);
+  }
+
+  function updateColorForGroup(indices: number[], newColor: string) {
+    setVariantes((prev) => {
+      const copy = [...prev];
+      indices.forEach((i) => {
+        copy[i] = { ...copy[i], color: newColor };
+      });
+      return copy;
+    });
+  }
+
+  function removeColorGroup(indices: number[]) {
+    setVariantes((prev) =>
+      prev.filter((_, idx) => !indices.includes(idx))
+    );
+  }
+
+  function addTallaToColor(colorValue: string) {
+    setVariantes((prev) => [
+      ...prev,
+      {
+        color: colorValue,
+        talla: "",
+        sku: "",
+        barcode: "",
+        precio_actual: "",
+        stock_inicial: "",
+        min_stock: "",
+      },
+    ]);
+  }
+
+
   function handleFilesChange(e: ChangeEvent<HTMLInputElement>) {
     const fileList = e.target.files;
     if (!fileList) return;
@@ -187,6 +261,14 @@ export default function NuevoProductoPage() {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
+
+    // ❗ Validar sucursal obligatoria
+    if (sucursalStockId === "") {
+      setLoading(false);
+      setErrorMsg("Debes seleccionar una sucursal para el stock inicial.");
+      return;
+    }
+
 
     try {
       // 1) Crear producto
@@ -401,11 +483,11 @@ export default function NuevoProductoPage() {
                     key={c.id}
                     type="button"
                     onClick={() => toggleCategoria(c.id)}
-                    className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${
-                      active
-                        ? "bg-[#a855f7] border-[#a855f7] text-white shadow-sm"
-                        : "bg-gray-50 border-gray-200 text-gray-700 hover:border-[#a855f7]"
-                    }`}
+                    className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${active
+                      ? "bg-[#f5f3ff] border-[#d8b4fe] text-[#6b21a8] shadow-sm"
+                      : "bg-gray-50 border-gray-200 text-gray-700 hover:border-[#a855f7]"
+                      }`}
+
                   >
                     {c.nombre}
                   </button>
@@ -423,19 +505,23 @@ export default function NuevoProductoPage() {
                 Variantes y stock inicial
               </h2>
               <p className="text-[11px] text-gray-500">
-                Define talla, color, precio y cantidad inicial en una sucursal.
+                Define colores, tallas, precio y cantidad inicial en una sucursal.
               </p>
             </div>
             <button
               type="button"
-              onClick={addVarianteRow}
-              className="self-start md:self-auto text-[11px] px-3 py-1 rounded-full bg-gray-900 text-white hover:bg-black shadow-sm"
+              onClick={addColorGroup}
+              className="self-start md:self-auto inline-flex items-center gap-1 text-[11px]
+             px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8]
+             border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+             shadow-sm transition-colors"
             >
-              + Agregar variante
+              <span>🎨</span>
+              <span>Agregar color</span>
             </button>
           </div>
 
-          {/* Sucursal para stock inicial - versión más bonita */}
+          {/* Sucursal para stock inicial */}
           <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 p-3 md:p-4 space-y-2">
             <div className="flex flex-col gap-1">
               <span className="font-medium text-gray-800 text-xs">
@@ -448,6 +534,7 @@ export default function NuevoProductoPage() {
             </div>
             <div className="mt-1">
               <select
+                required
                 className="w-full border border-gray-200 rounded-full px-3 py-2 text-xs bg-white focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
                 value={sucursalStockId === "" ? "" : String(sucursalStockId)}
                 onChange={(e) =>
@@ -456,7 +543,7 @@ export default function NuevoProductoPage() {
                   )
                 }
               >
-                <option value="">(Opcional) Seleccionar sucursal</option>
+                <option value="">-- Seleccionar sucursal (obligatorio) --</option>
                 {sucursales.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}
@@ -466,130 +553,107 @@ export default function NuevoProductoPage() {
             </div>
           </div>
 
-          {variantes.length === 0 ? (
+          {varianteGroups.length === 0 ? (
             <p className="text-[11px] text-gray-400">
-              Añade al menos una variante si quieres manejar tallas / colores
-              diferentes.
+              Añade al menos un color para manejar tallas y stock.
             </p>
           ) : (
-            <div className="space-y-2">
-              {variantes.map((v, index) => (
+            <div className="flex flex-wrap gap-3">
+              {varianteGroups.map((group, groupIndex) => (
                 <div
-                  key={index}
-                  className="grid md:grid-cols-[1.2fr,0.8fr,0.8fr,1fr,1fr,auto] gap-2 items-end bg-gray-50 border border-gray-200 rounded-xl p-3"
+                  key={groupIndex}
+                  className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-0.75rem)]
+                     bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3"
                 >
-                  <div className="space-y-1">
-                    <label className="font-medium text-gray-700 text-[11px]">
-                      Color
-                    </label>
-                    <input
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                      value={v.color}
-                      onChange={(e) =>
-                        updateVariante(index, "color", e.target.value)
-                      }
-                      placeholder="Ej: Negro"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-gray-700 text-[11px]">
-                      Talla
-                    </label>
-                    <input
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                      value={v.talla}
-                      onChange={(e) =>
-                        updateVariante(index, "talla", e.target.value)
-                      }
-                      placeholder="Ej: M"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-gray-700 text-[11px]">
-                      SKU
-                    </label>
-                    <input
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                      value={v.sku}
-                      onChange={(e) =>
-                        updateVariante(index, "sku", e.target.value)
-                      }
-                      required
-                      placeholder="Código interno"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-gray-700 text-[11px]">
-                      Código de barras
-                    </label>
-                    <input
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                      value={v.barcode}
-                      onChange={(e) =>
-                        updateVariante(index, "barcode", e.target.value)
-                      }
-                      placeholder="Opcional"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-gray-700 text-[11px]">
-                      Precio, stock inicial y mínimo
-                    </label>
-                    <div className="flex gap-2">
+                  {/* Header color */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 space-y-1">
+                      <label className="font-medium text-gray-700 text-[11px]">
+                        Color
+                      </label>
                       <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className="w-1/3 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                        value={v.precio_actual}
+                        className="w-full border border-gray-200 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+                        value={group.color}
                         onChange={(e) =>
-                          updateVariante(
-                            index,
-                            "precio_actual",
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
+                          updateColorForGroup(group.indices, e.target.value)
                         }
-                        placeholder="Precio"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        step="1"
-                        className="w-1/3 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                        value={v.stock_inicial}
-                        onChange={(e) =>
-                          updateVariante(
-                            index,
-                            "stock_inicial",
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
-                        }
-                        placeholder="Stock"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        step="1"
-                        className="w-1/3 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                        value={v.min_stock}
-                        onChange={(e) =>
-                          updateVariante(
-                            index,
-                            "min_stock",
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
-                        }
-                        placeholder="Mín (opc.)"
+                        placeholder="Ej: Negro"
                       />
                     </div>
-                  </div>
-                  <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => removeVarianteRow(index)}
-                      className="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                      onClick={() => removeColorGroup(group.indices)}
+                      className="inline-flex items-center justify-center text-[11px] px-2 py-1.5 rounded-full
+                         bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
                     >
-                      Eliminar
+                      🗑️
+                    </button>
+                  </div>
+
+                  {/* Tallas dentro del color */}
+                  <div className="space-y-2">
+                    {group.indices.map((variantIndex) => {
+                      const v = variantes[variantIndex];
+                      return (
+                        <div
+                          key={variantIndex}
+                          className="rounded-xl bg-white border border-gray-200 px-2.5 py-2 flex items-center justify-between gap-2"
+                        >
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-medium text-gray-700">
+                                Talla
+                              </span>
+                              <input
+                                className="w-16 border border-gray-200 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+                                value={v.talla}
+                                onChange={(e) =>
+                                  updateVariante(variantIndex, "talla", e.target.value)
+                                }
+                                placeholder="M"
+                              />
+                            </div>
+                            <p className="text-[10px] text-gray-500">
+                              {typeof v.precio_actual === "number" && v.precio_actual > 0
+                                ? `₡${v.precio_actual} · `
+                                : ""}
+                              {typeof v.stock_inicial === "number" &&
+                                v.stock_inicial > 0
+                                ? `${v.stock_inicial} u.`
+                                : "Sin stock inicial"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveVariantIndex(variantIndex)}
+                              className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full
+                                 bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+                                 hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-colors"
+                            >
+                              ⚙️ Detalles
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeVarianteRow(variantIndex)}
+                              className="inline-flex items-center justify-center text-[10px] px-2 py-1 rounded-full
+                                 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => addTallaToColor(group.color)}
+                      className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-full
+                         bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 transition-colors"
+                    >
+                      ➕ Agregar talla
                     </button>
                   </div>
                 </div>
@@ -597,6 +661,7 @@ export default function NuevoProductoPage() {
             </div>
           )}
         </section>
+
 
         {/* Media */}
         <section className="space-y-3">
@@ -641,10 +706,15 @@ export default function NuevoProductoPage() {
                     className="relative group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm"
                   >
                     <div className="absolute top-1 left-1 z-10">
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-black/70 text-white text-[10px]">
+                      <span
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full
+               bg-[#f5f3ff] text-[#6b21a8] border border-[#d8b4fe]
+               text-[10px] shadow-sm"
+                      >
                         {index + 1}
                       </span>
                     </div>
+
                     <img
                       src={item.previewUrl}
                       alt={`Imagen ${index + 1}`}
@@ -703,12 +773,163 @@ export default function NuevoProductoPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-1.5 text-xs rounded-full bg-[#a855f7] text-white font-semibold hover:bg-[#7e22ce] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 text-xs rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+             disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Guardando..." : "Crear producto"}
           </button>
+
         </div>
+
+        {/* Modal de detalles de variante (talla) */}
+        {activeVariantIndex !== null && variantes[activeVariantIndex] && (
+          <VariantDetailsModal
+            variante={variantes[activeVariantIndex]}
+            onChange={(field, value) =>
+              updateVariante(activeVariantIndex, field, value)
+            }
+            onClose={() => setActiveVariantIndex(null)}
+          />
+        )}
+
       </form>
+    </div>
+  );
+}
+
+type VariantDetailsModalProps = {
+  variante: VarianteForm;
+  onChange: (field: keyof VarianteForm, value: any) => void;
+  onClose: () => void;
+};
+
+function VariantDetailsModal({
+  variante,
+  onChange,
+  onClose,
+}: VariantDetailsModalProps) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 text-xs space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Detalles de talla
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1 col-span-2">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Talla
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.talla}
+              onChange={(e) => onChange("talla", e.target.value)}
+              placeholder="Ej: M"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              SKU
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.sku}
+              onChange={(e) => onChange("sku", e.target.value)}
+              placeholder="Código interno"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Código de barras
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.barcode}
+              onChange={(e) => onChange("barcode", e.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Precio
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.precio_actual}
+              onChange={(e) =>
+                onChange(
+                  "precio_actual",
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Cantidad inicial
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.stock_inicial}
+              onChange={(e) =>
+                onChange(
+                  "stock_inicial",
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+            />
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Stock mínimo (opcional)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.min_stock}
+              onChange={(e) =>
+                onChange(
+                  "min_stock",
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

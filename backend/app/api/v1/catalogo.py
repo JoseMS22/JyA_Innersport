@@ -3,7 +3,7 @@ from typing import List, Optional
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import func, and_, or_, distinct
 
 from app.db import get_db
@@ -13,6 +13,10 @@ from app.models.categoria import Categoria
 from app.models.inventario import Inventario
 from app.models.media import Media
 from pydantic import BaseModel
+from datetime import datetime  # 👈 agrega esto arriba
+
+from app.models.producto_categoria import ProductoCategoria  # 👈 importa la tabla pivote
+
 
 router = APIRouter()
 
@@ -40,6 +44,8 @@ class ProductoCatalogo(BaseModel):
 
     marca: Optional[str] = None          # 👈 NUEVO
     imagenes: list[str] = []             # 👈 aquí irán TODAS las fotos
+
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -71,7 +77,24 @@ def obtener_catalogo(
     por_pagina: int = Query(12, ge=1, le=100, description="Productos por página"),
     
     # Filtros
-    categoria: Optional[str] = Query(None, description="Nombre de categoría"),
+    categoria: Optional[str] = Query(
+        None,
+        description="Nombre de categoría (búsqueda libre, opcional)"
+    ),
+    categoria_slug: Optional[str] = Query(
+        None,
+        description="Slug de categoría (para URLs limpias /categorias/[slug])"
+    ),
+
+    principal_slug: Optional[str] = Query(
+        None,
+        description="Slug de categoría principal (para combinación principal+secundaria)"
+    ),
+    secundaria_slug: Optional[str] = Query(
+        None,
+        description="Slug de categoría secundaria (para combinación principal+secundaria)"
+    ),
+
     marca: Optional[str] = Query(None, description="Marca del producto"),
     color: Optional[str] = Query(None, description="Color disponible"),
     talla: Optional[str] = Query(None, description="Talla disponible"),
@@ -119,9 +142,8 @@ def obtener_catalogo(
         .filter(Producto.activo.is_(True))
     )
     
-    # 3️⃣ Filtro por disponibilidad (stock > 0)
+        # 3️⃣ Filtro por disponibilidad (stock > 0)
     if solo_disponibles:
-        # Subconsulta: productos que tienen al menos 1 variante con stock
         subq_stock = (
             db.query(distinct(Variante.producto_id))
             .join(Inventario, Inventario.variante_id == Variante.id)
@@ -131,16 +153,53 @@ def obtener_catalogo(
             )
             .subquery()
         )
-        
         query = query.filter(Producto.id.in_(subq_stock))
-    
-    # 4️⃣ Filtro por categoría
-    if categoria:
+
+
+    if principal_slug and secundaria_slug:
+        # Queremos productos que tengan ambas categorías: la principal y la secundaria
+        pc_principal = aliased(ProductoCategoria)
+        pc_secundaria = aliased(ProductoCategoria)
+
+        # Obtenemos los IDs de esas categorías por slug
+        principal_id_subq = (
+            db.query(Categoria.id)
+            .filter(Categoria.slug == principal_slug)
+            .scalar_subquery()
+        )
+        secundaria_id_subq = (
+            db.query(Categoria.id)
+            .filter(Categoria.slug == secundaria_slug)
+            .scalar_subquery()
+        )
+
+        query = (
+            query
+            .join(pc_principal, pc_principal.producto_id == Producto.id)
+            .join(pc_secundaria, pc_secundaria.producto_id == Producto.id)
+            .filter(
+                pc_principal.categoria_id == principal_id_subq,
+                pc_secundaria.categoria_id == secundaria_id_subq,
+            )
+        )
+
+    elif categoria_slug:
+        # Filtro por un solo slug (para /categorias/ropa-deportiva)
+        query = (
+            query
+            .join(Producto.categorias)
+            .filter(Categoria.slug == categoria_slug)
+        )
+
+    elif categoria:
+        # Filtro antiguo por nombre
         query = (
             query
             .join(Producto.categorias)
             .filter(Categoria.nombre.ilike(f"%{categoria}%"))
         )
+
+
     
     # 5️⃣ Filtro por marca (necesitamos join con variante)
     if marca:
@@ -272,25 +331,13 @@ def obtener_catalogo(
                 tiene_stock=tiene_stock,
                 marca=marca,
                 imagenes=imagenes_urls,
+                created_at=producto.created_at,
             )
         )
 
     # 1️⃣4️⃣ Calcular total de páginas
     total_paginas = (total + por_pagina - 1) // por_pagina
 
-    return CatalogoResponse(
-        productos=productos_catalogo,
-        total=total,
-        pagina=pagina,
-        total_paginas=total_paginas,
-        por_pagina=por_pagina,
-    )
-
-
-    
-    # 1️⃣4️⃣ Calcular total de páginas
-    total_paginas = (total + por_pagina - 1) // por_pagina
-    
     return CatalogoResponse(
         productos=productos_catalogo,
         total=total,

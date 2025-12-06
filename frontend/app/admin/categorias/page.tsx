@@ -235,9 +235,9 @@ export default function AdminCategoriasPage() {
       console.error(err);
       setError(
         err?.message ??
-          (confirmMode === "desactivar"
-            ? "Error al desactivar la categoría"
-            : "Error al activar la categoría")
+        (confirmMode === "desactivar"
+          ? "Error al desactivar la categoría"
+          : "Error al activar la categoría")
       );
       setConfirmLoading(false);
     }
@@ -281,7 +281,7 @@ export default function AdminCategoriasPage() {
         </div>
         <button
           onClick={openCreateModal}
-          className="text-xs px-3 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold hover:bg-[#7e22ce] shadow-sm"
+          className="text-xs px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8] font-semibold border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm"
         >
           + Nueva categoría
         </button>
@@ -370,9 +370,8 @@ export default function AdminCategoriasPage() {
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1 text-[11px]">
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            cat.activo ? "bg-emerald-500" : "bg-gray-300"
-                          }`}
+                          className={`w-2 h-2 rounded-full ${cat.activo ? "bg-emerald-500" : "bg-gray-300"
+                            }`}
                         />
                         <span
                           className={
@@ -430,30 +429,37 @@ export default function AdminCategoriasPage() {
 
                     {/* Acciones */}
                     <td className="px-3 py-2">
-                      <div className="flex justify-end gap-1 flex-wrap">
+                      <div className="flex justify-end gap-2 flex-wrap">
+                        {/* Editar */}
                         <button
                           onClick={() => openEditModal(cat)}
-                          className="px-2 py-1 rounded-full bg-amber-50 text-[11px] text-amber-700 hover:bg-amber-100 border border-amber-100"
+                          title="Editar categoría"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 text-sm"
                         >
-                          Editar
+                          ✏️
                         </button>
+
+                        {/* Activar / Desactivar */}
                         {cat.activo ? (
                           <button
                             onClick={() => openConfirmDesactivar(cat)}
-                            className="px-2 py-1 rounded-full bg-red-50 text-[11px] text-red-700 hover:bg-red-100 border border-red-100"
+                            title="Desactivar categoría"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-sm"
                           >
-                            Desactivar
+                            🗑️
                           </button>
                         ) : (
                           <button
                             onClick={() => openConfirmActivar(cat)}
-                            className="px-2 py-1 rounded-full bg-emerald-50 text-[11px] text-emerald-700 hover:bg-emerald-100 border border-emerald-100"
+                            title="Activar categoría"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 text-sm"
                           >
-                            Activar
+                            ✅
                           </button>
                         )}
                       </div>
                     </td>
+
                   </tr>
                 ))}
               </tbody>
@@ -711,11 +717,10 @@ function CategoriaForm({
                       key={c.id}
                       type="button"
                       onClick={() => togglePrincipalAsociada(c.id)}
-                      className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${
-                        active
+                      className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${active
                           ? "bg-violet-600 border-violet-600 text-white shadow-sm"
                           : "bg-white border-violet-200 text-violet-800 hover:bg-violet-100"
-                      }`}
+                        }`}
                     >
                       {c.nombre}
                     </button>
@@ -731,7 +736,7 @@ function CategoriaForm({
         <button
           type="submit"
           disabled={saving}
-          className="px-3 py-1.5 rounded-full bg-[#a855f7] text-white font-semibold text-xs hover:bg-[#7e22ce] disabled:opacity-60"
+          className="px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8] font-semibold text-xs border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd] disabled:opacity-60"
         >
           {saving ? "Guardando..." : actionLabel}
         </button>
@@ -802,19 +807,18 @@ function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold text-white ${
-              isDesactivar
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold text-white ${isDesactivar
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-emerald-600 hover:bg-emerald-700"
-            } disabled:opacity-60`}
+              } disabled:opacity-60`}
           >
             {loading
               ? isDesactivar
                 ? "Desactivando..."
                 : "Activando..."
               : isDesactivar
-              ? "Sí, desactivar"
-              : "Sí, activar"}
+                ? "Sí, desactivar"
+                : "Sí, activar"}
           </button>
         </div>
       </div>

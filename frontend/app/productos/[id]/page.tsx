@@ -456,10 +456,11 @@ export default function ProductDetailPage() {
       imagenUrl
     );
 
-    // Lógica original del main (alert) – la conservamos para no perder nada
-    alert(
-      `Agregado al carrito: ${cantidad} x ${producto?.nombre} (${selectedVariante.sku})`
-    );
+    // ✅ Mensaje moderno en vez de alert()
+    setToast({
+      type: "success",
+      message: `Agregado al carrito: ${cantidad} x ${producto.nombre} (${selectedVariante.sku})`,
+    });
 
     setAuthAlert({
       message: "El producto se añadió al carrito.",
@@ -687,7 +688,7 @@ export default function ProductDetailPage() {
 
             {/* Descripción */}
             {producto.descripcion && (
-              <div className="p-4 bg-white/70 rounded-xl border border-gray-200">
+              <div className="p-4 bg.white/70 rounded-xl border border-gray-200">
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {producto.descripcion}
                 </p>
@@ -938,6 +939,7 @@ export default function ProductDetailPage() {
         />
       )}
 
+      {/* Toast moderno */}
       {toast && (
         <div className="fixed bottom-4 right-4 z-50">
           <div
@@ -962,6 +964,7 @@ export default function ProductDetailPage() {
         </div>
       )}
 
+      {/* Modal de atención (authAlert) */}
       {authAlert && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
           <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">

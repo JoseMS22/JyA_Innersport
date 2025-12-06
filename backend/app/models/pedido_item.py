@@ -45,7 +45,8 @@ class PedidoItem(Base):
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
-    
+    impuesto = Column(Numeric(10, 2), nullable=False, default=0)
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

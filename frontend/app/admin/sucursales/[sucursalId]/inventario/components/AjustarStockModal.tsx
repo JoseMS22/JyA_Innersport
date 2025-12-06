@@ -171,7 +171,7 @@ export function AjustarStockModal({
 
         <div className="flex justify-end gap-2 pt-3">
           <button
-            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+            className="px-3 py-1 rounded-full bg-gray-200 hover:bg-gray-300"
             onClick={onClose}
             disabled={loading}
           >
@@ -180,7 +180,7 @@ export function AjustarStockModal({
 
           <button
             disabled={loading}
-            className="px-3 py-1 rounded bg-[#a855f7] text-white hover:bg-[#7e22ce] disabled:opacity-60"
+            className="px-3 py-1.5 rounded-full bg-[#f5f3ff] text-[#6b21a8] font-semibold text-xs border border-[#e9d5ff] hover:bg-[#ede9fe] hover:border-[#c4b5fd] disabled:opacity-60"
             onClick={submit}
           >
             {loading ? "Guardando..." : "Guardar"}

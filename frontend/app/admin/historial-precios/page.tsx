@@ -309,11 +309,28 @@ export default function HistorialPreciosResumenPage() {
                         <td className="px-3 py-3 text-center align-top">
                           <Link
                             href={`/admin/historial-precios/${p.id}`}
-                            className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-gray-800 text-white text-[11px] hover:bg-black"
+                            title="Ver detalles del historial"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full
+               bg-sky-50 text-sky-700 border border-sky-100
+               hover:bg-sky-100 hover:border-sky-200
+               transition-colors"
                           >
-                            Ver detalle
+                            {/* Ícono de lupa */}
+                            <svg
+                              className="w-3.5 h-3.5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="11" cy="11" r="6" />
+                              <line x1="16" y1="16" x2="20" y2="20" />
+                            </svg>
                           </Link>
                         </td>
+
                       </tr>
                     );
                   })}

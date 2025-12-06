@@ -15,6 +15,38 @@ from app.schemas.categoria import (
 from app.core.security import get_current_admin_user
 from app.models.usuario import Usuario
 
+import re
+import unicodedata
+
+def slugify(text: str) -> str:
+    """
+    Convierte 'Ropa Hombre' -> 'ropa-hombre'
+    No es super sofisticado pero sirve.
+    """
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    text = text.strip("-")
+    return text or "categoria"
+
+def generar_slug_unico(db: Session, base_text: str, categoria_id: int | None = None) -> str:
+    base = slugify(base_text)
+    slug = base
+    i = 1
+
+    while True:
+        q = db.query(Categoria).filter(Categoria.slug == slug)
+        if categoria_id is not None:
+            q = q.filter(Categoria.id != categoria_id)
+
+        existente = q.first()
+        if not existente:
+            return slug
+
+        i += 1
+        slug = f"{base}-{i}"
+
 router = APIRouter()
 
 
@@ -58,6 +90,9 @@ def crear_categoria(
             detail="Una categoría secundaria debe tener al menos una categoría principal asociada.",
         )
 
+    slug = generar_slug_unico(db, data.nombre)
+
+    slug = generar_slug_unico(db, data.nombre)
 
     categoria = Categoria(
         nombre=data.nombre,
@@ -65,7 +100,9 @@ def crear_categoria(
         activo=True,
         principal=data.principal,
         secundaria=data.secundaria,
+        slug=slug,
     )
+
     db.add(categoria)
     db.commit()
     db.refresh(categoria)
@@ -146,13 +183,15 @@ def get_categorias_menu(db: Session = Depends(get_db)):
                 secundarias_result.append(
                     CategoriaMenuRead(
                         id=sub.id,
+                        slug=sub.slug,
                         nombre=sub.nombre,
                         principal=sub.principal,
                         secundaria=sub.secundaria,
                         productos_count=sub_productos_count,
-                        secundarias=[],  # no usamos sub-subcategorías aquí
+                        secundarias=[],
                     )
                 )
+
 
         # 3) Si la principal no tiene productos directos NI secundarias con productos (para ella),
         #    no la mandamos al frontend.
@@ -162,6 +201,7 @@ def get_categorias_menu(db: Session = Depends(get_db)):
         resultado.append(
             CategoriaMenuRead(
                 id=cat.id,
+                slug=cat.slug,
                 nombre=cat.nombre,
                 principal=cat.principal,
                 secundaria=cat.secundaria,
@@ -169,6 +209,8 @@ def get_categorias_menu(db: Session = Depends(get_db)):
                 secundarias=secundarias_result,
             )
         )
+
+
 
     return resultado
 
@@ -180,6 +222,19 @@ def obtener_categoria(
     db: Session = Depends(get_db),
 ):
     categoria = db.query(Categoria).get(categoria_id)
+    if not categoria:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoría no encontrada.",
+        )
+    return categoria
+
+@router.get("/by-slug/{slug}", response_model=CategoriaRead)
+def obtener_categoria_por_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    categoria = db.query(Categoria).filter(Categoria.slug == slug).first()
     if not categoria:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -215,6 +270,7 @@ def actualizar_categoria(
                 detail="Ya existe otra categoría con ese nombre.",
             )
         categoria.nombre = data.nombre
+        categoria.slug = generar_slug_unico(db, data.nombre, categoria_id=categoria_id)
 
     if data.descripcion is not None:
         categoria.descripcion = data.descripcion

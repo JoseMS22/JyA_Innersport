@@ -1,9 +1,9 @@
 # backend/app/api/v1/pedidos.py
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.core.security import get_current_user
@@ -13,11 +13,17 @@ from app.schemas.pedido import (
     PedidoCreateFromCart,
     PedidoRead,
     PedidoHistorialOut,
+    PedidoEstadoUpdate,
+    PedidoEstadoResponse,
     CancelarPedidoRequest,
     ImpactoCancelacionResponse,
     CancelarPedidoResponse,
 )
-from app.services.pedido_service import crear_pedido_desde_carrito
+
+from app.services.pedido_service import (
+    crear_pedido_desde_carrito,
+    actualizar_estado_pedido,
+)
 from app.services.cancelar_pedido_service import (
     verificar_puede_cancelar_pedido,
     cancelar_pedido,
@@ -25,6 +31,10 @@ from app.services.cancelar_pedido_service import (
 
 router = APIRouter()
 
+def require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+  if current_user.rol != "ADMIN":
+      raise HTTPException(status_code=403, detail="Solo administradores")
+  return current_user
 
 def get_client_ip(request: Request) -> str:
     """Obtiene la IP del cliente desde el request"""
@@ -33,6 +43,42 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+@router.get("/admin", response_model=List[PedidoHistorialOut])
+def listar_pedidos_admin(
+    estado: Optional[str] = Query(None, description="Estado del pedido"),
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(require_admin),
+):
+    """
+    Lista pedidos para el panel admin.
+    - Puede filtrar por estado (PAGADO, EN_PREPARACION, ENVIADO, ENTREGADO, CANCELADO)
+    - Si `estado` es None -> trae todos.
+    """
+    query = (
+        db.query(Pedido)
+        .options(joinedload(Pedido.sucursal))  # 👈 para traer también la sucursal
+        .order_by(Pedido.fecha_creacion.desc())
+    )
+
+    if estado:
+        query = query.filter(Pedido.estado == estado)
+
+    pedidos = query.all()
+
+    # 👇 Construimos la respuesta incluyendo sucursal_nombre
+    return [
+        PedidoHistorialOut(
+            id=p.id,
+            total=p.total,
+            estado=p.estado,
+            fecha_creacion=p.fecha_creacion,
+            sucursal_id=p.sucursal_id,
+            sucursal_nombre=p.sucursal.nombre if p.sucursal else None,
+            cancelado=p.cancelado,
+            numero_pedido=p.numero_pedido,
+        )
+        for p in pedidos
+    ]
 
 @router.post("/checkout", response_model=PedidoRead)
 def crear_pedido_checkout(
@@ -69,50 +115,74 @@ def listar_mis_pedidos(
     return pedidos
 
 
+@router.patch("/{pedido_id}/estado", response_model=PedidoEstadoResponse)
+def cambiar_estado_pedido(
+    pedido_id: int,
+    data: PedidoEstadoUpdate,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cambia el estado de un pedido y envía un correo al cliente.
+
+    ⚠️ IMPORTANTE:
+    Más adelante deberías restringir este endpoint solo a usuarios
+    con rol de ADMIN / VENDEDOR o similar.
+    """
+    return actualizar_estado_pedido(
+        db=db,
+        pedido_id=pedido_id,
+        nuevo_estado=data.estado,
+        usuario_actual=current_user,
+    )
+
+
 @router.get("/{pedido_id}", response_model=dict)
 def obtener_detalle_pedido(
     pedido_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
 ):
     """
     Obtener detalles completos de un pedido específico
     """
-    # Buscar el pedido con todas sus relaciones cargadas
-    pedido = (
-        db.query(Pedido)
-        .filter(
-            Pedido.id == pedido_id,
-            Pedido.cliente_id == current_user.id
-        )
-        .first()
-    )
-    
+    query = db.query(Pedido).filter(Pedido.id == pedido_id)
+
+    if current_user.rol != "ADMIN":
+        query = query.filter(Pedido.cliente_id == current_user.id)
+
+    pedido = query.first()
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    # 🔧 CORREGIDO: Construir lista de productos con imagen desde media
+
+    # Productos del pedido (usando PedidoItem y relaciones)
     productos = []
     for item in pedido.items:
-        # Obtener la imagen del producto desde la relación media
         imagen_url = ""
-        if item.producto and hasattr(item.producto, 'media'):
-            # Buscar la primera imagen (puedes filtrar por tipo o posición si existe)
+        if item.producto and hasattr(item.producto, "media"):
             medias = item.producto.media
             if medias and len(medias) > 0:
-                # Tomar la primera media disponible
-                imagen_url = medias[0].url if hasattr(medias[0], 'url') else ""
-        
-        productos.append({
-            "id": item.id,
-            "nombre": item.producto.nombre if item.producto else "Producto eliminado",
-            "imagen_url": imagen_url,
-            "precio_unitario": float(item.precio_unitario),
-            "cantidad": item.cantidad,
-            "subtotal": float(item.subtotal)
-        })
-    
-    # 🔧 CORREGIDO: Usar campos reales del modelo Direccion
+                imagen_url = getattr(medias[0], "url", "")
+
+        productos.append(
+            {
+                "id": item.id,
+                "nombre": item.producto.nombre if item.producto else "Producto eliminado",
+                "imagen_url": imagen_url,
+                "precio_unitario": float(item.precio_unitario),
+                "cantidad": item.cantidad,
+                "subtotal": float(item.subtotal),
+                "impuesto": float(getattr(item, "impuesto", 0) or 0),
+            }
+        )
+
+        # Calcular impuesto total del pedido (suma de los ítems)
+    impuesto_total = sum(
+        float(getattr(it, "impuesto", 0) or 0) for it in pedido.items
+    )
+
+
     # Datos de dirección de envío
     direccion_data = {}
     if pedido.direccion_envio:
@@ -120,23 +190,22 @@ def obtener_detalle_pedido(
             "provincia": pedido.direccion_envio.provincia,
             "canton": pedido.direccion_envio.canton,
             "distrito": pedido.direccion_envio.distrito,
-            "detalle": pedido.direccion_envio.detalle,  # ✅ Campo correcto
+            "detalle": pedido.direccion_envio.detalle,
             "pais": pedido.direccion_envio.pais or "Costa Rica",
             "codigo_postal": pedido.direccion_envio.codigo_postal or "",
             "telefono": pedido.direccion_envio.telefono or "",
-            "nombre": pedido.direccion_envio.nombre or "",  # ✅ Campo correcto
-            "referencia": pedido.direccion_envio.referencia or ""
+            "nombre": pedido.direccion_envio.nombre or "",
+            "referencia": pedido.direccion_envio.referencia or "",
         }
-    
-    # Verificar si puede cancelar (dentro de 24 horas y estado permitido)
+
+    # Verificar si puede cancelar (ejemplo: solo ciertos estados / tiempo)
     puede_cancelar = False
     fecha_limite = None
-    
+
     if pedido.estado in ["PENDIENTE", "CONFIRMADO"]:
         fecha_limite = pedido.fecha_creacion + timedelta(hours=24)
         puede_cancelar = datetime.now() < fecha_limite
-    
-    # Construir respuesta
+
     return {
         "id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
@@ -150,8 +219,9 @@ def obtener_detalle_pedido(
         "metodo_envio": pedido.metodo_envio or "Envío Estándar",
         "direccion_envio": direccion_data,
         "productos": productos,
+        "impuesto_total": impuesto_total,
         "puede_cancelar": puede_cancelar,
-        "fecha_limite_cancelacion": fecha_limite.isoformat() if fecha_limite else None
+        "fecha_limite_cancelacion": fecha_limite.isoformat() if fecha_limite else None,
     }
 
 
@@ -171,27 +241,18 @@ def verificar_cancelacion_pedido(
     """
     US-26: Verifica si un pedido puede ser cancelado y muestra
     advertencias sobre el impacto (reembolsos, stock, etc).
-    
-    Este endpoint debe llamarse ANTES de confirmar la cancelación
-    para mostrar al usuario las consecuencias.
     """
-    # Obtener pedido
     pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
-    
+
     if not pedido:
-        raise HTTPException(
-            status_code=404,
-            detail="Pedido no encontrado"
-        )
-    
-    # Verificar permisos
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
     if current_user.rol != "ADMIN" and pedido.cliente_id != current_user.id:
         raise HTTPException(
             status_code=403,
-            detail="No tienes permiso para ver este pedido"
+            detail="No tienes permiso para ver este pedido",
         )
-    
-    # Verificar y retornar impacto
+
     return verificar_puede_cancelar_pedido(db, pedido)
 
 
@@ -208,18 +269,9 @@ def cancelar_pedido_endpoint(
 ):
     """
     US-26: Cancela un pedido.
-    
-    Criterios de aceptación:
-    - ✅ Solo cancela si no fue despachado o entregado
-    - ✅ Muestra advertencia de impacto antes (endpoint /verificar-cancelacion)
-    - ✅ Actualiza estado a CANCELADO y reintegra stock cuando aplique
-    - ✅ Registra auditoría con usuario, motivo, timestamp
-    
-    La notificación al cliente/admin se implementará posteriormente
-    con el sistema de notificaciones.
     """
     ip_address = get_client_ip(request)
-    
+
     return cancelar_pedido(
         db=db,
         pedido_id=pedido_id,

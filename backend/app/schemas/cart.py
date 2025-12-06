@@ -17,6 +17,7 @@ class CartItemFromApi(BaseModel):
     precio_unitario: Decimal
     subtotal: Decimal
     imagen_url: Optional[str] = None
+    stock_disponible: Optional[int] = None
 
     class Config:
         from_attributes = True

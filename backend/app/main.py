@@ -43,6 +43,8 @@ from app.api.v1.envio import router as envio_router
 #  Routers de pedidos y pagos
 from app.api.v1.pedidos import router as pedidos_router
 
+from app.api.v1.pos import router as pos_router
+
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
 logger = get_logger(__name__)
@@ -185,6 +187,7 @@ app.include_router(pedidos_router, prefix="/api/v1/pedidos", tags=["Pedidos"])
 # 🆕 US-19: Direcciones y envío
 app.include_router(direcciones_router, prefix="/api/v1/direcciones", tags=["Direcciones"])
 app.include_router(envio_router, prefix="/api/v1/envio", tags=["Envío"])
+app.include_router(pos_router, prefix="/api/v1/pos", tags=["Pos"])
 
 
 # =========================

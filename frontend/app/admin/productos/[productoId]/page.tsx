@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 const API_BASE =
@@ -70,6 +70,7 @@ export default function EditarProductoPage() {
   const [marca, setMarca] = useState(""); // Marca única del producto
 
   const [variantes, setVariantes] = useState<VarianteRow[]>([]);
+  const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -81,18 +82,14 @@ export default function EditarProductoPage() {
 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-
   function showSuccess(message: string) {
     setSuccessMsg(message);
-    // limpiar error si había
     setErrorMsg(null);
 
-    // borrar el mensaje después de unos segundos
     setTimeout(() => {
       setSuccessMsg(null);
     }, 3000);
   }
-
 
   // =========================
   // Cargar datos
@@ -143,13 +140,11 @@ export default function EditarProductoPage() {
       const sortedMedia: Media[] = (pData.media || [])
         .slice()
         .sort((a: Media, b: Media) => {
-          // por si vienen muchos con 0
           if (a.orden === b.orden) return a.id - b.id;
           return a.orden - b.orden;
         });
 
       setMediaList(sortedMedia);
-
     } catch (err) {
       console.error("Error cargando producto:", err);
       setErrorMsg("No se pudo cargar el producto.");
@@ -246,6 +241,62 @@ export default function EditarProductoPage() {
     setVariantes((prev) => [...prev, nueva]);
   }
 
+  // Agregar nueva talla dentro de un color existente
+  function addSizeForColor(color: string) {
+    const nueva: VarianteRow = {
+      id: 0,
+      sku: "",
+      barcode: "",
+      marca: marca || "",
+      color: color || "",
+      talla: "",
+      precio_actual: 0,
+      activo: true,
+      historial_precios: [],
+      _isNew: true,
+    };
+
+    setVariantes((prev) => [...prev, nueva]);
+  }
+
+  type VarianteGroup = {
+    color: string;
+    items: { index: number; v: VarianteRow }[];
+  };
+
+  const varianteGroups: VarianteGroup[] = useMemo(() => {
+    const map = new Map<string, VarianteGroup>();
+
+    variantes.forEach((v, index) => {
+      const key = v.color || "__sin_color__";
+      if (!map.has(key)) {
+        map.set(key, {
+          color: v.color || "",
+          items: [],
+        });
+      }
+      map.get(key)!.items.push({ index, v });
+    });
+
+    return Array.from(map.values());
+  }, [variantes]);
+
+  function updateColorForGroup(indices: number[], newColor: string) {
+    setVariantes((prev) => {
+      const copy = [...prev];
+      indices.forEach((i) => {
+        copy[i] = { ...copy[i], color: newColor };
+      });
+      return copy;
+    });
+  }
+
+  function removeColorGroup(indices: number[]) {
+    setVariantes((prev) =>
+      prev.filter((_, idx) => !indices.includes(idx))
+    );
+  }
+
   async function saveVariante(index: number) {
     if (!producto) return;
     const v = variantes[index];
@@ -315,7 +366,6 @@ export default function EditarProductoPage() {
   async function desactivarVariante(index: number) {
     const v = variantes[index];
     if (!v.id || v._isNew) {
-      // Si es nueva y aún no se ha guardado, solo la quitamos
       setVariantes((prev) => prev.filter((_, i) => i !== index));
       return;
     }
@@ -410,7 +460,6 @@ export default function EditarProductoPage() {
     }
   }
 
-  // mover imagen en la lista local
   function moveMedia(mediaId: number, direction: "up" | "down") {
     setMediaList((prev) => {
       const idx = prev.findIndex((m) => m.id === mediaId);
@@ -426,7 +475,6 @@ export default function EditarProductoPage() {
     });
   }
 
-  // guardar orden en backend
   async function handleSaveMediaOrder() {
     if (!producto) return;
     if (mediaList.length === 0) return;
@@ -455,7 +503,6 @@ export default function EditarProductoPage() {
         );
       }
 
-      // refrescar todo para traer media ya con orden actualizado
       await loadData();
       showSuccess("El orden de las imágenes se guardó correctamente.");
     } catch (err: any) {
@@ -533,7 +580,7 @@ export default function EditarProductoPage() {
               <label className="font-medium text-gray-700 text-[11px]">
                 Estado
               </label>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items.center gap-2 mt-1">
                 <input
                   id="activo"
                   type="checkbox"
@@ -601,10 +648,11 @@ export default function EditarProductoPage() {
                     key={c.id}
                     type="button"
                     onClick={() => toggleCategoria(c.id)}
-                    className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${active
-                        ? "bg-[#a855f7] border-[#a855f7] text-white shadow-sm"
+                    className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${
+                      active
+                        ? "bg-[#f5f3ff] border-[#d8b4fe] text-[#6b21a8] shadow-sm"
                         : "bg-gray-50 border-gray-200 text-gray-700 hover:border-[#a855f7]"
-                      }`}
+                    }`}
                   >
                     {c.nombre}
                   </button>
@@ -626,7 +674,6 @@ export default function EditarProductoPage() {
           </div>
         )}
 
-
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"
@@ -638,7 +685,10 @@ export default function EditarProductoPage() {
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-1.5 text-xs rounded-full bg-[#a855f7] text-white font-semibold hover:bg-[#7e22ce] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 text-xs rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+             disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
@@ -659,9 +709,12 @@ export default function EditarProductoPage() {
           <button
             type="button"
             onClick={addNewVarianteRow}
-            className="text-[11px] px-3 py-1.5 rounded-full bg-gray-900 text-white hover:bg-black shadow-sm"
+            className="inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
           >
-            + Nueva variante
+            <span>➕</span>
+            <span>Nueva variante</span>
           </button>
         </div>
 
@@ -670,123 +723,104 @@ export default function EditarProductoPage() {
             No hay variantes registradas.
           </p>
         ) : (
-          <div className="space-y-2">
-            {variantes.map((v, index) => (
+          <div className="flex flex-wrap gap-3">
+            {varianteGroups.map((group, groupIndex) => (
               <div
-                key={`${v.id}-${index}`}
-                className="grid md:grid-cols-[1.1fr,0.9fr,0.9fr,1fr,0.9fr,auto] gap-2 items-end bg-gray-50 border border-gray-200 rounded-xl p-3"
+                key={groupIndex}
+                className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-0.75rem)]
+                     bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3"
               >
-                <div className="space-y-1">
-                  <label className="font-medium text-gray-700 text-[11px]">
-                    Color
-                  </label>
-                  <input
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                    value={v.color || ""}
-                    onChange={(e) =>
-                      updateVarianteField(index, "color", e.target.value)
-                    }
-                    placeholder="Ej: Negro"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-gray-700 text-[11px]">
-                    Talla
-                  </label>
-                  <input
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                    value={v.talla || ""}
-                    onChange={(e) =>
-                      updateVarianteField(index, "talla", e.target.value)
-                    }
-                    placeholder="Ej: M"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-gray-700 text-[11px]">
-                    SKU
-                  </label>
-                  <input
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                    value={v.sku || ""}
-                    onChange={(e) =>
-                      updateVarianteField(index, "sku", e.target.value)
-                    }
-                    placeholder="Código interno"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-gray-700 text-[11px]">
-                    Código de barras
-                  </label>
-                  <input
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                    value={v.barcode || ""}
-                    onChange={(e) =>
-                      updateVarianteField(index, "barcode", e.target.value)
-                    }
-                    placeholder="Opcional"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-gray-700 text-[11px]">
-                    Precio
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
-                    value={v.precio_actual}
-                    onChange={(e) =>
-                      updateVarianteField(
-                        index,
-                        "precio_actual",
-                        Number(e.target.value) || 0
-                      )
-                    }
-                  />
-                  <div className="flex items-center gap-1 mt-1">
+                {/* Header color */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 space-y-1">
+                    <label className="font-medium text-gray-700 text-[11px]">
+                      Color
+                    </label>
                     <input
-                      id={`var-activo-${index}`}
-                      type="checkbox"
-                      className="rounded border-gray-300"
-                      checked={v.activo}
+                      className="w-full border border-gray-200 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+                      value={group.color}
                       onChange={(e) =>
-                        updateVarianteField(
-                          index,
-                          "activo",
-                          e.target.checked
+                        updateColorForGroup(
+                          group.items.map((it) => it.index),
+                          e.target.value
                         )
                       }
+                      placeholder="Ej: Negro"
                     />
-                    <label
-                      htmlFor={`var-activo-${index}`}
-                      className="text-[10px] text-gray-600"
-                    >
-                      Activa
-                    </label>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeColorGroup(group.items.map((it) => it.index))
+                    }
+                    className="inline-flex items-center justify-center text-[11px] px-2 py-1.5 rounded-full
+                         bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                  >
+                    🗑️
+                  </button>
                 </div>
 
-                <div className="flex flex-col items-end gap-1">
+                {/* Tallas de este color */}
+                <div className="space-y-2">
+                  {group.items.map(({ index, v }) => (
+                    <div
+                      key={index}
+                      className="rounded-xl bg-white border border-gray-200 px-2.5 py-2 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium text-gray-700">
+                            Talla
+                          </span>
+                          <input
+                            className="w-16 border border-gray-200 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+                            value={v.talla || ""}
+                            onChange={(e) =>
+                              updateVarianteField(index, "talla", e.target.value)
+                            }
+                            placeholder="M"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          {v.precio_actual != null &&
+                          !isNaN(Number(v.precio_actual))
+                            ? `₡${Number(v.precio_actual).toFixed(2)}`
+                            : "Sin precio"}{" "}
+                          · {v.activo ? "Activa" : "Inactiva"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveVariantIndex(index)}
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full
+                               bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+                               hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-colors"
+                        >
+                          ⚙️ Detalles
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => desactivarVariante(index)}
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full
+                               bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
                   <button
                     type="button"
-                    onClick={() => saveVariante(index)}
-                    className="text-[11px] px-2 py-1 rounded-full bg-[#a855f7] text-white hover:bg-[#7e22ce]"
+                    onClick={() => addSizeForColor(group.color)}
+                    className="mt-1 inline-flex.items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
+           bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+           hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
                   >
-                    Guardar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => desactivarVariante(index)}
-                    className="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
-                  >
-                    Eliminar
+                    <span>➕</span>
+                    <span>Agregar talla</span>
                   </button>
                 </div>
               </div>
@@ -794,6 +828,18 @@ export default function EditarProductoPage() {
           </div>
         )}
       </section>
+
+      {activeVariantIndex !== null && variantes[activeVariantIndex] && (
+        <VariantEditModal
+          variante={variantes[activeVariantIndex]}
+          onChange={(field, value) =>
+            updateVarianteField(activeVariantIndex, field as keyof VarianteRow, value)
+          }
+          onSave={() => saveVariante(activeVariantIndex)}
+          onDelete={() => desactivarVariante(activeVariantIndex)}
+          onClose={() => setActiveVariantIndex(null)}
+        />
+      )}
 
       {/* MEDIA */}
       <section className="bg-white rounded-2xl border border-gray-200 p-5 text-xs space-y-4 shadow-sm">
@@ -809,8 +855,14 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            <label className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-900 text-white text-[11px] cursor-pointer hover:bg-black shadow-sm">
-              {uploading ? "Subiendo..." : "Subir imágenes"}
+            <label
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             text-[11px] cursor-pointer hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+             shadow-sm transition-colors"
+            >
+              <span>📸</span>
+              <span>{uploading ? "Subiendo..." : "Subir imágenes"}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -852,9 +904,11 @@ export default function EditarProductoPage() {
                   />
                 </div>
 
-                {/* Orden + controles */}
                 <div className="absolute top-1 left-1 flex items-center gap-1">
-                  <span className="text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-full">
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded-full
+               bg-[#f5f3ff] text-[#6b21a8] border border-[#d8b4fe] shadow-sm"
+                  >
                     #{index + 1}
                   </span>
                 </div>
@@ -873,14 +927,14 @@ export default function EditarProductoPage() {
                     type="button"
                     onClick={() => moveMedia(m.id, "down")}
                     disabled={index === mediaList.length - 1}
-                    className="text-[10px] bg-white/80 text-gray-800 px-1.5 py-0.5 rounded-full border border-gray-200 disabled:opacity-40"
+                    className="text-[10px] bg-white/80 text-gray-800 px-1.5 py-0.5 rounded-full border border-gray-200.disabled:opacity-40"
                     title="Bajar"
                   >
                     ▼
                   </button>
                   <button
                     onClick={() => eliminarMedia(m.id)}
-                    className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full hover:bg-red-700"
+                    className="text-[10px] bg-red-600 text.white px-1.5 py-0.5 rounded-full hover:bg-red-700"
                     title="Eliminar"
                   >
                     ✕
@@ -895,6 +949,149 @@ export default function EditarProductoPage() {
           </p>
         )}
       </section>
+    </div>
+  );
+}
+
+type VariantEditModalProps = {
+  variante: VarianteRow;
+  onChange: (field: keyof VarianteRow, value: any) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+};
+
+function VariantEditModal({
+  variante,
+  onChange,
+  onSave,
+  onDelete,
+  onClose,
+}: VariantEditModalProps) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 text-xs space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Detalles de variante
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1 col-span-2">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Talla
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.talla || ""}
+              onChange={(e) => onChange("talla", e.target.value)}
+              placeholder="Ej: M"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              SKU
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.sku || ""}
+              onChange={(e) => onChange("sku", e.target.value)}
+              placeholder="Código interno"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Código de barras
+            </label>
+            <input
+              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.barcode || ""}
+              onChange={(e) => onChange("barcode", e.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Precio
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              value={variante.precio_actual}
+              onChange={(e) =>
+                onChange("precio_actual", Number(e.target.value) || 0)
+              }
+            />
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="font-medium text-gray-700 text-[11px]">
+              Estado
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="var-activo-modal"
+                type="checkbox"
+                className="rounded border-gray-300"
+                checked={variante.activo}
+                onChange={(e) => onChange("activo", e.target.checked)}
+              />
+              <label
+                htmlFor="var-activo-modal"
+                className="text-[11px] text-gray-700"
+              >
+                Variante activa
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-2">
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
+                     bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+          >
+            🗑️ Eliminar
+          </button>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSave();
+                onClose();
+              }}
+              className="px-4.py-1.5 text-xs rounded-full
+                       bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+                       font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+                      .disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

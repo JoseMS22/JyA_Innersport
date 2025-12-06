@@ -25,6 +25,13 @@ from .metodo_envio import MetodoEnvio
 from .pedido import Pedido
 from .pedido_item import PedidoItem  # 🆕 AGREGAR ESTA LÍNEA
 from .pago import Pago
+from .auditoria import AuditoriaUsuario
+from .caja_movimientos import CajaMovimiento
+from .caja_turno import CajaTurno
+from .usuario_sucursal import UsuarioSucursal
+from .venta_pos import VentaPOS
+from .venta_pos_item import VentaPOSItem
+from .pago_pos import PagoPOS
 
 __all__ = [
     "Usuario",

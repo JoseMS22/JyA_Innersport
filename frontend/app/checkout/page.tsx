@@ -54,6 +54,14 @@ type LimitePuntos = {
   saldo_puntos: number;
 };
 
+type ToastState =
+  | {
+    type: "success" | "warning";
+    title: string;
+    message: string;
+  }
+  | null;
+
 const PROVINCIAS = [
   "San José",
   "Alajuela",
@@ -67,6 +75,13 @@ const PROVINCIAS = [
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
+  // IVA Costa Rica (ajusta si usas otro)
+  const TAX_RATE = 0.13;
+
+  // Si "total" YA incluye impuesto, sacamos el impuesto y el subtotal sin impuesto
+  const subtotalSinImpuesto = total / (1 + TAX_RATE);
+  const impuestoTotal = total - subtotalSinImpuesto;
+
 
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [direccionSeleccionada, setDireccionSeleccionada] =
@@ -99,8 +114,11 @@ export default function CheckoutPage() {
     predeterminada: false,
   });
 
-  // Nuevo: estado para bloquear botón mientras se procesa el pedido
+  // Bloquear botón mientras se procesa el pedido
   const [procesandoPago, setProcesandoPago] = useState(false);
+
+  // Toast bonito
+  const [toast, setToast] = useState<ToastState>(null);
 
   // ========= 1) Verificar sesión y cargar datos iniciales =========
   useEffect(() => {
@@ -138,7 +156,6 @@ export default function CheckoutPage() {
       if (!res.ok) return;
 
       const data = await res.json();
-      // data.saldo viene del backend
       setPuntosDisponibles(data.saldo || 0);
     } catch (err) {
       console.error("Error al cargar saldo de puntos", err);
@@ -262,7 +279,6 @@ export default function CheckoutPage() {
   // ========= 6) Calcular límite de puntos en función del total de la compra =========
   async function calcularLimitePuntos(totalCompra: number) {
     try {
-      // Llama al endpoint que usa total_compra
       const res = await fetch(
         `${API_BASE}/api/v1/puntos/me/limite-redencion?total_compra=${totalCompra}`,
         { credentials: "include" }
@@ -294,7 +310,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Por defecto no aplica puntos aún, el usuario decide
       setPuntosUsados(0);
       setDescuento(0);
     } catch (error) {
@@ -319,121 +334,131 @@ export default function CheckoutPage() {
 
   // ========= 8) Confirmar pedido (simulado) + crear Pedido real =========
   async function handleContinuarPago() {
-  if (!direccionSeleccionada || !metodoSeleccionado) {
-    setError("Por favor selecciona una dirección y método de envío");
-    return;
-  }
-
-  if (items.length === 0) {
-    setError("Tu carrito está vacío");
-    return;
-  }
-
-  try {
-    setProcesandoPago(true);
-    setError(null);
-
-    // 1️⃣ Crear Pedido real en el backend
-    const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        direccion_envio_id: direccionSeleccionada.id,
-        metodo_pago: "SIMULADO",
-      }),
-    });
-
-    if (!resPedido.ok) {
-      const errData = await resPedido.json().catch(() => null);
-      console.error("Error creando pedido:", errData);
-      setError(
-        errData?.detail ||
-          "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
-      );
+    if (!direccionSeleccionada || !metodoSeleccionado) {
+      setError("Por favor selecciona una dirección y método de envío");
       return;
     }
 
-    const pedido = await resPedido.json(); // PedidoRead
-
-    // 2️⃣ Confirmar compra y procesar puntos (SIEMPRE, aunque puntosUsados sea 0)
-    let dataPuntos: any = null;
-    try {
-      const resPuntos = await fetch(
-        `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            total_compra: total + Number(metodoSeleccionado.costo),
-            puntos_a_usar: puntosUsados, // puede ser 0
-            // si luego el backend acepta order_id, aquí puedes enviar: order_id: pedido.id
-          }),
-        }
-      );
-
-      if (!resPuntos.ok) {
-        const err = await resPuntos.json().catch(() => null);
-        console.error("Error al confirmar puntos:", err);
-        // No rompemos el pedido, solo avisamos
-        alert(
-          "El pedido se creó correctamente, pero hubo un problema al registrar los puntos.\n" +
-            (err?.detail ? `Detalle: ${err.detail}` : "")
-        );
-      } else {
-        dataPuntos = await resPuntos.json();
-      }
-    } catch (e) {
-      console.error("Error de red al confirmar puntos:", e);
-      // Igual no rompemos la compra
+    if (items.length === 0) {
+      setError("Tu carrito está vacío");
+      return;
     }
 
-    // 3️⃣ Calcular totales mostrados al usuario
-    const descuentoAplicado = dataPuntos
-      ? Number(dataPuntos.descuento_aplicado || 0)
-      : 0;
+    try {
+      setProcesandoPago(true);
+      setError(null);
 
-    const totalFinal = dataPuntos
-      ? Number(dataPuntos.total_final || 0)
-      : total + Number(metodoSeleccionado.costo) - descuentoAplicado;
+      // 1️⃣ Crear Pedido real en el backend
+      const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          direccion_envio_id: direccionSeleccionada.id,
+          metodo_pago: "SIMULADO",
+          metodo_envio: metodoSeleccionado?.metodo_nombre,
+        }),
+      });
 
-    const textoPuntos = dataPuntos
-      ? `
-Puntos usados: ${dataPuntos.puntos_redimidos}
-Puntos ganados: ${dataPuntos.puntos_ganados}
-Nuevo saldo de puntos: ${dataPuntos.saldo_puntos_final}`
-      : `
-Los puntos no pudieron registrarse correctamente en esta compra.`;
+      if (!resPedido.ok) {
+        const errData = await resPedido.json().catch(() => null);
+        console.error("Error creando pedido:", errData);
+        setError(
+          errData?.detail ||
+          "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
+        );
+        return;
+      }
 
-    alert(
-      `Pedido #${pedido.id} creado correctamente 🎉
+      const pedido = await resPedido.json(); // PedidoRead
 
-Subtotal: ₡${total.toLocaleString("es-CR")}
-Envío: ₡${Number(
-        metodoSeleccionado.costo
-      ).toLocaleString("es-CR")}
-Descuento aplicado: ₡${descuentoAplicado.toLocaleString("es-CR")}
+      // 2️⃣ Confirmar compra y procesar puntos (SIEMPRE, aunque puntosUsados sea 0)
+      let dataPuntos: any = null;
+      let huboErrorPuntos = false;
 
-TOTAL FINAL: ₡${totalFinal.toLocaleString("es-CR")}
-${textoPuntos}
-`
-    );
+      try {
+        const resPuntos = await fetch(
+          `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              total_compra: total + Number(metodoSeleccionado.costo),
+              puntos_a_usar: puntosUsados, // puede ser 0
+              // En el futuro: pedido_id: pedido.id
+            }),
+          }
+        );
 
-    // 4️⃣ Limpiar carrito y redirigir a pedidos
-    clearCart();
-    router.push("/account/orders");
-  } catch (err) {
-    console.error("Error finalizando compra", err);
-    setError("Hubo un problema al procesar el pago.");
-  } finally {
-    setProcesandoPago(false);
+        if (!resPuntos.ok) {
+          const err = await resPuntos.json().catch(() => null);
+          console.error("Error al confirmar puntos:", err);
+          huboErrorPuntos = true;
+          setToast({
+            type: "warning",
+            title: "Pedido creado, pero hubo un detalle",
+            message:
+              "Tu pedido se registró correctamente, pero ocurrió un problema al aplicar o registrar los puntos. Podrás verlo en tu historial de pedidos.",
+          });
+        } else {
+          dataPuntos = await resPuntos.json();
+        }
+      } catch (e) {
+        console.error("Error de red al confirmar puntos:", e);
+        huboErrorPuntos = true;
+        setToast({
+          type: "warning",
+          title: "Pedido creado, pero hubo un detalle",
+          message:
+            "Tu pedido se registró correctamente, pero no se pudieron registrar los puntos por un problema de conexión.",
+        });
+      }
+
+      // 3️⃣ Calcular totales mostrados (para el toast)
+      const descuentoAplicado = dataPuntos
+        ? Number(dataPuntos.descuento_aplicado || 0)
+        : 0;
+
+      const totalFinal = dataPuntos
+        ? Number(dataPuntos.total_final || 0)
+        : total + Number(metodoSeleccionado.costo) - descuentoAplicado;
+
+      const subtotalMostrar = dataPuntos
+        ? total + Number(metodoSeleccionado.costo)
+        : Number(pedido.subtotal ?? total);
+
+      const envioMostrar = dataPuntos
+        ? Number(metodoSeleccionado.costo)
+        : Number(pedido.costo_envio ?? metodoSeleccionado.costo);
+
+      setToast({
+        type: "success",
+        title: `Pedido #${pedido.id} creado correctamente 🎉`,
+        message: `Subtotal: ₡${subtotalMostrar.toLocaleString(
+          "es-CR"
+        )} · Envío: ₡${envioMostrar.toLocaleString(
+          "es-CR"
+        )} · Total: ₡${totalFinal.toLocaleString("es-CR")}${huboErrorPuntos
+            ? " (con observaciones en los puntos)."
+            : " · ¡Gracias por tu compra!"
+          }`,
+      });
+
+      // 4️⃣ Limpiar carrito y redirigir a pedidos
+      clearCart();
+      router.push("/account/orders");
+    } catch (err) {
+      console.error("Error finalizando compra", err);
+      setError("Hubo un problema al procesar el pago.");
+    } finally {
+      setProcesandoPago(false);
+    }
   }
-}
 
   // ========= LOADING / CARRITO VACÍO =========
   if (loading) {
@@ -446,6 +471,26 @@ ${textoPuntos}
             <p className="text-sm text-gray-600">Cargando información...</p>
           </div>
         </div>
+
+        {/* Toast mientras carga (por si acaso) */}
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
+                ? "bg-white border-green-200"
+                : "bg-white border-yellow-200"
+              }`}
+          >
+            <p
+              className={`font-semibold mb-1 ${toast.type === "success"
+                  ? "text-green-700"
+                  : "text-yellow-700"
+                }`}
+            >
+              {toast.title}
+            </p>
+            <p className="text-gray-700">{toast.message}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -471,24 +516,43 @@ ${textoPuntos}
             </button>
           </div>
         </div>
+
+        {/* Toast en vista carrito vacío */}
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
+                ? "bg-white border-green-200"
+                : "bg-white border-yellow-200"
+              }`}
+          >
+            <p
+              className={`font-semibold mb-1 ${toast.type === "success"
+                  ? "text-green-700"
+                  : "text-yellow-700"
+                }`}
+            >
+              {toast.title}
+            </p>
+            <p className="text-gray-700">{toast.message}</p>
+          </div>
+        )}
       </div>
     );
   }
 
   // ========= UI PRINCIPAL =========
-  // Factor de conversión puntos → colones (si hay límite)
   const factorPuntoEnColones =
     limitePuntos && limitePuntos.puntos_necesarios_para_maximo > 0
       ? limitePuntos.descuento_maximo_colones /
-        limitePuntos.puntos_necesarios_para_maximo
+      limitePuntos.puntos_necesarios_para_maximo
       : 0;
 
   const maxPuntosUsables =
     limitePuntos && limitePuntos.puede_usar_puntos
       ? Math.min(
-          limitePuntos.saldo_puntos,
-          limitePuntos.puntos_necesarios_para_maximo
-        )
+        limitePuntos.saldo_puntos,
+        limitePuntos.puntos_necesarios_para_maximo
+      )
       : puntosDisponibles;
 
   return (
@@ -717,11 +781,10 @@ ${textoPuntos}
                 <button
                   key={dir.id}
                   onClick={() => handleSeleccionarDireccion(dir)}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                    direccionSeleccionada?.id === dir.id
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${direccionSeleccionada?.id === dir.id
                       ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
                       : "border-gray-200 hover:border-[#a855f7]"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -790,12 +853,11 @@ ${textoPuntos}
                   <button
                     key={metodo.metodo_envio_id}
                     onClick={() => setMetodoSeleccionado(metodo)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                      metodoSeleccionado?.metodo_envio_id ===
-                      metodo.metodo_envio_id
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${metodoSeleccionado?.metodo_envio_id ===
+                        metodo.metodo_envio_id
                         ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
                         : "border-gray-200 hover:border-[#a855f7]"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -805,8 +867,8 @@ ${textoPuntos}
                           </p>
                           {metodoSeleccionado?.metodo_envio_id ===
                             metodo.metodo_envio_id && (
-                            <span className="text-[#a855f7] text-lg">✓</span>
-                          )}
+                              <span className="text-[#a855f7] text-lg">✓</span>
+                            )}
                         </div>
                         {metodo.descripcion && (
                           <p className="text-xs text-gray-600 mb-2">
@@ -819,12 +881,11 @@ ${textoPuntos}
                             <span>
                               Entrega estimada:{" "}
                               {metodo.dias_entrega_min ===
-                              metodo.dias_entrega_max
-                                ? `${metodo.dias_entrega_min} ${
-                                    metodo.dias_entrega_min === 1
-                                      ? "día"
-                                      : "días"
-                                  }`
+                                metodo.dias_entrega_max
+                                ? `${metodo.dias_entrega_min} ${metodo.dias_entrega_min === 1
+                                  ? "día"
+                                  : "días"
+                                }`
                                 : `${metodo.dias_entrega_min}-${metodo.dias_entrega_max} días`}
                             </span>
                           </p>
@@ -941,25 +1002,37 @@ ${textoPuntos}
             <div className="space-y-2 text-sm mb-6">
               <div className="flex justify-between">
                 <span className="text-gray-600">
-                  Subtotal ({items.length} producto
+                  Subtotal sin impuesto ({items.length} producto
                   {items.length !== 1 ? "s" : ""}):
                 </span>
                 <span className="font-semibold">
-                  ₡{total.toLocaleString("es-CR")}
+                  ₡{Math.round(subtotalSinImpuesto).toLocaleString("es-CR")}
                 </span>
               </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-600">
+                  Impuesto ({Math.round(TAX_RATE * 100)}%):
+                </span>
+                <span className="font-semibold">
+                  ₡{Math.round(impuestoTotal).toLocaleString("es-CR")}
+                </span>
+              </div>
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Costo de envío:</span>
                 <span className="font-semibold text-[#6b21a8]">
                   ₡{Number(metodoSeleccionado.costo).toLocaleString("es-CR")}
                 </span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Descuento por puntos:</span>
                 <span className="font-semibold text-green-600">
                   - ₡{descuento.toLocaleString("es-CR")}
                 </span>
               </div>
+
               <div className="border-t pt-2 mt-2 flex justify-between text-base">
                 <span className="font-bold">Total final:</span>
                 <span className="font-bold text-xl text-[#6b21a8]">
@@ -972,6 +1045,7 @@ ${textoPuntos}
                 </span>
               </div>
             </div>
+
 
             {/* Info envío */}
             <div className="bg-[#faf5ff] rounded-lg p-3 mb-4 text-xs">
@@ -1035,6 +1109,33 @@ ${textoPuntos}
           </div>
         )}
       </main>
+
+      {/* Toast flotante global */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border z-50 ${toast.type === "success"
+              ? "bg-white border-green-200"
+              : "bg-white border-yellow-200"
+            }`}
+        >
+          <div className="flex items-start gap-2">
+            <div className="mt-0.5">
+              {toast.type === "success" ? "✅" : "⚠️"}
+            </div>
+            <div>
+              <p
+                className={`font-semibold mb-1 ${toast.type === "success"
+                    ? "text-green-700"
+                    : "text-yellow-700"
+                  }`}
+              >
+                {toast.title}
+              </p>
+              <p className="text-gray-700">{toast.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
