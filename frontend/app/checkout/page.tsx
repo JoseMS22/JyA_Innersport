@@ -372,21 +372,23 @@ export default function CheckoutPage() {
       let huboErrorPuntos = false;
 
       try {
-        const resPuntos = await fetch(
-          `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              total_compra: total + Number(metodoSeleccionado.costo),
-              puntos_a_usar: puntosUsados, // puede ser 0
-              // En el futuro: pedido_id: pedido.id
-            }),
-          }
-        );
+          const resPuntos = await fetch(
+            `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                // Enviar subtotal (productos) y costo_envio por separado
+                subtotal: Number(pedido.subtotal ?? total),
+                costo_envio: Number(pedido.costo_envio ?? metodoSeleccionado.costo),
+                puntos_a_usar: puntosUsados, // puede ser 0
+                order_id: pedido.id, // enlazar movimiento con el pedido creado
+              }),
+            }
+          );
 
         if (!resPuntos.ok) {
           const err = await resPuntos.json().catch(() => null);
@@ -415,20 +417,16 @@ export default function CheckoutPage() {
       // 3️⃣ Calcular totales mostrados (para el toast)
       const descuentoAplicado = dataPuntos
         ? Number(dataPuntos.descuento_aplicado || 0)
-        : 0;
+        : descuento;
 
       const totalFinal = dataPuntos
         ? Number(dataPuntos.total_final || 0)
         : total + Number(metodoSeleccionado.costo) - descuentoAplicado;
 
-      const subtotalMostrar = dataPuntos
-        ? total + Number(metodoSeleccionado.costo)
-        : Number(pedido.subtotal ?? total);
+      const subtotalMostrar = Number(pedido.subtotal ?? total);
 
-      const envioMostrar = dataPuntos
-        ? Number(metodoSeleccionado.costo)
-        : Number(pedido.costo_envio ?? metodoSeleccionado.costo);
-
+      const envioMostrar = Number(pedido.costo_envio ?? metodoSeleccionado.costo);
+      
       setToast({
         type: "success",
         title: `Pedido #${pedido.id} creado correctamente 🎉`,

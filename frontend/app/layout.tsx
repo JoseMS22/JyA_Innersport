@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { CartProvider } from "./context/cartContext";
 import { FavoritesProvider } from "./context/favoritesContext";
+import { ToastProvider } from "./context/ToastContext"; // 🆕 1. Importar aquí
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,9 +30,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <CartProvider>
-           <FavoritesProvider>{children}</FavoritesProvider>
-        </CartProvider>
+        {/* 🆕 2. Envolver todo con ToastProvider */}
+        <ToastProvider>
+          <CartProvider>
+             <FavoritesProvider>{children}</FavoritesProvider>
+          </CartProvider>
+        </ToastProvider>
       </body>
     </html>
   );

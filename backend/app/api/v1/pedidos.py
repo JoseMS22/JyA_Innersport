@@ -19,6 +19,7 @@ from app.schemas.pedido import (
     ImpactoCancelacionResponse,
     CancelarPedidoResponse,
 )
+from app.models.rma import RMAEstado
 
 from app.services.pedido_service import (
     crear_pedido_desde_carrito,
@@ -156,6 +157,26 @@ def obtener_detalle_pedido(
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
 
+    rmas_data = []
+    tiene_rma_activo = False
+    estados_activos = ["solicitado", "en_revision", "aprobado"]
+
+    if pedido.rmas:
+        for rma in pedido.rmas:
+            # Determinamos si hay alguno activo para bloquear el botón
+            if rma.estado in estados_activos:
+                tiene_rma_activo = True
+
+            # 🔧 CORRECCIÓN: Agregamos la solicitud SIEMPRE, sin importar el estado
+            rmas_data.append({
+                "id": rma.id,
+                "tipo": rma.tipo,
+                "estado": rma.estado,
+                "motivo": rma.motivo,
+                "respuesta_admin": rma.respuesta_admin,
+                "fecha": rma.created_at.isoformat()
+            })
+    
     # Productos del pedido (usando PedidoItem y relaciones)
     productos = []
     for item in pedido.items:
@@ -214,6 +235,8 @@ def obtener_detalle_pedido(
         "productos": productos,
         "puede_cancelar": puede_cancelar,
         "fecha_limite_cancelacion": fecha_limite.isoformat() if fecha_limite else None,
+        "tiene_rma_activo": tiene_rma_activo,
+        "solicitudes_rma": rmas_data
     }
 
 

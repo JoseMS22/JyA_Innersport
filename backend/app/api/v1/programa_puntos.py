@@ -167,16 +167,11 @@ def confirmar_compra_con_puntos(
     usuario: Usuario = Depends(get_current_user),
 ):
     """
-    Endpoint pensado para usarse desde el checkout:
-
-    - Recibe el total bruto de la compra (antes de puntos).
-    - Opcionalmente recibe cuántos puntos quiere usar el cliente.
-    - Valida contra las reglas del programa (mínimo, % máximo, tope por compra).
-    - Registra movimiento de redención (redeem) si aplica.
-    - Registra los puntos GANADOS por el monto efectivamente pagado.
-    - Devuelve totales y saldo final de puntos.
-
-    La pasarela de pago real no se implementa aquí: se asume pago APROBADO.
+    Endpoint para confirmar compra y registrar movimientos de puntos.
+    - Ahora acepta subtotal (productos) y costo_envio por separado.
+    - Si subtotal no se provee, se usa total_compra (compatibilidad).
+    - Si el usuario usa puntos -> NO se otorgan puntos por la compra.
+    - Los puntos se calculan SOLO sobre el subtotal (sin incluir envío).
     """
     config = obtener_config_activa(db)
 
@@ -186,13 +181,28 @@ def confirmar_compra_con_puntos(
             detail="El programa de puntos está inactivo.",
         )
 
-    if data.total_compra <= 0:
+    # Determinar subtotal y costo_envio (compatibilidad con clientes antiguos)
+    if data.subtotal is not None:
+        subtotal = Decimal(data.subtotal)
+        costo_envio = Decimal(data.costo_envio or 0)
+    elif data.total_compra is not None:
+        # Si no se envía subtotal, tratamos total_compra como subtotal (sin envío)
+        subtotal = Decimal(data.total_compra)
+        costo_envio = Decimal("0")
+    else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El total de la compra debe ser mayor que cero.",
+            detail="Se debe enviar 'subtotal' o 'total_compra'."
         )
 
-    total_bruto = Decimal(data.total_compra)
+    if subtotal < 0 or costo_envio < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Los montos no pueden ser negativos."
+        )
+
+    # total bruto es subtotal + envío
+    total_bruto = subtotal + costo_envio
 
     # -----------------------------
     # 1) Aplicar puntos (redención)
@@ -203,7 +213,6 @@ def confirmar_compra_con_puntos(
     valor_por_punto = Decimal(config.valor_colon_por_punto or 0)
 
     if data.puntos_a_usar > 0 and valor_por_punto > 0:
-        # Calculamos el límite permitido según configuración
         limite = calcular_limite_redencion(
             db,
             usuario_id=usuario.id,
@@ -211,19 +220,11 @@ def confirmar_compra_con_puntos(
         )
 
         if limite["puede_usar_puntos"]:
-            # Descuento máximo que se puede aplicar según reglas
             max_descuento = limite["descuento_maximo_colones"]
-
-            # Descuento que el usuario está pidiendo con esos puntos
-            descuento_solicitado = (
-                Decimal(data.puntos_a_usar) * valor_por_punto
-            )
-
-            # Tomamos el mínimo entre lo solicitado y el máximo permitido
+            descuento_solicitado = Decimal(data.puntos_a_usar) * valor_por_punto
             descuento_aplicado = min(descuento_solicitado, max_descuento)
 
             if descuento_aplicado > 0:
-                # Puntos que realmente vamos a descontar
                 puntos_redimidos = int(
                     (descuento_aplicado / valor_por_punto).to_integral_value(
                         rounding="ROUND_FLOOR"
@@ -231,7 +232,6 @@ def confirmar_compra_con_puntos(
                 )
 
                 if puntos_redimidos > 0:
-                    # Registrar movimiento NEGATIVO (redeem)
                     registrar_movimiento_puntos(
                         db,
                         usuario_id=usuario.id,
@@ -249,13 +249,33 @@ def confirmar_compra_con_puntos(
     # --------------------------------
     # 2) Otorgar puntos por la compra
     # --------------------------------
-    # Normalmente se otorgan puntos solo sobre lo efectivamente pagado
-    puntos_ganados = registrar_puntos_por_compra(
-        db,
-        usuario_id=usuario.id,
-        total_compra_colones=total_despues_puntos,
-        order_id=data.order_id,
-    )
+    # Regla solicitada:
+    # - Si el usuario USÓ puntos -> NO se otorgan puntos.
+    # - Los puntos se calculan sobre el subtotal (productos) excluyendo envío.
+    puntos_ganados = 0
+
+    if puntos_redimidos > 0:
+        # No otorgar puntos si se usaron puntos
+        puntos_ganados = 0
+    else:
+        # Si no hubo redención, calculamos la porción del descuento que toca al subtotal
+        # (si el descuento se aplicó sobre todo el total, lo repartimos proporcionalmente)
+        discount_on_subtotal = Decimal("0")
+        if descuento_aplicado > 0 and total_bruto > 0:
+            proporción_subtotal = (subtotal / total_bruto)
+            discount_on_subtotal = (descuento_aplicado * proporción_subtotal)
+        # subtotal después de descuento (no negativo)
+        subtotal_after_discount = subtotal - discount_on_subtotal
+        if subtotal_after_discount < 0:
+            subtotal_after_discount = Decimal("0")
+
+        # Registrar puntos usando sólo el subtotal_after_discount
+        puntos_ganados = registrar_puntos_por_compra(
+            db,
+            usuario_id=usuario.id,
+            total_compra_colones=subtotal_after_discount,
+            order_id=data.order_id,
+        )
 
     # Saldo final de puntos
     saldo_final = obtener_o_crear_saldo(db, usuario.id)

@@ -177,6 +177,20 @@ def get_current_admin_user(
         )
     return current_user
 
+def get_current_admin(
+    current_user: Usuario = Depends(get_current_user),
+) -> Usuario:
+    """
+    Dependencia que verifica que el usuario actual tenga rol de administrador.
+    """
+    # Verifica si el rol es 'admin' (ajusta la cadena según tus roles: 'ADMIN', 'admin', etc.)
+    if current_user.rol.lower() != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes privilegios de administrador",
+        )
+    return current_user
+
 
 def get_current_staff_user(
     current_user: Usuario = Depends(get_current_user),

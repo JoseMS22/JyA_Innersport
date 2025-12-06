@@ -33,6 +33,12 @@ export default function ProfilePage() {
     telefono: "",
   });
 
+  // ---- Nuevo: estado para puntos ----
+  const [puntosSaldo, setPuntosSaldo] = useState<number | null>(null);
+  const [puntosValorAprox, setPuntosValorAprox] = useState<number | null>(null);
+  const [cargandoPuntos, setCargandoPuntos] = useState(false);
+  // -----------------------------------
+
   // Cargar perfil al entrar
   useEffect(() => {
     async function loadProfile() {
@@ -45,18 +51,45 @@ export default function ProfilePage() {
           nombre: data.nombre ?? "",
           telefono: data.telefono ?? "",
         });
+
+        // ---- Cargar puntos junto con el perfil ----
+        cargarSaldoPuntos();
       } catch (err: any) {
         setErrorMsg(
           err?.message ??
             "No se pudo cargar tu perfil. Intenta iniciar sesión nuevamente."
         );
-      } finally {
         setLoading(false);
+      } finally {
+        // Nota: no seteamos loading=false aquí si fallo la carga de puntos; lo hacemos abajo.
       }
     }
 
     loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Función para obtener saldo de puntos
+  async function cargarSaldoPuntos() {
+    try {
+      setCargandoPuntos(true);
+      const data = await apiFetch("/api/v1/puntos/me/saldo");
+      // data: { saldo: number, valor_aproximado: Decimal/string }
+      setPuntosSaldo(Number(data.saldo ?? 0));
+      // valor_aproximado puede venir como string/number -> convertir a number
+      setPuntosValorAprox(
+        data.valor_aproximado ? Number(data.valor_aproximado) : 0
+      );
+    } catch (err) {
+      // Si falla la carga de puntos no bloqueamos la vista
+      console.error("Error al cargar puntos:", err);
+      setPuntosSaldo(null);
+      setPuntosValorAprox(null);
+    } finally {
+      setCargandoPuntos(false);
+      setLoading(false); // aseguramos que la pantalla deje el estado loading
+    }
+  }
 
   // Auto-hide mensajes
   useEffect(() => {
@@ -151,18 +184,16 @@ export default function ProfilePage() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-[#6b21a8] mb-1">
-            Mi cuenta
-          </h1>
+          <h1 className="text-2xl font-semibold text-[#6b21a8] mb-1">Mi cuenta</h1>
           <p className="text-xs text-gray-500">
             Gestiona tu información personal y preferencias
           </p>
         </div>
 
         {/* Grid de tarjetas */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          {/* Tarjeta: Información personal */}
-          <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
+        <div className="grid md:grid-cols-3 gap-6 mb-6">
+          {/* Tarjeta: Información personal (ocupa 2 columnas en md) */}
+          <div className="md:col-span-2 bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-[#f3e8ff] flex items-center justify-center text-2xl">
                 👤
@@ -171,18 +202,14 @@ export default function ProfilePage() {
                 <h2 className="text-base font-semibold text-gray-900">
                   Información personal
                 </h2>
-                <p className="text-xs text-gray-500">
-                  Nombre y datos de contacto
-                </p>
+                <p className="text-xs text-gray-500">Nombre y datos de contacto</p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
               {/* Nombre */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Nombre completo
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">Nombre completo</label>
                 <input
                   name="nombre"
                   value={form.nombre}
@@ -196,9 +223,7 @@ export default function ProfilePage() {
 
               {/* Teléfono */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Teléfono
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">Teléfono</label>
                 <input
                   name="telefono"
                   value={form.telefono}
@@ -212,9 +237,7 @@ export default function ProfilePage() {
 
               {/* Correo (solo lectura) */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Correo electrónico
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">Correo electrónico</label>
                 <input
                   value={profile.correo}
                   readOnly
@@ -225,16 +248,12 @@ export default function ProfilePage() {
                   {profile.email_verificado ? (
                     <>
                       <span className="text-emerald-600 text-xs">✓</span>
-                      <span className="text-xs text-emerald-600">
-                        Correo verificado
-                      </span>
+                      <span className="text-xs text-emerald-600">Correo verificado</span>
                     </>
                   ) : (
                     <>
                       <span className="text-amber-600 text-xs">⚠</span>
-                      <span className="text-xs text-amber-600">
-                        Correo pendiente de verificación
-                      </span>
+                      <span className="text-xs text-amber-600">Correo pendiente de verificación</span>
                     </>
                   )}
                 </div>
@@ -264,25 +283,22 @@ export default function ProfilePage() {
             </form>
           </div>
 
-          {/* Tarjeta: Direcciones */}
+          
+
+          {/* Tarjeta: Direcciones (ahora ocupa 1 columna en md) */}
           <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-[#fef3c7] flex items-center justify-center text-2xl">
                 📍
               </div>
               <div>
-                <h2 className="text-base font-semibold text-gray-900">
-                  Mis direcciones
-                </h2>
-                <p className="text-xs text-gray-500">
-                  Gestiona tus direcciones de envío
-                </p>
+                <h2 className="text-base font-semibold text-gray-900">Mis direcciones</h2>
+                <p className="text-xs text-gray-500">Gestiona tus direcciones de envío</p>
               </div>
             </div>
 
             <p className="text-sm text-gray-600 mb-4">
-              Administra las direcciones donde recibirás tus pedidos. Puedes
-              tener varias direcciones y elegir cuál usar en cada compra.
+              Administra las direcciones donde recibirás tus pedidos. Puedes tener varias direcciones y elegir cuál usar en cada compra.
             </p>
 
             <button
@@ -292,13 +308,39 @@ export default function ProfilePage() {
               Ver mis direcciones →
             </button>
           </div>
+
+          {/* Tarjeta: Puntos (nueva) */}
+          <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[#eef2ff] flex items-center justify-center text-2xl">
+                ⭐
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Mis puntos</h2>
+                <p className="text-xs text-gray-500">Saldo y valor aproximado</p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              {cargandoPuntos ? (
+                <div className="text-sm text-gray-500">Cargando puntos...</div>
+              ) : puntosSaldo === null ? (
+                <div className="text-sm text-gray-500">No se pudo cargar el saldo de puntos</div>
+              ) : (
+                <div>
+                  <p className="text-2xl font-bold text-[#6b21a8]">{puntosSaldo.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ≈ ₡{(puntosValorAprox ?? 0).toLocaleString("es-CR")}
+                  </p>
+                </div>
+              )}
+            </div>     
+          </div>
         </div>
 
         {/* Sección de acciones importantes */}
         <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">
-            Seguridad y configuración
-          </h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Seguridad y configuración</h2>
 
           <div className="space-y-3">
             {/* Cambiar contraseña */}
@@ -307,16 +349,10 @@ export default function ProfilePage() {
               className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-[#a855f7] hover:bg-[#faf5ff] transition-all text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#f3e8ff] flex items-center justify-center text-xl">
-                  🔒
-                </div>
+                <div className="w-10 h-10 rounded-full bg-[#f3e8ff] flex items-center justify-center text-xl">🔒</div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    Cambiar contraseña
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Actualiza tu contraseña para mayor seguridad
-                  </p>
+                  <p className="text-sm font-medium text-gray-900">Cambiar contraseña</p>
+                  <p className="text-xs text-gray-500">Actualiza tu contraseña para mayor seguridad</p>
                 </div>
               </div>
               <span className="text-gray-400">→</span>
@@ -328,16 +364,10 @@ export default function ProfilePage() {
               className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-red-500 hover:bg-red-50 transition-all text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-xl">
-                  ⚠️
-                </div>
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-xl">⚠️</div>
                 <div>
-                  <p className="text-sm font-medium text-red-600">
-                    Eliminar mi cuenta
-                  </p>
-                  <p className="text-xs text-red-500">
-                    Eliminar permanentemente tu cuenta y datos
-                  </p>
+                  <p className="text-sm font-medium text-red-600">Eliminar mi cuenta</p>
+                  <p className="text-xs text-red-500">Eliminar permanentemente tu cuenta y datos</p>
                 </div>
               </div>
               <span className="text-red-400">→</span>
@@ -347,9 +377,7 @@ export default function ProfilePage() {
 
         {/* Info de cuenta */}
         <div className="mt-6 p-4 bg-white/70 rounded-xl border border-[#e5e7eb]">
-          <h3 className="text-sm font-semibold text-[#6b21a8] mb-2">
-            ℹ️ Información de tu cuenta
-          </h3>
+          <h3 className="text-sm font-semibold text-[#6b21a8] mb-2">ℹ️ Información de tu cuenta</h3>
           <div className="text-xs text-gray-600 space-y-1">
             <p>
               <span className="font-medium">Rol:</span>{" "}
@@ -357,11 +385,7 @@ export default function ProfilePage() {
             </p>
             <p>
               <span className="font-medium">Estado:</span>{" "}
-              {profile.activo ? (
-                <span className="text-emerald-600">✓ Activa</span>
-              ) : (
-                <span className="text-red-600">✗ Inactiva</span>
-              )}
+              {profile.activo ? <span className="text-emerald-600">✓ Activa</span> : <span className="text-red-600">✗ Inactiva</span>}
             </p>
             <p>
               <span className="font-medium">Miembro desde:</span>{" "}

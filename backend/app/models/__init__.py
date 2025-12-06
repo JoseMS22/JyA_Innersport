@@ -26,6 +26,7 @@ from .pedido import Pedido
 from .pedido_item import PedidoItem  # 🆕 AGREGAR ESTA LÍNEA
 from .pago import Pago
 from .auditoria import AuditoriaUsuario
+from .rma import RMA, RMAItem
 
 __all__ = [
     "Usuario",
@@ -52,4 +53,6 @@ __all__ = [
     "Pedido",
     "PedidoItem",  # 🆕 AGREGAR ESTA LÍNEA
     "Pago",
+    "RMA",
+    "RMAItem",
 ]
