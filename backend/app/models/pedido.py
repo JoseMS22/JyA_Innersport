@@ -20,6 +20,13 @@ class Pedido(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    canal = Column(
+        String(20),
+        nullable=False,
+        default="ONLINE",
+        index=True,
+    )
+
     cliente_id = Column(
         Integer,
         ForeignKey("usuario.id", ondelete="RESTRICT"),

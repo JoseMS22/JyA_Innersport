@@ -56,10 +56,10 @@ type LimitePuntos = {
 
 type ToastState =
   | {
-      type: "success" | "warning";
-      title: string;
-      message: string;
-    }
+    type: "success" | "warning";
+    title: string;
+    message: string;
+  }
   | null;
 
 const PROVINCIAS = [
@@ -75,6 +75,13 @@ const PROVINCIAS = [
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
+  // IVA Costa Rica (ajusta si usas otro)
+  const TAX_RATE = 0.13;
+
+  // Si "total" YA incluye impuesto, sacamos el impuesto y el subtotal sin impuesto
+  const subtotalSinImpuesto = total / (1 + TAX_RATE);
+  const impuestoTotal = total - subtotalSinImpuesto;
+
 
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [direccionSeleccionada, setDireccionSeleccionada] =
@@ -360,7 +367,7 @@ export default function CheckoutPage() {
         console.error("Error creando pedido:", errData);
         setError(
           errData?.detail ||
-            "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
+          "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
         );
         return;
       }
@@ -436,11 +443,10 @@ export default function CheckoutPage() {
           "es-CR"
         )} · Envío: ₡${envioMostrar.toLocaleString(
           "es-CR"
-        )} · Total: ₡${totalFinal.toLocaleString("es-CR")}${
-          huboErrorPuntos
+        )} · Total: ₡${totalFinal.toLocaleString("es-CR")}${huboErrorPuntos
             ? " (con observaciones en los puntos)."
             : " · ¡Gracias por tu compra!"
-        }`,
+          }`,
       });
 
       // 4️⃣ Limpiar carrito y redirigir a pedidos
@@ -469,18 +475,16 @@ export default function CheckoutPage() {
         {/* Toast mientras carga (por si acaso) */}
         {toast && (
           <div
-            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${
-              toast.type === "success"
+            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
                 ? "bg-white border-green-200"
                 : "bg-white border-yellow-200"
-            }`}
+              }`}
           >
             <p
-              className={`font-semibold mb-1 ${
-                toast.type === "success"
+              className={`font-semibold mb-1 ${toast.type === "success"
                   ? "text-green-700"
                   : "text-yellow-700"
-              }`}
+                }`}
             >
               {toast.title}
             </p>
@@ -516,18 +520,16 @@ export default function CheckoutPage() {
         {/* Toast en vista carrito vacío */}
         {toast && (
           <div
-            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${
-              toast.type === "success"
+            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
                 ? "bg-white border-green-200"
                 : "bg-white border-yellow-200"
-            }`}
+              }`}
           >
             <p
-              className={`font-semibold mb-1 ${
-                toast.type === "success"
+              className={`font-semibold mb-1 ${toast.type === "success"
                   ? "text-green-700"
                   : "text-yellow-700"
-              }`}
+                }`}
             >
               {toast.title}
             </p>
@@ -542,15 +544,15 @@ export default function CheckoutPage() {
   const factorPuntoEnColones =
     limitePuntos && limitePuntos.puntos_necesarios_para_maximo > 0
       ? limitePuntos.descuento_maximo_colones /
-        limitePuntos.puntos_necesarios_para_maximo
+      limitePuntos.puntos_necesarios_para_maximo
       : 0;
 
   const maxPuntosUsables =
     limitePuntos && limitePuntos.puede_usar_puntos
       ? Math.min(
-          limitePuntos.saldo_puntos,
-          limitePuntos.puntos_necesarios_para_maximo
-        )
+        limitePuntos.saldo_puntos,
+        limitePuntos.puntos_necesarios_para_maximo
+      )
       : puntosDisponibles;
 
   return (
@@ -779,11 +781,10 @@ export default function CheckoutPage() {
                 <button
                   key={dir.id}
                   onClick={() => handleSeleccionarDireccion(dir)}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                    direccionSeleccionada?.id === dir.id
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${direccionSeleccionada?.id === dir.id
                       ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
                       : "border-gray-200 hover:border-[#a855f7]"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -852,12 +853,11 @@ export default function CheckoutPage() {
                   <button
                     key={metodo.metodo_envio_id}
                     onClick={() => setMetodoSeleccionado(metodo)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                      metodoSeleccionado?.metodo_envio_id ===
-                      metodo.metodo_envio_id
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${metodoSeleccionado?.metodo_envio_id ===
+                        metodo.metodo_envio_id
                         ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
                         : "border-gray-200 hover:border-[#a855f7]"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -867,8 +867,8 @@ export default function CheckoutPage() {
                           </p>
                           {metodoSeleccionado?.metodo_envio_id ===
                             metodo.metodo_envio_id && (
-                            <span className="text-[#a855f7] text-lg">✓</span>
-                          )}
+                              <span className="text-[#a855f7] text-lg">✓</span>
+                            )}
                         </div>
                         {metodo.descripcion && (
                           <p className="text-xs text-gray-600 mb-2">
@@ -881,12 +881,11 @@ export default function CheckoutPage() {
                             <span>
                               Entrega estimada:{" "}
                               {metodo.dias_entrega_min ===
-                              metodo.dias_entrega_max
-                                ? `${metodo.dias_entrega_min} ${
-                                    metodo.dias_entrega_min === 1
-                                      ? "día"
-                                      : "días"
-                                  }`
+                                metodo.dias_entrega_max
+                                ? `${metodo.dias_entrega_min} ${metodo.dias_entrega_min === 1
+                                  ? "día"
+                                  : "días"
+                                }`
                                 : `${metodo.dias_entrega_min}-${metodo.dias_entrega_max} días`}
                             </span>
                           </p>
@@ -1003,25 +1002,37 @@ export default function CheckoutPage() {
             <div className="space-y-2 text-sm mb-6">
               <div className="flex justify-between">
                 <span className="text-gray-600">
-                  Subtotal ({items.length} producto
+                  Subtotal sin impuesto ({items.length} producto
                   {items.length !== 1 ? "s" : ""}):
                 </span>
                 <span className="font-semibold">
-                  ₡{total.toLocaleString("es-CR")}
+                  ₡{Math.round(subtotalSinImpuesto).toLocaleString("es-CR")}
                 </span>
               </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-600">
+                  Impuesto ({Math.round(TAX_RATE * 100)}%):
+                </span>
+                <span className="font-semibold">
+                  ₡{Math.round(impuestoTotal).toLocaleString("es-CR")}
+                </span>
+              </div>
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Costo de envío:</span>
                 <span className="font-semibold text-[#6b21a8]">
                   ₡{Number(metodoSeleccionado.costo).toLocaleString("es-CR")}
                 </span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Descuento por puntos:</span>
                 <span className="font-semibold text-green-600">
                   - ₡{descuento.toLocaleString("es-CR")}
                 </span>
               </div>
+
               <div className="border-t pt-2 mt-2 flex justify-between text-base">
                 <span className="font-bold">Total final:</span>
                 <span className="font-bold text-xl text-[#6b21a8]">
@@ -1034,6 +1045,7 @@ export default function CheckoutPage() {
                 </span>
               </div>
             </div>
+
 
             {/* Info envío */}
             <div className="bg-[#faf5ff] rounded-lg p-3 mb-4 text-xs">
@@ -1101,11 +1113,10 @@ export default function CheckoutPage() {
       {/* Toast flotante global */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border z-50 ${
-            toast.type === "success"
+          className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border z-50 ${toast.type === "success"
               ? "bg-white border-green-200"
               : "bg-white border-yellow-200"
-          }`}
+            }`}
         >
           <div className="flex items-start gap-2">
             <div className="mt-0.5">
@@ -1113,11 +1124,10 @@ export default function CheckoutPage() {
             </div>
             <div>
               <p
-                className={`font-semibold mb-1 ${
-                  toast.type === "success"
+                className={`font-semibold mb-1 ${toast.type === "success"
                     ? "text-green-700"
                     : "text-yellow-700"
-                }`}
+                  }`}
               >
                 {toast.title}
               </p>

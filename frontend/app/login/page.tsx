@@ -43,9 +43,13 @@ export default function LoginPage() {
         method: "GET",
       })) as UserMe;
 
+      // 3) Redirección según rol
       if (me.rol === "ADMIN") {
         router.push("/admin");
+      } else if (me.rol === "VENDEDOR") {
+        router.push("/seller");
       } else {
+        // Cliente normal u otros roles → tienda pública
         router.push("/");
       }
     } catch (err: any) {
