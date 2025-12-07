@@ -6,7 +6,8 @@ from app.models.rma import RMAEstado, RMATipo
 
 # --- Schemas para Items ---
 class RMAItemBase(BaseModel):
-    pedido_item_id: int
+    pedido_item_id: Optional[int] = None
+    venta_pos_item_id: Optional[int] = None
     cantidad: int
 
 class RMAItemCreate(RMAItemBase):
@@ -21,7 +22,8 @@ class RMAItemResponse(RMAItemBase):
 
 # --- Schemas para RMA ---
 class RMACreate(BaseModel):
-    pedido_id: int
+    pedido_id: Optional[int] = None
+    venta_pos_id: Optional[int] = None
     tipo: RMATipo
     motivo: str
     evidencia_url: Optional[str] = None
@@ -33,7 +35,8 @@ class RMAUpdate(BaseModel):
 
 class RMAResponse(BaseModel):
     id: int
-    pedido_id: int
+    pedido_id: Optional[int]
+    venta_pos_id: Optional[int]
     usuario_id: int
     estado: RMAEstado
     tipo: RMATipo

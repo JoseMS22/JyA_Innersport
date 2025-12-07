@@ -20,16 +20,19 @@ class RMA(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # Vinculación
-    pedido_id = Column(Integer, ForeignKey("pedido.id"), nullable=False, index=True)
+    # 🔧 CAMBIO: pedido_id ahora es opcional (nullable=True)
+    pedido_id = Column(Integer, ForeignKey("pedido.id"), nullable=True, index=True)
+    
+    # 🆕 NUEVO: Referencia a Venta POS
+    venta_pos_id = Column(Integer, ForeignKey("venta_pos.id"), nullable=True, index=True)
+
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False, index=True)
     
-    # Detalles de la solicitud
     tipo = Column(Enum(RMATipo), nullable=False)
     estado = Column(Enum(RMAEstado), default=RMAEstado.SOLICITADO, index=True)
     motivo = Column(Text, nullable=False)
     
-    # Gestión administrativa
+    evidencia_url = Column(String, nullable=True) 
     respuesta_admin = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -37,20 +40,29 @@ class RMA(Base):
 
     # Relaciones
     pedido = relationship("Pedido", back_populates="rmas")
-    usuario = relationship("Usuario") # Cliente que solicita
+    
+    # 🆕 Relación con VentaPos
+    venta_pos = relationship("VentaPOS", back_populates="rmas") 
+    
+    usuario = relationship("Usuario")
     items = relationship("RMAItem", back_populates="rma", cascade="all, delete-orphan")
-
-    # Opcional: URL de evidencia (foto, video, etc.)
-    evidencia_url = Column(String, nullable=True)
 
 class RMAItem(Base):
     __tablename__ = "rma_items"
     
     id = Column(Integer, primary_key=True, index=True)
     rma_id = Column(Integer, ForeignKey("rmas.id", ondelete="CASCADE"), nullable=False)
-    pedido_item_id = Column(Integer, ForeignKey("pedido_item.id"), nullable=False)
+    
+    # 🔧 CAMBIO: pedido_item_id ahora es opcional
+    pedido_item_id = Column(Integer, ForeignKey("pedido_item.id"), nullable=True)
+    
+    # 🆕 CAMBIO: Referencia a item de POS
+    venta_pos_item_id = Column(Integer, ForeignKey("venta_pos_item.id"), nullable=True)
     
     cantidad = Column(Integer, nullable=False)
     
     rma = relationship("RMA", back_populates="items")
     pedido_item = relationship("PedidoItem")
+    
+    # 🆕 Relación con item POS
+    venta_pos_item = relationship("VentaPOSItem")

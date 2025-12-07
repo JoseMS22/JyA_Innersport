@@ -1,6 +1,7 @@
+# backend/app/schemas/pos.py
 from decimal import Decimal
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
@@ -102,12 +103,15 @@ class POSVentaCreate(BaseModel):
 
 
 class POSVentaItemOut(BaseModel):
+    id: int
     variante_id: int
     producto_id: int
     nombre_producto: str
     cantidad: int
     precio_unitario: Decimal
     subtotal: Decimal
+ 
+    imagen_url: Optional[str] = None 
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,17 +122,16 @@ class POSVentaOut(BaseModel):
     vendedor_id: int
     cliente_id: Optional[int] = None
     nombre_cliente: Optional[str] = None
-
     subtotal: Decimal
     descuento_puntos: Decimal
     impuesto: Decimal
     total: Decimal
     puntos_ganados: int
-
     estado: str
     fecha_creacion: datetime
-
     items: List[POSVentaItemOut]
+    tiene_rma_activo: Optional[bool] = False
+    solicitudes_rma: Optional[List[Dict[str, Any]]] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,18 +139,6 @@ class POSVentaOut(BaseModel):
 # ============================
 # VENTAS POS – Salidas (para listado y detalle)
 # ============================
-
-class POSVentaItemOut(BaseModel):
-    id: int
-    variante_id: int
-    producto_id: int
-    nombre_producto: str
-    cantidad: int
-    precio_unitario: Decimal
-    subtotal: Decimal
-
-    model_config = ConfigDict(from_attributes=True)
-
 
 class POSPagoPOSOut(BaseModel):
     id: int
@@ -195,6 +186,8 @@ class POSVentaDetailOut(BaseModel):
 
     items: List[POSVentaItemOut]
     pagos: List[POSPagoPOSOut]
+    tiene_rma_activo: Optional[bool] = False
+    solicitudes_rma: Optional[List[Dict[str, Any]]] = []
 
     model_config = ConfigDict(from_attributes=True)
 

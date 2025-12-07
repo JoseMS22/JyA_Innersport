@@ -1,67 +1,79 @@
 # backend/app/services/rma_service.py
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from app.models.rma import RMA, RMAItem, RMAEstado
 from app.models.pedido import Pedido
 from app.models.pedido_item import PedidoItem
-from app.schemas.rma import RMACreate, RMAUpdate
+from app.models.venta_pos import VentaPOS
+# 🔧 CORRECCIÓN: Usar VentaPOSItem (POS en mayúsculas)
+from app.models.venta_pos_item import VentaPOSItem 
 from app.models.usuario import Usuario
-from app.services.inventario import ajustar_inventario # 🆕 Importar servicio inventario
-from app.core.email import send_rma_update_email     # 🆕 Importar servicio email
+from app.schemas.rma import RMACreate, RMAUpdate
+from app.services.inventario import ajustar_inventario
+from app.core.email import send_rma_update_email
 
 def crear_solicitud_rma(db: Session, rma_in: RMACreate, usuario_actual: Usuario):
-    # 1. Validar Pedido
-    pedido = db.query(Pedido).filter(Pedido.id == rma_in.pedido_id).first()
-    if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    es_dueno = pedido.cliente_id == usuario_actual.id
-    es_staff = usuario_actual.rol in ["ADMIN", "VENDEDOR"]
-
-    # 2. Validar Permisos
-    if not (es_dueno or es_staff):
-        raise HTTPException(status_code=403, detail="No tienes permiso sobre este pedido")
-
-    
-    # 3. Validar Estado del Pedido (Opcional: Solo permitir si fue entregado)
-    if pedido.estado != "ENTREGADO":
-        raise HTTPException(
-            status_code=400, 
-            detail="Solo se pueden solicitar devoluciones de pedidos entregados."
-        )
-
-    # 4. Crear RMA Cabecera
-    db_rma = RMA(
-        pedido_id=rma_in.pedido_id,
-        usuario_id=usuario_actual.id, 
-        tipo=rma_in.tipo,
-        motivo=rma_in.motivo,
-        estado=RMAEstado.SOLICITADO,
-        evidencia_url=rma_in.evidencia_url
-    )
-    db.add(db_rma)
-    db.flush() # Obtener ID antes de commit
-
-    # 5. Crear Items y Validar Cantidades
-    for item in rma_in.items:
-        # Verificar que el item pertenece al pedido
-        db_pedido_item = db.query(PedidoItem).filter(
-            PedidoItem.id == item.pedido_item_id,
-            PedidoItem.pedido_id == pedido.id
-        ).first()
+    # === CASO 1: PEDIDO WEB ===
+    if rma_in.pedido_id:
+        pedido = db.query(Pedido).filter(Pedido.id == rma_in.pedido_id).first()
+        if not pedido: raise HTTPException(404, detail="Pedido no encontrado")
         
-        if not db_pedido_item:
-            raise HTTPException(status_code=400, detail=f"El item {item.pedido_item_id} no pertenece al pedido")
-        
-        if item.cantidad > db_pedido_item.cantidad:
-            raise HTTPException(status_code=400, detail=f"Cantidad inválida para el item {db_pedido_item.producto_id}")
+        if pedido.cliente_id != usuario_actual.id and usuario_actual.rol not in ["ADMIN", "VENDEDOR"]:
+            raise HTTPException(403, detail="No tienes permiso")
+            
+        if pedido.estado != "ENTREGADO":
+             raise HTTPException(400, detail="El pedido no está entregado")
 
-        db_item = RMAItem(
-            rma_id=db_rma.id,
-            pedido_item_id=item.pedido_item_id,
-            cantidad=item.cantidad
+        db_rma = RMA(
+            pedido_id=rma_in.pedido_id,
+            usuario_id=usuario_actual.id,
+            tipo=rma_in.tipo,
+            motivo=rma_in.motivo,
+            estado=RMAEstado.SOLICITADO,
+            evidencia_url=rma_in.evidencia_url
         )
-        db.add(db_item)
+        db.add(db_rma)
+        db.flush()
+
+        for item in rma_in.items:
+            p_item = db.query(PedidoItem).get(item.pedido_item_id)
+            if not p_item or p_item.pedido_id != pedido.id:
+                raise HTTPException(400, detail="Item inválido")
+            db.add(RMAItem(rma_id=db_rma.id, pedido_item_id=item.pedido_item_id, cantidad=item.cantidad))
+
+    # === CASO 2: VENTA POS ===
+    elif rma_in.venta_pos_id:
+        venta = db.query(VentaPOS).filter(VentaPOS.id == rma_in.venta_pos_id).first()
+        if not venta: raise HTTPException(404, detail="Venta POS no encontrada")
+        
+        if usuario_actual.rol not in ["ADMIN", "VENDEDOR"]:
+             raise HTTPException(403, detail="Solo personal autorizado puede gestionar POS")
+
+        db_rma = RMA(
+            venta_pos_id=rma_in.venta_pos_id,
+            usuario_id=usuario_actual.id,
+            tipo=rma_in.tipo,
+            motivo=rma_in.motivo,
+            estado=RMAEstado.SOLICITADO,
+            evidencia_url=rma_in.evidencia_url
+        )
+        db.add(db_rma)
+        db.flush()
+
+        for item in rma_in.items:
+            if not item.venta_pos_item_id:
+                raise HTTPException(400, detail="Falta ID del item POS")
+            
+            # 🔧 CORRECCIÓN: Usar VentaPOSItem aquí también
+            v_item = db.query(VentaPOSItem).get(item.venta_pos_item_id)
+            
+            if not v_item or v_item.venta_pos_id != venta.id:
+                raise HTTPException(400, detail="Item POS inválido")
+            db.add(RMAItem(rma_id=db_rma.id, venta_pos_item_id=item.venta_pos_item_id, cantidad=item.cantidad))
+
+    else:
+        raise HTTPException(400, detail="Debe especificar pedido_id o venta_pos_id")
     
     db.commit()
     db.refresh(db_rma)
@@ -91,34 +103,38 @@ def gestionar_rma_admin(db: Session, rma_id: int, rma_update: RMAUpdate):
         rma.respuesta_admin = rma_update.respuesta_admin
 
     # 2. Lógica de Inventario (RF43)
-    # Si la devolución se completa exitosamente, devolvemos el stock al inventario
     if rma.estado == "completado" and estado_anterior != "completado":
-        # Iteramos sobre los items devueltos
         for item in rma.items:
-            # Obtenemos la variante y sucursal original del pedido
-            # Nota: Asumimos que el pedido tiene sucursal_id, si no, se debe definir una lógica default
-            sucursal_id = rma.pedido.sucursal_id 
+            sucursal_id = None
+            if rma.pedido:
+                 sucursal_id = rma.pedido.sucursal_id
+            elif rma.venta_pos:
+                 sucursal_id = rma.venta_pos.sucursal_id
+
+            variante_id = None
+            if item.pedido_item:
+                variante_id = item.pedido_item.variante_id
+            elif item.venta_pos_item:
+                variante_id = item.venta_pos_item.variante_id
             
-            if sucursal_id:
+            if sucursal_id and variante_id:
                 try:
                     ajustar_inventario(
                         db,
-                        variante_id=item.pedido_item.variante_id,
+                        variante_id=variante_id,
                         sucursal_id=sucursal_id,
-                        tipo="ENTRADA", # Reingreso de mercadería
+                        tipo="ENTRADA",
                         cantidad=item.cantidad,
                         motivo=f"RMA #{rma.id} Completado - {rma.tipo}",
                         source_type="RMA"
                     )
                 except Exception as e:
                     print(f"Error ajustando inventario para RMA {rma.id}: {e}")
-                    # No detenemos el proceso, pero logueamos el error
 
     db.commit()
     db.refresh(rma)
     
     # 3. Notificar al Cliente (RF42)
-    # Solo si el estado cambió
     if rma.estado != estado_anterior:
         if rma.usuario and rma.usuario.correo:
             send_rma_update_email(

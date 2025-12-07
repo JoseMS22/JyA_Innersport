@@ -136,8 +136,12 @@ export default function CrearRMAPage() {
                     <div key={p.id} className={`flex flex-col p-3 rounded-lg border transition-colors ${isSelected ? "border-purple-500 bg-purple-50" : "border-gray-200"}`}>
                       <div className="flex items-center">
                           <input type="checkbox" checked={isSelected} onChange={() => toggleItem(p.id)} className="h-5 w-5 text-purple-600 rounded border-gray-300 focus:ring-purple-500 cursor-pointer"/>
-                          <div className="ml-4 h-12 w-12 relative rounded overflow-hidden bg-gray-200 flex-shrink-0">
-                            <ProductImage src={p.imagen_url} alt={p.nombre} fill className="object-cover" />
+                          <div className="ml-4 h-12 w-12 relative rounded overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-200 flex items-center justify-center">
+                              {p.imagen_url ? (
+                                  <ProductImage src={p.imagen_url} alt={p.nombre} fill className="object-cover" />
+                              ) : (
+                                  <span className="text-[10px] text-gray-400">Sin foto</span>
+                              )}
                           </div>
                           <div className="ml-4 flex-1">
                             <p className="text-sm font-medium text-gray-900">{p.nombre}</p>
