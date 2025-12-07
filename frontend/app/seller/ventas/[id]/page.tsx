@@ -1,6 +1,7 @@
 // frontend/app/seller/ventas/[id]/page.tsx
 "use client";
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -63,6 +64,22 @@ function precioConIVADesdeBase(base: number) {
   return Math.round(base * FACTOR_IVA * 100) / 100;
 }
 
+// Estados posibles de la venta POS (alineados con backend)
+const ESTADOS_VENTA = ["PAGADO", "ENTREGADO", "CANCELADO"] as const;
+
+function getEstadoChipClasses(estado: string): string {
+  switch (estado) {
+    case "PAGADO":
+      return "bg-blue-50 text-blue-700 border border-blue-200";
+    case "ENTREGADO":
+      return "bg-green-50 text-green-700 border border-green-200";
+    case "CANCELADO":
+      return "bg-red-50 text-red-700 border border-red-200";
+    default:
+      return "bg-gray-50 text-gray-700 border border-gray-200";
+  }
+}
+
 export default function VentaDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -73,6 +90,12 @@ export default function VentaDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [user, setUser] = useState<UserMe | null>(null);
+
+  // 🔁 estado editable
+  const [estadoLocal, setEstadoLocal] = useState<string>("");
+  const [savingEstado, setSavingEstado] = useState(false);
+  const [estadoMsg, setEstadoMsg] = useState<string | null>(null);
+  const [estadoError, setEstadoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -100,6 +123,9 @@ export default function VentaDetailPage() {
 
         if (!isMounted) return;
         setVenta(data);
+        setEstadoLocal(data.estado); // 👈 estado inicial desde backend
+        setEstadoMsg(null);
+        setEstadoError(null);
       } catch (err: any) {
         if (!isMounted) return;
         if (err?.status === 401) {
@@ -135,6 +161,35 @@ export default function VentaDetailPage() {
     }
   }
 
+  // 🔁 actualizar estado de la venta (similar a admin/pedidos/[id])
+  async function handleCambiarEstado(e: React.FormEvent) {
+    e.preventDefault();
+    if (!venta) return;
+
+    try {
+      setSavingEstado(true);
+      setEstadoMsg(null);
+      setEstadoError(null);
+
+      await apiFetch(`/api/v1/pos/ventas/${venta.id}/estado`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado: estadoLocal }),
+      });
+
+      // actualizamos en memoria para refrescar el chip y datos
+      setVenta((prev) =>
+        prev ? { ...prev, estado: estadoLocal } : prev
+      );
+      setEstadoMsg("Estado de la venta actualizado correctamente.");
+    } catch (err: any) {
+      setEstadoError(
+        err?.message ?? "No se pudo actualizar el estado de la venta."
+      );
+    } finally {
+      setSavingEstado(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex flex-col">
       {/* Menú vendedor solo en pantalla */}
@@ -166,6 +221,18 @@ export default function VentaDetailPage() {
           </p>
         ) : (
           <>
+            {/* Mensajes de cambio de estado */}
+            {estadoMsg && (
+              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
+                {estadoMsg}
+              </div>
+            )}
+            {estadoError && (
+              <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700">
+                {estadoError}
+              </div>
+            )}
+
             {/* Encabezado + botón imprimir */}
             <section className="bg-white rounded-2xl border border-[#e5e7eb] p-4 shadow-sm space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -190,10 +257,9 @@ export default function VentaDetailPage() {
                 <div className="flex flex-col items-end gap-2">
                   <div className="space-y-1 text-right">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${venta.estado === "COMPLETADA"
-                        ? "bg-green-50 text-green-700 border border-green-200"
-                        : "bg-yellow-50 text-yellow-700 border border-yellow-200"
-                        }`}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getEstadoChipClasses(
+                        venta.estado
+                      )}`}
                     >
                       {venta.estado}
                     </span>
@@ -223,6 +289,47 @@ export default function VentaDetailPage() {
               </div>
             </section>
 
+            {/* Panel para cambiar estado de la venta */}
+            <section className="bg-white rounded-2xl border border-[#e5e7eb] p-4 shadow-sm text-xs space-y-2">
+              <h2 className="text-sm font-semibold text-gray-800">
+                Estado de la venta
+              </h2>
+              <form onSubmit={handleCambiarEstado} className="space-y-2">
+                <div>
+                  <label className="block mb-1 text-gray-700 text-xs font-semibold">
+                    Estado actual
+                  </label>
+                  <select
+                    value={estadoLocal}
+                    onChange={(e) => setEstadoLocal(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-[#a855f7] text-xs"
+                  >
+                    <option value="PAGADO">PAGADO (pago registrado)</option>
+                    <option value="ENTREGADO">ENTREGADO (cliente recibió)</option>
+                    <option value="CANCELADO">CANCELADO</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Cambia el estado de la venta para indicar si está pagada,
+                  entregada al cliente o cancelada.
+                </p>
+                <div className="pt-1 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingEstado}
+                    className="px-3 py-1.5 rounded-full 
+                      bg-[#f5f3ff] text-[#6b21a8] 
+                      border border-[#a855f7]/40 
+                      shadow-sm text-xs font-semibold
+                      hover:bg-[#ede9fe]
+                      disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {savingEstado ? "Guardando..." : "Actualizar estado"}
+                  </button>
+                </div>
+              </form>
+            </section>
+
             {/* Items + totales */}
             <section className="grid md:grid-cols-3 gap-4">
               <div className="md:col-span-2 bg-white rounded-2xl border border-[#e5e7eb] p-4 shadow-sm">
@@ -246,7 +353,8 @@ export default function VentaDetailPage() {
                         >
                           <div>
                             <p className="font-semibold text-gray-800">
-                              {item.nombre_producto || `Producto #${item.producto_id}`}
+                              {item.nombre_producto ||
+                                `Producto #${item.producto_id}`}
                             </p>
                             <p className="text-[11px] text-gray-500">
                               Precio base: {currency.format(precioBase)} (sin IVA)
@@ -267,7 +375,6 @@ export default function VentaDetailPage() {
                         </div>
                       );
                     })}
-
                   </div>
                 )}
               </div>

@@ -3,7 +3,7 @@ from typing import Optional, List
 from decimal import Decimal
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_db
@@ -20,6 +20,7 @@ from app.models.inventario import Inventario
 from app.models.variante import Variante
 from app.models.producto import Producto
 from app.models.media import Media  # 👈 agregar
+from app.models.programa_puntos import SaldoPuntosUsuario
 
 
 from app.schemas.pos import (
@@ -36,6 +37,11 @@ from app.schemas.pos import (
     POSVentaDetailOut,
     POSPagoPOSOut,
     POSProductoOut,
+    POSVentaEstadoUpdate,
+    POSVentaEstadoResponse,
+    POSClienteCreate,
+    POSClientePublic,
+    POSClienteSearchItem,
 )
 
 from app.services.programa_puntos_service import (
@@ -45,8 +51,103 @@ from app.services.programa_puntos_service import (
     registrar_movimiento_puntos,
 )
 
+from app.services.usuario_service import create_cliente_pos
+from app.services.audit_service import registrar_auditoria
+from app.core.request_utils import get_client_ip
+
 
 router = APIRouter()
+
+
+@router.post(
+    "/clientes",
+    response_model=POSClientePublic,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_cliente_pos_endpoint(
+    payload: POSClienteCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Crea un cliente desde POS (rol CLIENTE, sin dirección).
+    Solo VENDEDOR o ADMIN.
+    """
+    if current_user.rol not in ("VENDEDOR", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para crear clientes desde POS.",
+        )
+
+    ip_address = get_client_ip(request)
+
+    usuario = create_cliente_pos(db, payload)
+
+    # Auditoría
+    registrar_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        accion="POS_CREATE_CLIENTE",
+        entidad="Usuario",
+        entidad_id=usuario.id,
+        detalles=f"Cliente POS creado: {usuario.correo}",
+        ip_address=ip_address,
+    )
+
+    return usuario
+
+
+@router.get(
+    "/clientes/buscar",
+    response_model=list[POSClienteSearchItem],
+    status_code=status.HTTP_200_OK,
+)
+def buscar_clientes_pos(
+    correo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Busca clientes por correo (ILIKE %correo%).
+    Devuelve id, nombre, correo, telefono y puntos actuales.
+    Solo VENDEDOR o ADMIN.
+    """
+    if current_user.rol not in ("VENDEDOR", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para buscar clientes.",
+        )
+
+    query = (
+        db.query(Usuario, SaldoPuntosUsuario)
+        .outerjoin(SaldoPuntosUsuario, SaldoPuntosUsuario.usuario_id == Usuario.id)
+        .filter(
+            Usuario.rol == "CLIENTE",
+            Usuario.activo == True,
+            Usuario.correo.ilike(f"%{correo}%"),
+        )
+        .order_by(Usuario.correo.asc())
+        .limit(10)
+    )
+
+    resultados: list[POSClienteSearchItem] = []
+
+    for usuario, saldo in query.all():
+        puntos = saldo.saldo if saldo is not None else 0
+
+        resultados.append(
+            POSClienteSearchItem(
+                id=usuario.id,
+                nombre=usuario.nombre,
+                correo=usuario.correo,
+                telefono=usuario.telefono,
+                puntos_actuales=puntos,
+            )
+        )
+
+
+    return resultados
 
 
 # ===== Helpers / permisos =====
@@ -802,4 +903,52 @@ def obtener_venta_pos(
         fecha_creacion=venta.fecha_creacion,
         items=items_out,
         pagos=pagos_out,
+    )
+
+@router.patch("/ventas/{venta_id}/estado", response_model=POSVentaEstadoResponse)
+def cambiar_estado_venta_pos(
+    venta_id: int,
+    data: POSVentaEstadoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_vendedor_o_admin),
+):
+    """
+    Cambia el estado de una venta POS.
+
+    Solo ADMIN o el VENDEDOR dueño de la venta pueden cambiar su estado.
+
+    ⚠️ IMPORTANTE:
+    Este endpoint SOLO cambia el campo `estado` de la venta POS.
+    No revierte inventario, puntos ni movimientos de caja.
+    Si quieres una cancelación "real" (como pedidos), deberías
+    implementar un servicio similar a cancelar_pedido.
+    """
+    venta: Optional[VentaPOS] = (
+        db.query(VentaPOS)
+        .filter(VentaPOS.id == venta_id)
+        .first()
+    )
+
+    if not venta:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La venta POS indicada no existe.",
+        )
+
+    # Si es vendedor, solo puede tocar sus propias ventas
+    if current_user.rol != "ADMIN" and venta.vendedor_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para cambiar el estado de esta venta.",
+        )
+
+    venta.estado = data.estado
+    db.add(venta)
+    db.commit()
+    db.refresh(venta)
+
+    return POSVentaEstadoResponse(
+        id=venta.id,
+        estado=venta.estado,
+        fecha_actualizacion=datetime.now(timezone.utc),
     )

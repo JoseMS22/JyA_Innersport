@@ -21,6 +21,7 @@ from app.schemas.auth import ChangePasswordSchema
 from app.core.password_policy import validate_password_policy
 from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest
 from app.core.email import send_password_reset_email
+from app.schemas.pos import POSClienteCreate
 
 # Configuration constants
 GRACE_DAYS = 180  # Period before permanent account deletion
@@ -701,3 +702,68 @@ def reset_password_with_token(db: Session, data: ResetPasswordRequest) -> dict:
         "message": "Contraseña restablecida correctamente. Por favor inicia sesión con tu nueva contraseña.",
         "usuario": usuario.correo,
     }
+
+
+def create_cliente_pos(db: Session, data: POSClienteCreate) -> Usuario:
+    """
+    Crea un usuario CLIENTE desde POS.
+    - Sin dirección
+    - Aplica política de contraseña
+    - Verifica correo único
+    - Genera token de verificación y envía correo
+    """
+
+    # 1) Contraseña y confirmación deben coincidir
+    if data.password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=["Las contraseñas no coinciden."],
+        )
+
+    # 2) Política de contraseña
+    validate_password_policy(data.password)
+
+    # 3) Verificar si el correo ya existe
+    existing = (
+        db.query(Usuario)
+        .filter(Usuario.correo == data.correo)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=["El correo ya está registrado."],
+        )
+
+    # 4) Hashear contraseña
+    hashed_password = get_password_hash(data.password)
+
+    # 5) Token de verificación
+    token = secrets.token_urlsafe(32)
+    expira = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    print("\n==========================================")
+    print(" TOKEN DE VERIFICACIÓN (POS) GENERADO")
+    print(" →", token)
+    print("==========================================\n")
+
+    # 6) Crear usuario CLIENTE sin dirección
+    usuario = Usuario(
+        nombre=data.nombre,
+        correo=data.correo,
+        telefono=data.telefono,
+        contrasena_hash=hashed_password,
+        rol="CLIENTE",
+        activo=True,
+        email_verificado=False,
+        token_verificacion=token,
+        token_verificacion_expira=expira,
+    )
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+
+    # 7) Enviar correo de verificación
+    send_verification_email(usuario.correo, token)
+
+    return usuario
