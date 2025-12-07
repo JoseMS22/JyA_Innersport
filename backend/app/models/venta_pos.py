@@ -107,3 +107,5 @@ class VentaPOS(Base):
     back_populates="venta",
     cascade="all, delete-orphan",
 )
+    
+    rmas = relationship("RMA", back_populates="venta_pos", cascade="all, delete-orphan")

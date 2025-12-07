@@ -112,3 +112,6 @@ class Pedido(Base):
         back_populates="pedido",
         cascade="all, delete-orphan",
     )
+
+    # relaciones con RMA
+    rmas = relationship("RMA", back_populates="pedido", cascade="all, delete-orphan")

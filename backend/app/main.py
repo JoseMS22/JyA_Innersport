@@ -43,7 +43,15 @@ from app.api.v1.envio import router as envio_router
 #  Routers de pedidos y pagos
 from app.api.v1.pedidos import router as pedidos_router
 
+# 🆕 IMPORTAR ROUTER RMA
+from app.api.v1.rma import router as rma_router
+# 🆕 IMPORTAR ROUTER PO
+# S
 from app.api.v1.pos import router as pos_router
+
+# 🆕 IMPORTAR ROUTER USUARIO
+from app.api.v1.usuario import router as usuarios_router
+
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -149,6 +157,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # =========================
 
 MEDIA_DIR = os.path.join(os.path.dirname(__file__), "media")
+os.makedirs(MEDIA_DIR, exist_ok=True)
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
@@ -188,6 +197,12 @@ app.include_router(pedidos_router, prefix="/api/v1/pedidos", tags=["Pedidos"])
 app.include_router(direcciones_router, prefix="/api/v1/direcciones", tags=["Direcciones"])
 app.include_router(envio_router, prefix="/api/v1/envio", tags=["Envío"])
 app.include_router(pos_router, prefix="/api/v1/pos", tags=["Pos"])
+
+# 🆕 US-RF41/42/43: RMA (Devoluciones)
+app.include_router(rma_router, prefix="/api/v1/rma", tags=["RMA"])
+
+# 🆕 US-ADMIN: Gestión de usuario
+app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["Gestión de Usuarios"])
 
 
 # =========================

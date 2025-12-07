@@ -165,7 +165,7 @@ function ProductoNuevoCard({
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-white">
+          <div className="flex items-center justify-center h-full !text-white">
             📦
           </div>
         )}
@@ -173,12 +173,12 @@ function ProductoNuevoCard({
         {/* Badges de stock */}
         <div className="absolute bottom-2 left-2 flex gap-1 text-[10px]">
           {!producto.tiene_stock && (
-            <span className="px-1.5 py-0.5 bg-red-500 text-white font-semibold rounded">
+            <span className="px-1.5 py-0.5 bg-red-500 !text-white font-semibold rounded">
               AGOTADO
             </span>
           )}
           {producto.tiene_stock && (
-            <span className="px-1.5 py-0.5 bg-emerald-500 text-white font-semibold rounded flex items-center gap-1">
+            <span className="px-1.5 py-0.5 bg-emerald-500 !text-white font-semibold rounded flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               DISPONIBLE
             </span>
@@ -740,7 +740,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setAuthAlert(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
+                className="px-4 py-1.5 rounded-lg bg-[#a855f7] !text-white text-xs font-semibold hover:bg-[#7e22ce]"
               >
                 Aceptar
               </button>
