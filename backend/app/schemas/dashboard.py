@@ -98,15 +98,13 @@ class DesempenoVendedoresResponse(BaseModel):
 
 
 # ============================
-# COMISIONES
+# COMISIONES - SCHEMAS CORREGIDOS
 # ============================
 
 class ConfiguracionComisionBase(BaseModel):
     tipo_venta: str
-    porcentaje_comision: Decimal
-    monto_minimo: Decimal
-    fecha_inicio: date
-    fecha_fin: Optional[date] = None
+    porcentaje: Decimal
+    monto_minimo: Optional[Decimal] = None
 
 
 class ConfiguracionComisionCreate(ConfiguracionComisionBase):
@@ -116,7 +114,8 @@ class ConfiguracionComisionCreate(ConfiguracionComisionBase):
 class ConfiguracionComisionOut(ConfiguracionComisionBase):
     id: int
     activo: bool
-    created_at: datetime
+    fecha_creacion: datetime
+    fecha_actualizacion: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

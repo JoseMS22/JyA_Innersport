@@ -45,18 +45,18 @@ def calcular_comision_venta_pos(
         return None
     
     # Validar monto mínimo
-    if venta.total < config.monto_minimo:
+    if config.monto_minimo and venta.total < config.monto_minimo:
         return None
     
     # Calcular comisión
-    monto_comision = (venta.total * config.porcentaje_comision) / Decimal("100")
+    monto_comision = (venta.total * config.porcentaje) / Decimal("100")
     
     # Crear registro
     comision = ComisionVendedor(
         vendedor_id=venta.vendedor_id,
-        venta_id=venta.id,
+        venta_pos_id=venta.id,
         monto_venta=venta.total,
-        porcentaje_aplicado=config.porcentaje_comision,
+        porcentaje_aplicado=config.porcentaje,
         monto_comision=monto_comision,
         tipo_venta="POS",
         estado="PENDIENTE",
@@ -88,18 +88,18 @@ def calcular_comision_pedido(
         return None
     
     # Validar monto mínimo
-    if pedido.total < config.monto_minimo:
+    if config.monto_minimo and pedido.total < config.monto_minimo:
         return None
     
     # Calcular comisión
-    monto_comision = (pedido.total * config.porcentaje_comision) / Decimal("100")
+    monto_comision = (pedido.total * config.porcentaje) / Decimal("100")
     
     # Crear registro
     comision = ComisionVendedor(
         vendedor_id=pedido.vendedor_id,
         pedido_id=pedido.id,
         monto_venta=pedido.total,
-        porcentaje_aplicado=config.porcentaje_comision,
+        porcentaje_aplicado=config.porcentaje,
         monto_comision=monto_comision,
         tipo_venta="ONLINE",
         estado="PENDIENTE",
@@ -142,8 +142,8 @@ def calcular_comisiones_periodo(
                 VentaPOS.estado.in_(["PAGADO", "COMPLETADO"]),
                 VentaPOS.cancelado == False,
                 ~VentaPOS.id.in_(
-                    db.query(ComisionVendedor.venta_id).filter(
-                        ComisionVendedor.venta_id.isnot(None)
+                    db.query(ComisionVendedor.venta_pos_id).filter(
+                        ComisionVendedor.venta_pos_id.isnot(None)
                     )
                 )
             )
@@ -295,7 +295,7 @@ def liquidar_comisiones(
     for comision in comisiones:
         comision.estado = "LIQUIDADA"
         comision.fecha_liquidacion = datetime.now()
-        comision.liquidada_por = usuario_liquidador.id
+        comision.liquidado_por_id = usuario_liquidador.id
         ids_liquidados.append(comision.id)
     
     db.commit()

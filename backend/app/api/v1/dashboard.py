@@ -19,6 +19,7 @@ from app.services.dashboard_service import (
     obtener_alertas_inventario,
     obtener_desempeno_vendedores,
 )
+from app.models.venta_pos import VentaPOS
 
 
 router = APIRouter()
@@ -159,3 +160,60 @@ def get_desempeno_vendedores(
     )
     
     return {"vendedores": vendedores}
+
+@router.get("/ventas-historico")
+def get_ventas_historico(
+    fecha_inicio: Optional[str] = Query(None),
+    fecha_fin: Optional[str] = Query(None),
+    sucursal_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Obtiene datos históricos de ventas agrupados por día.
+    """
+    from datetime import timedelta
+    from sqlalchemy import func
+    
+    fecha_inicio_dt = None
+    fecha_fin_dt = None
+    
+    if fecha_inicio:
+        fecha_inicio_dt = datetime.fromisoformat(fecha_inicio.replace('Z', '+00:00'))
+    else:
+        fecha_inicio_dt = datetime.now() - timedelta(days=30)
+    
+    if fecha_fin:
+        fecha_fin_dt = datetime.fromisoformat(fecha_fin.replace('Z', '+00:00'))
+    else:
+        fecha_fin_dt = datetime.now()
+    
+    # Query base
+    query = db.query(
+        func.date(VentaPOS.fecha_creacion).label("fecha"),
+        func.sum(VentaPOS.total).label("total"),
+        func.count(VentaPOS.id).label("cantidad")
+    ).filter(
+        VentaPOS.fecha_creacion >= fecha_inicio_dt,
+        VentaPOS.fecha_creacion <= fecha_fin_dt,
+        VentaPOS.estado.in_(["PAGADO", "COMPLETADO"]),
+        VentaPOS.cancelado == False
+    )
+    
+    if sucursal_id:
+        query = query.filter(VentaPOS.sucursal_id == sucursal_id)
+    
+    # Agrupar por fecha
+    ventas = query.group_by(func.date(VentaPOS.fecha_creacion)).order_by("fecha").all()
+    
+    # Formatear respuesta
+    datos = [
+        {
+            "fecha": venta.fecha.isoformat(),
+            "total": float(venta.total),
+            "cantidad": venta.cantidad
+        }
+        for venta in ventas
+    ]
+    
+    return {"datos": datos}

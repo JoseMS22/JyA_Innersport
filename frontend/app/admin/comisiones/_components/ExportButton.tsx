@@ -38,21 +38,20 @@ export function ExportButton({ formato, filtros }: ExportButtonProps) {
       if (filtros.estado !== "TODOS") params.append("estado", filtros.estado);
       if (filtros.tipo_venta) params.append("tipo_venta", filtros.tipo_venta);
 
-      // Obtener token
-      const token = localStorage.getItem("access_token");
-
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/comisiones/reporte/exportar?${params}`,
+        `${API_BASE_URL}/api/v1/comisiones/reporte/exportar?${params}`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include", // ✅ Envía cookies automáticamente
         }
       );
 
       if (!response.ok) {
-        throw new Error("Error al exportar reporte");
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }));
+        console.error("Error del servidor:", errorData);
+        throw new Error(errorData.detail || "Error al exportar reporte");
       }
 
       // Descargar archivo
@@ -67,7 +66,7 @@ export function ExportButton({ formato, filtros }: ExportButtonProps) {
       document.body.removeChild(a);
     } catch (error) {
       console.error("Error exportando:", error);
-      alert("Error al exportar el reporte");
+      alert(error instanceof Error ? error.message : "Error al exportar el reporte");
     } finally {
       setLoading(false);
     }

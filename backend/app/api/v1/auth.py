@@ -134,7 +134,7 @@ def login(
         response.set_cookie(
             key="access_token",
             value=access_token,
-            httponly=True,
+            httponly=False,
             max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             samesite="lax",
             secure=False,

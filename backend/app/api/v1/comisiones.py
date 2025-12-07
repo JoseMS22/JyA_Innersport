@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 import csv
 import io
-
+from sqlalchemy import func
 from app.db import get_db
 from app.core.security import get_current_user
 from app.models.usuario import Usuario
@@ -102,34 +102,42 @@ def create_configuracion_comision(
     """
     Crea o actualiza configuración de comisiones.
     
-    Si existe una configuración activa para ese tipo de venta,
-    la desactiva y crea una nueva.
+    Si existe una configuración para ese tipo de venta,
+    la actualiza. Si no existe, crea una nueva.
     """
-    # Desactivar configuración anterior si existe
-    config_anterior = db.query(ConfiguracionComision).filter(
-        ConfiguracionComision.tipo_venta == data.tipo_venta,
-        ConfiguracionComision.activo == True
+    from sqlalchemy import exc
+    
+    # Buscar si ya existe configuración para este tipo de venta
+    config_existente = db.query(ConfiguracionComision).filter(
+        ConfiguracionComision.tipo_venta == data.tipo_venta
     ).first()
     
-    if config_anterior:
-        config_anterior.activo = False
-        config_anterior.fecha_fin = date.today()
-    
-    # Crear nueva configuración
-    nueva_config = ConfiguracionComision(
-        tipo_venta=data.tipo_venta,
-        porcentaje_comision=data.porcentaje_comision,
-        monto_minimo=data.monto_minimo,
-        fecha_inicio=data.fecha_inicio,
-        fecha_fin=data.fecha_fin,
-        activo=True
-    )
-    
-    db.add(nueva_config)
-    db.commit()
-    db.refresh(nueva_config)
-    
-    return nueva_config
+    if config_existente:
+        # ✅ ACTUALIZAR la configuración existente
+        config_existente.porcentaje = data.porcentaje
+        config_existente.monto_minimo = data.monto_minimo
+        config_existente.activo = True
+        config_existente.fecha_actualizacion = func.now()
+        
+        db.add(config_existente)
+        db.commit()
+        db.refresh(config_existente)
+        
+        return config_existente
+    else:
+        # ✅ CREAR nueva configuración
+        nueva_config = ConfiguracionComision(
+            tipo_venta=data.tipo_venta,
+            porcentaje=data.porcentaje,
+            monto_minimo=data.monto_minimo,
+            activo=True
+        )
+        
+        db.add(nueva_config)
+        db.commit()
+        db.refresh(nueva_config)
+        
+        return nueva_config
 
 
 # ============================

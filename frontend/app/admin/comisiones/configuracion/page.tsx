@@ -8,11 +8,11 @@ import { apiFetch } from "@/lib/api";
 type Configuracion = {
   id: number;
   tipo_venta: string;
-  porcentaje_comision: number;
+  porcentaje: number;
   monto_minimo: number;
   activo: boolean;
-  fecha_inicio: string;
-  fecha_fin: string | null;
+  fecha_creacion: string;
+  fecha_actualizacion: string | null;
 };
 
 export default function ConfiguracionComisionesPage() {
@@ -25,10 +25,8 @@ export default function ConfiguracionComisionesPage() {
 
   const [formData, setFormData] = useState({
     tipo_venta: "POS",
-    porcentaje_comision: "5.00",
+    porcentaje: "5.00",
     monto_minimo: "0.00",
-    fecha_inicio: new Date().toISOString().split("T")[0],
-    fecha_fin: "",
   });
 
   useEffect(() => {
@@ -63,10 +61,8 @@ export default function ConfiguracionComisionesPage() {
         method: "POST",
         body: JSON.stringify({
           tipo_venta: formData.tipo_venta,
-          porcentaje_comision: parseFloat(formData.porcentaje_comision),
-          monto_minimo: parseFloat(formData.monto_minimo),
-          fecha_inicio: formData.fecha_inicio,
-          fecha_fin: formData.fecha_fin || null,
+          porcentaje: parseFloat(formData.porcentaje),
+          monto_minimo: parseFloat(formData.monto_minimo) || null,
         }),
       });
 
@@ -77,10 +73,8 @@ export default function ConfiguracionComisionesPage() {
       // Limpiar formulario
       setFormData({
         tipo_venta: "POS",
-        porcentaje_comision: "5.00",
+        porcentaje: "5.00",
         monto_minimo: "0.00",
-        fecha_inicio: new Date().toISOString().split("T")[0],
-        fecha_fin: "",
       });
 
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -170,21 +164,21 @@ export default function ConfiguracionComisionesPage() {
                     <div>
                       <span className="text-gray-500">Porcentaje:</span>{" "}
                       <span className="font-medium text-purple-600">
-                        {config.porcentaje_comision}%
+                        {config.porcentaje}%
                       </span>
                     </div>
 
                     <div>
                       <span className="text-gray-500">Monto mínimo:</span>{" "}
                       <span className="font-medium">
-                        {currency.format(config.monto_minimo)}
+                        {currency.format(config.monto_minimo || 0)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-gray-500">Desde:</span>{" "}
+                      <span className="text-gray-500">Creada:</span>{" "}
                       <span className="font-medium">
-                        {new Date(config.fecha_inicio).toLocaleDateString("es-CR")}
+                        {new Date(config.fecha_creacion).toLocaleDateString("es-CR")}
                       </span>
                     </div>
                   </div>
@@ -237,11 +231,11 @@ export default function ConfiguracionComisionesPage() {
                 step="0.01"
                 min="0"
                 max="100"
-                value={formData.porcentaje_comision}
+                value={formData.porcentaje}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    porcentaje_comision: e.target.value,
+                    porcentaje: e.target.value,
                   })
                 }
                 required
@@ -249,7 +243,7 @@ export default function ConfiguracionComisionesPage() {
               />
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Monto Mínimo (₡)
               </label>
@@ -261,37 +255,12 @@ export default function ConfiguracionComisionesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, monto_minimo: e.target.value })
                 }
+                placeholder="0.00"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha de Inicio *
-              </label>
-              <input
-                type="date"
-                value={formData.fecha_inicio}
-                onChange={(e) =>
-                  setFormData({ ...formData, fecha_inicio: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha de Fin (opcional)
-              </label>
-              <input
-                type="date"
-                value={formData.fecha_fin}
-                onChange={(e) =>
-                  setFormData({ ...formData, fecha_fin: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+              <p className="text-xs text-gray-500 mt-1">
+                Monto mínimo de venta requerido para generar comisión (opcional)
+              </p>
             </div>
           </div>
 
