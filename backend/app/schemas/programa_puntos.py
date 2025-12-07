@@ -57,9 +57,11 @@ class LimiteRedencionOut(BaseModel):
 # ============================
 
 class ConfirmarCompraIn(BaseModel):
-    total_compra: Decimal          # total BRUTO de la compra (sin puntos)
-    puntos_a_usar: int = 0         # puntos que el cliente quiere utilizar
-    order_id: Optional[int] = None # opcional, si luego enlazas con Pedido
+    subtotal: Optional[Decimal] = None        # monto sólo de productos (recomendado)
+    costo_envio: Optional[Decimal] = Decimal("0")  # costo del envío
+    total_compra: Optional[Decimal] = None    # por compatibilidad con clientes antiguos
+    puntos_a_usar: int = 0
+    order_id: Optional[int] = None
 
 
 class ConfirmarCompraOut(BaseModel):

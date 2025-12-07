@@ -26,9 +26,16 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "Innersport Tienda"
     EMAIL_FROM_ADDRESS: str = "onboarding@resend.dev"  # default ok
     FRONTEND_BASE_URL: str = "http://localhost:3000"
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
 
     # 🔹 Cookies - IMPORTANTE: False en desarrollo local
     COOKIE_SECURE: bool = False  # Cambiar a True solo en producción con HTTPS
+
+    # Rutas y directorios
+    BASE_APP_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Ruta absoluta para media: .../backend/app/media
+    MEDIA_ROOT: str = os.path.join(BASE_APP_DIR, "media")
 
     # Redis / Celery
     REDIS_URL: str = "redis://redis:6379/0"

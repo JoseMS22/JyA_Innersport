@@ -194,3 +194,45 @@ def send_pedido_estado_email(
 
     except Exception as e:
         print(f"[EMAIL PEDIDO] Error enviando correo de estado para pedido #{pedido_id}: {e}")
+
+def send_rma_update_email(to_email: str, rma_id: int, estado: str, respuesta_admin: str = None):
+    """
+    Notifica al cliente cuando cambia el estado de su solicitud RMA.
+    """
+    subject = f"Actualización de Solicitud RMA #{rma_id} - Innersport"
+    
+    estado_texto = {
+        "solicitado": "Recibida",
+        "en_revision": "En Revisión",
+        "aprobado": "Aprobada",
+        "rechazado": "Rechazada",
+        "completado": "Completada"
+    }.get(estado, estado)
+
+    mensaje_admin_html = f"""
+    <div style="background-color: #f3f4f6; padding: 15px; border-left: 4px solid #a855f7; margin: 15px 0;">
+        <strong>Mensaje del equipo:</strong><br>
+        {respuesta_admin}
+    </div>
+    """ if respuesta_admin else ""
+
+    html_content = f"""
+        <h2>Actualización de tu Devolución/Cambio</h2>
+        <p>Tu solicitud <strong>#{rma_id}</strong> ha cambiado de estado a: <strong>{estado_texto.upper()}</strong>.</p>
+        
+        {mensaje_admin_html}
+        
+        <p>Puedes ver más detalles ingresando a tu cuenta.</p>
+        <hr>
+        <p style="font-size: 12px; color: #666;">Innersport Support Team</p>
+    """
+
+    try:
+        resend.Emails.send({
+            "from": f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM_ADDRESS}>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+        })
+    except Exception as e:
+        print(f"Error enviando correo RMA: {e}")

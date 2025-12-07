@@ -145,6 +145,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Cargar carrito REAL desde el backend cuando haya usuario logueado
   useEffect(() => {
     async function fetchCartFromServer() {
+      if (userId === null) return;
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/cart`, {
           credentials: "include",

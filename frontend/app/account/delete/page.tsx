@@ -228,7 +228,7 @@ export default function DeleteAccountPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 !text-white font-medium py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">

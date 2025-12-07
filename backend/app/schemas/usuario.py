@@ -1,7 +1,7 @@
 # backend/app/schemas/usuario.py
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
@@ -133,3 +133,36 @@ class UsuarioRead(BaseModel):
     telefono: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+#=========================
+# ADMIN - GESTIÓN DE USUARIOS
+#=========================
+class UserCreateAdmin(BaseModel):
+    """
+    Creación de usuario por parte de un administrador.
+    - Permite definir el rol explícitamente.
+    - No requiere dirección obligatoria al inicio (útil para vendedores/admins).
+    """
+    nombre: str
+    correo: EmailStr
+    password: str
+    confirm_password: str
+    rol: str = "CLIENTE"  # CLIENTE, VENDEDOR, ADMIN
+    activo: bool = True
+    telefono: Optional[str] = None
+
+class UserUpdateAdmin(BaseModel):
+    """
+    Edición completa de usuario por parte de un administrador.
+    Permite cambiar roles, estado activo/inactivo, contraseñas, etc.
+    """
+    nombre: Optional[str] = None
+    correo: Optional[EmailStr] = None
+    telefono: Optional[str] = None
+    rol: Optional[str] = None
+    activo: Optional[bool] = None
+    password: Optional[str] = None # Opcional: para resetear contraseña manualmente
+
+class UserListResponse(BaseModel):
+    total: int
+    items: List[UserPublic]

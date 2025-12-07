@@ -172,7 +172,7 @@ export default function ReactivateAccountPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 text-sm disabled:opacity-60"
+              className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 !text-white font-medium py-2 text-sm disabled:opacity-60"
             >
               {submitting ? "Procesando..." : "Reactivar cuenta"}
             </button>

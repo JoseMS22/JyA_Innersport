@@ -1,4 +1,4 @@
-//frontend/app/account/orders/[id]/page.tsx
+// frontend/app/account/orders/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -28,6 +28,15 @@ interface Direccion {
   referencia: string;
 }
 
+interface RMA {
+  id: number;
+  tipo: string;
+  estado: string;
+  motivo: string;
+  respuesta_admin?: string;
+  fecha: string;
+}
+
 interface PedidoDetalle {
   id: number;
   numero_pedido: string;
@@ -43,6 +52,8 @@ interface PedidoDetalle {
   productos: Producto[];
   puede_cancelar: boolean;
   fecha_limite_cancelacion?: string;
+  tiene_rma_activo?: boolean;
+  solicitudes_rma?: RMA[];
 }
 
 const ESTADOS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -53,6 +64,15 @@ const ESTADOS_CONFIG: Record<string, { label: string; color: string; bgColor: st
   ENTREGADO: { label: "Entregado", color: "text-green-700", bgColor: "bg-green-100" },
   CANCELADO: { label: "Cancelado", color: "text-red-700", bgColor: "bg-red-100" },
   PAGADO: { label: "Pagado", color: "text-green-700", bgColor: "bg-green-100" },
+};
+
+// Usamos lowercase en las claves para coincidir con el backend
+const ESTADOS_RMA_CLIENTE: Record<string, { label: string; color: string }> = {
+  solicitado: { label: "Solicitud Recibida", color: "bg-yellow-50 text-yellow-800 border-yellow-200" },
+  en_revision: { label: "En Revisión", color: "bg-blue-50 text-blue-800 border-blue-200" },
+  aprobado: { label: "✅ Solicitud Aprobada", color: "bg-green-50 text-green-800 border-green-200" },
+  rechazado: { label: "❌ Solicitud Rechazada", color: "bg-red-50 text-red-800 border-red-200" },
+  completado: { label: "Devolución Completada", color: "bg-gray-50 text-gray-800 border-gray-200" },
 };
 
 export default function OrderDetailPage() {
@@ -193,6 +213,8 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* COLUMNA IZQUIERDA: DETALLES PRODUCTOS Y DIRECCIÓN */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -258,6 +280,7 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
+          {/* COLUMNA DERECHA: RESUMEN Y ACCIONES */}
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Resumen del Pedido</h2>
@@ -298,11 +321,12 @@ export default function OrderDetailPage() {
               </div>
             )}
 
+            {/* BOTÓN CANCELAR (SOLO SI APLICA) */}
             {pedido.puede_cancelar && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  className="w-full px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                 >
                   Cancelar Pedido
                 </button>
@@ -313,6 +337,65 @@ export default function OrderDetailPage() {
                 )}
               </div>
             )}
+
+            {/* SECCIÓN DE DEVOLUCIONES / RMA */}
+            <div className="space-y-4">
+                
+                {/* 1. HISTORIAL DE SOLICITUDES (SIMPRE VISIBLE SI EXISTEN) */}
+                {pedido.solicitudes_rma && pedido.solicitudes_rma.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm p-6">
+                        <h3 className="font-semibold text-gray-900 mb-4 border-b pb-2">Estado de Devoluciones</h3>
+                        <div className="space-y-4">
+                            {pedido.solicitudes_rma.map((rma) => {
+                                // Aseguramos usar la configuración correcta (fallback seguro)
+                                const config = ESTADOS_RMA_CLIENTE[rma.estado.toLowerCase()] || 
+                                              { label: rma.estado, color: "bg-gray-100 border-gray-200" };
+                                
+                                return (
+                                    <div key={rma.id} className={`p-4 rounded-lg border ${config.color}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="font-bold text-xs uppercase tracking-wide">{config.label}</span>
+                                            <span className="text-[10px] opacity-75">{new Date(rma.fecha).toLocaleDateString()}</span>
+                                        </div>
+                                        
+                                        <p className="text-sm mb-1 font-medium">
+                                            {rma.tipo === 'devolucion' ? 'Solicitud de Reembolso' : 'Solicitud de Cambio'}
+                                        </p>
+                                        
+                                        {/* Motivo del cliente */}
+                                        <p className="text-xs italic mb-2 opacity-80">"{rma.motivo}"</p>
+
+                                        {/* Respuesta del admin (IMPORTANTE VISUALIZARLA SIEMPRE) */}
+                                        {rma.respuesta_admin && (
+                                            <div className="mt-3 bg-white/60 p-2 rounded text-xs border border-black/5">
+                                                <strong>Respuesta de la tienda:</strong>
+                                                <p className="mt-1">{rma.respuesta_admin}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. BOTÓN PARA NUEVA SOLICITUD */}
+                {/* Solo se muestra si está entregado Y NO hay una solicitud activa */}
+                {/* Si fue rechazada, 'tiene_rma_activo' es false, así que el botón vuelve a aparecer para reintentar */}
+                {pedido.estado === "ENTREGADO" && !pedido.tiene_rma_activo && (
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-indigo-100">
+                    <h3 className="font-semibold text-gray-900 mb-2">¿Problemas con tu pedido?</h3>
+                    <button
+                      onClick={() => router.push(`/account/orders/${orderId}/rma`)}
+                      className="w-full px-4 py-2 bg-indigo-600 !text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex justify-center items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
+                      Solicitar Devolución o Cambio
+                    </button>
+                  </div>
+                )}
+            </div>
+
           </div>
         </div>
       </div>
@@ -359,7 +442,7 @@ export default function OrderDetailPage() {
               <button
                 onClick={handleCancelar}
                 disabled={canceling || !cancelReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {canceling ? "Cancelando..." : "Cancelar Pedido"}
               </button>

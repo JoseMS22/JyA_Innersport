@@ -718,7 +718,7 @@ function CategoriaForm({
                       type="button"
                       onClick={() => togglePrincipalAsociada(c.id)}
                       className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${active
-                          ? "bg-violet-600 border-violet-600 text-white shadow-sm"
+                          ? "bg-violet-600 border-violet-600 !text-white shadow-sm"
                           : "bg-white border-violet-200 text-violet-800 hover:bg-violet-100"
                         }`}
                     >
@@ -807,7 +807,7 @@ function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold text-white ${isDesactivar
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold !text-white ${isDesactivar
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-emerald-600 hover:bg-emerald-700"
               } disabled:opacity-60`}

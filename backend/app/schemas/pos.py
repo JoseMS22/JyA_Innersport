@@ -1,8 +1,9 @@
+# backend/app/schemas/pos.py
 from decimal import Decimal
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
 # ============================
@@ -102,12 +103,15 @@ class POSVentaCreate(BaseModel):
 
 
 class POSVentaItemOut(BaseModel):
+    id: int
     variante_id: int
     producto_id: int
     nombre_producto: str
     cantidad: int
     precio_unitario: Decimal
     subtotal: Decimal
+ 
+    imagen_url: Optional[str] = None 
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,17 +122,16 @@ class POSVentaOut(BaseModel):
     vendedor_id: int
     cliente_id: Optional[int] = None
     nombre_cliente: Optional[str] = None
-
     subtotal: Decimal
     descuento_puntos: Decimal
     impuesto: Decimal
     total: Decimal
     puntos_ganados: int
-
     estado: str
     fecha_creacion: datetime
-
     items: List[POSVentaItemOut]
+    tiene_rma_activo: Optional[bool] = False
+    solicitudes_rma: Optional[List[Dict[str, Any]]] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,18 +139,6 @@ class POSVentaOut(BaseModel):
 # ============================
 # VENTAS POS – Salidas (para listado y detalle)
 # ============================
-
-class POSVentaItemOut(BaseModel):
-    id: int
-    variante_id: int
-    producto_id: int
-    nombre_producto: str
-    cantidad: int
-    precio_unitario: Decimal
-    subtotal: Decimal
-
-    model_config = ConfigDict(from_attributes=True)
-
 
 class POSPagoPOSOut(BaseModel):
     id: int
@@ -195,8 +186,11 @@ class POSVentaDetailOut(BaseModel):
 
     items: List[POSVentaItemOut]
     pagos: List[POSPagoPOSOut]
+    tiene_rma_activo: Optional[bool] = False
+    solicitudes_rma: Optional[List[Dict[str, Any]]] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class POSProductoOut(BaseModel):
     variante_id: int
@@ -212,6 +206,63 @@ class POSProductoOut(BaseModel):
     color: Optional[str] = None
     talla: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-        
+    model_config = ConfigDict(from_attributes=True)
+
+
+class POSVentaEstadoUpdate(BaseModel):
+    """
+    Payload de entrada para cambiar el estado de una venta POS.
+    """
+    estado: Literal[
+        "PAGADO",
+        "ENTREGADO",
+        "CANCELADO",
+    ]
+
+
+class POSVentaEstadoResponse(BaseModel):
+    """
+    Respuesta simplificada cuando se actualiza el estado de una venta POS.
+    """
+    id: int
+    estado: str
+    fecha_actualizacion: datetime
+
+
+# ==== CLIENTES POS ====
+
+class POSClienteCreate(BaseModel):
+    """
+    Cliente creado desde el POS por un vendedor.
+    No requiere dirección, solo datos básicos y contraseña.
+    """
+    nombre: str
+    correo: EmailStr
+    telefono: Optional[str] = None
+    password: str
+    confirm_password: str
+
+
+class POSClientePublic(BaseModel):
+    """
+    Datos públicos mínimos de un cliente para POS.
+    """
+    id: int
+    nombre: str
+    correo: EmailStr
+    telefono: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class POSClienteSearchItem(BaseModel):
+    """
+    Item devuelto al buscar clientes por correo en el POS.
+    """
+    id: int
+    nombre: str
+    correo: EmailStr
+    telefono: Optional[str] = None
+    puntos_actuales: int = 0   # tomado de SaldoPuntosUsuario si existe
+
+    model_config = ConfigDict(from_attributes=True)

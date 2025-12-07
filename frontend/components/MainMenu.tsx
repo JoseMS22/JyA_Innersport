@@ -161,8 +161,6 @@ export function MainMenu() {
       console.error("Error en logout:", error);
     } finally {
       setUser(null);
-      clearCart();
-      clearFavorites();
       setCartUserId(null);
       setFavUserId(null);
       setProfileMenuOpen(false);
