@@ -45,6 +45,12 @@ from app.api.v1.pedidos import router as pedidos_router
 
 from app.api.v1.pos import router as pos_router
 
+# ✅ NUEVOS ROUTERS - Dashboard y Comisiones
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.comisiones import router as comisiones_router
+
+from app.api.v1.usuarios import router as usuarios_router
+
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
 logger = get_logger(__name__)
@@ -181,14 +187,19 @@ app.include_router(home_hero_router, prefix="/api/v1", tags=["Home Hero"])
 # Programa de puntos
 app.include_router(programa_puntos_router.router, prefix="/api/v1")
 
-# 🆕 Checkout / pedidos
-app.include_router(pedidos_router, prefix="/api/v1/pedidos", tags=["Pedidos"])
-
 # 🆕 US-19: Direcciones y envío
 app.include_router(direcciones_router, prefix="/api/v1/direcciones", tags=["Direcciones"])
 app.include_router(envio_router, prefix="/api/v1/envio", tags=["Envío"])
+
+# Pedidos y POS
+app.include_router(pedidos_router, prefix="/api/v1/pedidos", tags=["Pedidos"])
 app.include_router(pos_router, prefix="/api/v1/pos", tags=["Pos"])
 
+# ✅ DASHBOARD Y COMISIONES - US-39 y US-44
+app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Dashboard"])
+app.include_router(comisiones_router, prefix="/api/v1/comisiones", tags=["Comisiones"])
+
+app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["Usuarios"])
 
 # =========================
 # ENDPOINTS RAÍZ

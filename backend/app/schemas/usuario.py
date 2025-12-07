@@ -123,3 +123,13 @@ class UsuarioMini(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UsuarioRead(BaseModel):
+    id: int
+    nombre: str
+    correo: str
+    rol: str
+    activo: bool
+    telefono: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)

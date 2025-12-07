@@ -32,6 +32,9 @@ from .usuario_sucursal import UsuarioSucursal
 from .venta_pos import VentaPOS
 from .venta_pos_item import VentaPOSItem
 from .pago_pos import PagoPOS
+from .comision_vendedor import ComisionVendedor
+from .configuracion_comision import ConfiguracionComision
+from .liquidacion_comision import LiquidacionComision
 
 __all__ = [
     "Usuario",
