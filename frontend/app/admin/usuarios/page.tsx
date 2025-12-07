@@ -105,11 +105,14 @@ export default function AdminUsuariosPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
+    // Validaciones
     if (!editingUser) {
+        // Creación: Contraseña obligatoria
         if (!formData.password || formData.password !== formData.confirm_password) {
             return showToast("Las contraseñas no coinciden o están vacías", "error");
         }
     } else {
+        // Edición: Contraseña opcional, pero si se pone, debe coincidir
         if (formData.password && formData.password !== formData.confirm_password) {
             return showToast("Las contraseñas no coinciden", "error");
         }
@@ -123,8 +126,20 @@ export default function AdminUsuariosPage() {
       const method = editingUser ? "PUT" : "POST";
       
       const payload: any = { ...formData };
-      if (!payload.password) delete payload.password;
-      delete payload.confirm_password;
+
+      // LÓGICA CORREGIDA AQUÍ:
+      if (editingUser) {
+         // Si estamos editando (PUT):
+         // 1. Si no escribió password, lo quitamos para no enviar string vacío.
+         if (!payload.password) delete payload.password;
+         // 2. El esquema de actualización (UserUpdateAdmin) NO tiene confirm_password, lo borramos.
+         delete payload.confirm_password;
+      } else {
+         // Si estamos creando (POST):
+         // El esquema de creación (UserCreateAdmin) REQUIERE confirm_password.
+         // NO debemos borrarlo.
+      }
+      
       if (!payload.telefono) payload.telefono = null;
 
       const res = await fetch(url, {
