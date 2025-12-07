@@ -149,7 +149,7 @@ def obtener_detalle_pedido(
     """
     query = db.query(Pedido).filter(Pedido.id == pedido_id)
 
-    if current_user.rol != "ADMIN":
+    if current_user.rol not in ["ADMIN", "VENDEDOR"]:
         query = query.filter(Pedido.cliente_id == current_user.id)
 
     pedido = query.first()

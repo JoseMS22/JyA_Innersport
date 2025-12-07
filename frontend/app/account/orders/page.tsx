@@ -166,7 +166,7 @@ export default function OrdersPage() {
             </p>
             <button
               onClick={() => router.push("/")}
-              className="px-6 py-2 bg-[#a855f7] hover:bg-[#7e22ce] text-white text-sm font-medium rounded-xl"
+              className="px-6 py-2 bg-[#a855f7] hover:bg-[#7e22ce] !text-white text-sm font-medium rounded-xl"
             >
               Ir a comprar
             </button>

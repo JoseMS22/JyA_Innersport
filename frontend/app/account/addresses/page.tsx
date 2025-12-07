@@ -280,7 +280,7 @@ export default function AddressesPage() {
           {!editando && (
             <button
               onClick={iniciarNueva}
-              className="px-4 py-2 bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium rounded-lg text-sm transition-colors"
+              className="px-4 py-2 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium rounded-lg text-sm transition-colors"
             >
               + Nueva dirección
             </button>
@@ -491,7 +491,7 @@ export default function AddressesPage() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="flex-1 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2 text-sm disabled:opacity-60"
+                  className="flex-1 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2 text-sm disabled:opacity-60"
                 >
                   {guardando ? "Guardando..." : "Guardar dirección"}
                 </button>
@@ -514,7 +514,7 @@ export default function AddressesPage() {
                 </p>
                 <button
                   onClick={iniciarNueva}
-                  className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold rounded-xl"
+                  className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold rounded-xl"
                 >
                   Agregar dirección
                 </button>
@@ -535,7 +535,7 @@ export default function AddressesPage() {
                           </h3>
                         )}
                         {direccion.predeterminada && (
-                          <span className="px-2 py-1 bg-[#22c55e] text-white text-[10px] rounded-full font-semibold">
+                          <span className="px-2 py-1 bg-[#22c55e] !text-white text-[10px] rounded-full font-semibold">
                             PREDETERMINADA
                           </span>
                         )}

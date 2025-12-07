@@ -23,7 +23,7 @@ def solicitar_rma(
     current_user = Depends(get_current_user)
 ):
     """Cliente crea una solicitud de devolución/cambio."""
-    return rma_service.crear_solicitud_rma(db, rma_in, current_user.id)
+    return rma_service.crear_solicitud_rma(db, rma_in, current_user)
 
 @router.get("/mis-solicitudes", response_model=List[RMAResponse])
 def ver_mis_rmas(

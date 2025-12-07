@@ -189,13 +189,13 @@ export default function CrearRMAPage() {
                 {previewUrl && (
                     <div className="relative w-20 h-20 border rounded-lg overflow-hidden shrink-0">
                         <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => { setEvidenceFile(null); setPreviewUrl(null); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl text-xs">✕</button>
+                        <button type="button" onClick={() => { setEvidenceFile(null); setPreviewUrl(null); }} className="absolute top-0 right-0 bg-red-500 !text-white p-0.5 rounded-bl text-xs">✕</button>
                     </div>
                 )}
             </div>
           </div>
 
-          <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+          <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 !text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
             {submitting ? "Enviando..." : "Enviar Solicitud"}
           </button>
         </form>

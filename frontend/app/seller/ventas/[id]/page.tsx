@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SellerMenu } from "@/components/SellerMenu";
+import { useToast } from "@/app/context/ToastContext";
 
 type VentaItem = {
   id: number;
@@ -41,6 +42,7 @@ type VentaDetail = {
   fecha_creacion: string;
   items: VentaItem[];
   pagos: PagoPOS[];
+  tiene_rma_activo?: boolean; // 🆕 Campo necesario para bloquear botón
 };
 
 type UserMe = {
@@ -67,6 +69,7 @@ export default function VentaDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
+  const { showToast } = useToast(); // 🆕 Usamos Toast
 
   const [venta, setVenta] = useState<VentaDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,9 +97,7 @@ export default function VentaDetailPage() {
         setUser(me);
 
         // Detalle venta
-        const data = (await apiFetch(
-          `/api/v1/pos/ventas/${id}`
-        )) as VentaDetail;
+        const data = (await apiFetch(`/api/v1/pos/ventas/${id}`)) as VentaDetail;
 
         if (!isMounted) return;
         setVenta(data);
@@ -106,9 +107,8 @@ export default function VentaDetailPage() {
           router.push("/login");
           return;
         }
-        setErrorMsg(
-          err?.message ?? "No se pudo cargar el detalle de la venta."
-        );
+        setErrorMsg(err?.message ?? "No se pudo cargar el detalle de la venta.");
+        showToast("Error cargando venta", "error"); // 🆕
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -118,7 +118,7 @@ export default function VentaDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, router]);
+  }, [id, router, showToast]);
 
   async function handleLogout() {
     try {
@@ -166,9 +166,9 @@ export default function VentaDetailPage() {
           </p>
         ) : (
           <>
-            {/* Encabezado + botón imprimir */}
+            {/* Encabezado + botón imprimir + botón RMA */}
             <section className="bg-white rounded-2xl border border-[#e5e7eb] p-4 shadow-sm space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h1 className="text-lg font-bold text-[#6b21a8]">
                     Venta #{venta.id}
@@ -187,8 +187,27 @@ export default function VentaDetailPage() {
                     })}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="space-y-1 text-right">
+
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                  
+                  {/* 🆕 BOTÓN DE RMA (DEVOLUCIÓN) */}
+                  {!venta.tiene_rma_activo ? (
+                      <button
+                        onClick={() => router.push(`/seller/ventas/${id}/rma`)}
+                        className="px-3 py-1.5 bg-indigo-600 !text-white rounded-lg hover:bg-indigo-700 text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
+                        Devolución / Cambio
+                      </button>
+                  ) : (
+                      <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium border border-yellow-200 flex items-center gap-1">
+                          ⚠️ Devolución en proceso
+                      </span>
+                  )}
+
+                  <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+
+                  <div className="flex flex-col items-end gap-1">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${venta.estado === "COMPLETADA"
                         ? "bg-green-50 text-green-700 border border-green-200"
@@ -197,28 +216,16 @@ export default function VentaDetailPage() {
                     >
                       {venta.estado}
                     </span>
-                    <p className="text-[11px] text-gray-600">
-                      Vendedor:{" "}
-                      <span className="font-semibold">
-                        {venta.vendedor_nombre}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-gray-600">
-                      Cliente:{" "}
-                      <span className="font-semibold">
-                        {venta.nombre_cliente_ticket || "Anónimo"}
-                      </span>
-                    </p>
+                    
+                    {/* Botón imprimir ticket */}
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[#e5e7eb] text-gray-700 hover:bg-gray-50 print:hidden"
+                    >
+                      🧾 Imprimir ticket
+                    </button>
                   </div>
-
-                  {/* Botón imprimir ticket */}
-                  <button
-                    type="button"
-                    onClick={handlePrint}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[#e5e7eb] text-gray-700 hover:bg-gray-50 print:hidden"
-                  >
-                    🧾 Imprimir ticket
-                  </button>
                 </div>
               </div>
             </section>

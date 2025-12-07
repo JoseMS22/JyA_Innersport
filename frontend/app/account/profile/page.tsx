@@ -155,7 +155,7 @@ export default function ProfilePage() {
             </p>
             <button
               onClick={() => router.push("/login")}
-              className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold rounded-xl"
+              className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold rounded-xl"
             >
               Iniciar sesión
             </button>
@@ -276,7 +276,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium px-4 py-2 text-sm disabled:opacity-60"
+                className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium px-4 py-2 text-sm disabled:opacity-60"
               >
                 {saving ? "Guardando..." : "Guardar cambios"}
               </button>

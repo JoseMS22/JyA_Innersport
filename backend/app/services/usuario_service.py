@@ -1,11 +1,12 @@
 # backend/app/services/usuario_service.py
 
+from operator import or_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.models.usuario import Usuario
 from app.models.direccion import Direccion
-from app.schemas.usuario import UserCreate, UserPublic, UserUpdate
+from app.schemas.usuario import UserCreate, UserPublic, UserUpdate, UserCreateAdmin, UserUpdateAdmin
 from app.schemas.auth import DeleteAccountSchema, LoginSchema
 from app.core.security import (
     get_password_hash,
@@ -701,3 +702,112 @@ def reset_password_with_token(db: Session, data: ResetPasswordRequest) -> dict:
         "message": "Contraseña restablecida correctamente. Por favor inicia sesión con tu nueva contraseña.",
         "usuario": usuario.correo,
     }
+
+def get_users_admin(
+    db: Session, 
+    skip: int = 0, 
+    limit: int = 10, 
+    rol: str = None, 
+    search: str = None
+):
+    """
+    Lista usuarios con paginación y filtros (Rol, Búsqueda por nombre/correo).
+    """
+    query = db.query(Usuario)
+
+    # Filtro por Rol
+    if rol:
+        query = query.filter(Usuario.rol == rol)
+
+    # Búsqueda (case insensitive)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Usuario.nombre.ilike(search_term),
+                Usuario.correo.ilike(search_term)
+            )
+        )
+
+    total = query.count()
+    users = query.order_by(Usuario.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {"total": total, "items": users}
+
+def get_user_by_id(db: Session, user_id: int) -> Usuario:
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+    return user
+
+def create_user_admin(db: Session, user_in: UserCreateAdmin) -> Usuario:
+    """
+    Crea un usuario desde el panel admin.
+    - No envía correo de verificación (se asume verificado o se gestiona manual).
+    - Permite definir el rol.
+    """
+    # 1. Validar contraseñas
+    if user_in.password != user_in.confirm_password:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
+
+    # 2. Validar correo único
+    if db.query(Usuario).filter(Usuario.correo == user_in.correo).first():
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+
+    # 3. Validar política (opcional, recomendado)
+    validate_password_policy(user_in.password)
+
+    # 4. Crear
+    hashed_pw = get_password_hash(user_in.password)
+    
+    db_user = Usuario(
+        nombre=user_in.nombre,
+        correo=user_in.correo,
+        contrasena_hash=hashed_pw,
+        rol=user_in.rol,
+        activo=user_in.activo,
+        telefono=user_in.telefono,
+        email_verificado=True, # Admin crea usuarios ya verificados
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
+    )
+    
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def update_user_admin(db: Session, user_id: int, user_in: UserUpdateAdmin) -> Usuario:
+    """
+    Actualiza cualquier campo del usuario.
+    """
+    user = get_user_by_id(db, user_id)
+
+    # Validar correo único si se cambia
+    if user_in.correo and user_in.correo != user.correo:
+        if db.query(Usuario).filter(Usuario.correo == user_in.correo).first():
+            raise HTTPException(status_code=400, detail="El correo ya está en uso")
+        user.correo = user_in.correo
+
+    if user_in.nombre:
+        user.nombre = user_in.nombre
+    if user_in.telefono:
+        user.telefono = user_in.telefono
+    if user_in.rol:
+        user.rol = user_in.rol
+    if user_in.activo is not None:
+        user.activo = user_in.activo
+    
+    # Cambio de contraseña manual
+    if user_in.password:
+        validate_password_policy(user_in.password)
+        user.contrasena_hash = get_password_hash(user_in.password)
+
+    user.updated_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    db.refresh(user)
+    return user

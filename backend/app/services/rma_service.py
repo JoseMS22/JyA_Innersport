@@ -5,18 +5,23 @@ from app.models.rma import RMA, RMAItem, RMAEstado
 from app.models.pedido import Pedido
 from app.models.pedido_item import PedidoItem
 from app.schemas.rma import RMACreate, RMAUpdate
+from app.models.usuario import Usuario
 from app.services.inventario import ajustar_inventario # 🆕 Importar servicio inventario
 from app.core.email import send_rma_update_email     # 🆕 Importar servicio email
 
-def crear_solicitud_rma(db: Session, rma_in: RMACreate, user_id: int):
+def crear_solicitud_rma(db: Session, rma_in: RMACreate, usuario_actual: Usuario):
     # 1. Validar Pedido
     pedido = db.query(Pedido).filter(Pedido.id == rma_in.pedido_id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    # 2. Validar Propiedad
-    if pedido.cliente_id != user_id:
+    es_dueno = pedido.cliente_id == usuario_actual.id
+    es_staff = usuario_actual.rol in ["ADMIN", "VENDEDOR"]
+
+    # 2. Validar Permisos
+    if not (es_dueno or es_staff):
         raise HTTPException(status_code=403, detail="No tienes permiso sobre este pedido")
+
     
     # 3. Validar Estado del Pedido (Opcional: Solo permitir si fue entregado)
     if pedido.estado != "ENTREGADO":
@@ -28,7 +33,7 @@ def crear_solicitud_rma(db: Session, rma_in: RMACreate, user_id: int):
     # 4. Crear RMA Cabecera
     db_rma = RMA(
         pedido_id=rma_in.pedido_id,
-        usuario_id=user_id,
+        usuario_id=usuario_actual.id, 
         tipo=rma_in.tipo,
         motivo=rma_in.motivo,
         estado=RMAEstado.SOLICITADO,

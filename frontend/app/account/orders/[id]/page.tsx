@@ -326,7 +326,7 @@ export default function OrderDetailPage() {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  className="w-full px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                 >
                   Cancelar Pedido
                 </button>
@@ -442,7 +442,7 @@ export default function OrderDetailPage() {
               <button
                 onClick={handleCancelar}
                 disabled={canceling || !cancelReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {canceling ? "Cancelando..." : "Cancelar Pedido"}
               </button>

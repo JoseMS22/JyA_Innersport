@@ -49,6 +49,9 @@ from app.api.v1.rma import router as rma_router
 # S
 from app.api.v1.pos import router as pos_router
 
+# 🆕 IMPORTAR ROUTER USUARIO
+from app.api.v1.usuario import router as usuarios_router
+
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -197,6 +200,9 @@ app.include_router(pos_router, prefix="/api/v1/pos", tags=["Pos"])
 
 # 🆕 US-RF41/42/43: RMA (Devoluciones)
 app.include_router(rma_router, prefix="/api/v1/rma", tags=["RMA"])
+
+# 🆕 US-ADMIN: Gestión de usuario
+app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["Gestión de Usuarios"])
 
 
 # =========================
