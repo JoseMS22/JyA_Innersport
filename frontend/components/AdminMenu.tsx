@@ -27,8 +27,12 @@ const links = [
   { href: "/admin/home-hero", label: "Portada" },
   { href: "/admin/programa-puntos", label: "Programa de puntos" },
   { href: "/admin/pedidos", label: "Pedidos" },
+
   { href: "/admin/rma", label: "Devoluciones (RMA)" },
   { href: "/admin/usuarios", label: "Usuarios" },
+
+  { href: "/admin/pos/ventas", label: "Ventas POS" },
+
 ];
 
 export function AdminMenu({ user, onLogout }: Props) {

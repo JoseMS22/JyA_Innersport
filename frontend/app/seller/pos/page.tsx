@@ -18,8 +18,6 @@ function buildMediaUrl(url?: string | null) {
   return `${API_BASE_URL}${url}`;
 }
 
-
-
 type CajaTurno = {
   id: number;
   usuario_id: number;
@@ -71,13 +69,30 @@ type POSProducto = {
   talla?: string | null;
 };
 
+// Cliente que viene de /pos/clientes/buscar
+type POSClienteSearchItem = {
+  id: number;
+  nombre: string;
+  correo: string;
+  telefono?: string | null;
+  puntos_actuales: number;
+};
+
+// Cliente creado desde /pos/clientes
+type POSClientePublic = {
+  id: number;
+  nombre: string;
+  correo: string;
+  telefono?: string | null;
+};
+
 // Ítem en el carrito listo para enviar al backend
 type CartItem = {
   id: string; // usamos variante_id como string
   variante_id: number;
   producto_id: number;
   nombre: string;
-  precio: number;
+  precio: number; // SIN IVA
   cantidad: number;
   stock: number;
 };
@@ -86,14 +101,12 @@ const IVA_RATE = 0.13;
 const FACTOR_IVA = 1 + IVA_RATE;
 
 function precioBaseDesdeConIVA(precioConIVA: number) {
-  // redondeamos a 2 decimales para que no queden números larguísimos
   return Math.round((precioConIVA / FACTOR_IVA) * 100) / 100;
 }
 
 function precioConIVADesdeBase(base: number) {
   return Math.round(base * FACTOR_IVA * 100) / 100;
 }
-
 
 const currency = new Intl.NumberFormat("es-CR", {
   style: "currency",
@@ -111,7 +124,8 @@ export default function SellerPOSPage() {
   const [userMenu, setUserMenu] = useState<UserMeForMenu | null>(null);
 
   // Sucursal seleccionada para vender
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
+  const [sucursalSeleccionada, setSucursalSeleccionada] =
+    useState<number | null>(null);
 
   // Caja
   const [caja, setCaja] = useState<CajaTurno | null>(null);
@@ -138,28 +152,50 @@ export default function SellerPOSPage() {
   const [pagoLoading, setPagoLoading] = useState(false);
   const [pagoError, setPagoError] = useState<string | null>(null);
 
+  // Cliente para el POS (búsqueda / selección / creación)
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteResultados, setClienteResultados] = useState<
+    POSClienteSearchItem[]
+  >([]);
+  const [clienteLoading, setClienteLoading] = useState(false);
+  const [clienteError, setClienteError] = useState<string | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] =
+    useState<POSClienteSearchItem | null>(null);
+
+  const [showCreateCliente, setShowCreateCliente] = useState(false);
+  const [clienteNuevoNombre, setClienteNuevoNombre] = useState("");
+  const [clienteNuevoCorreo, setClienteNuevoCorreo] = useState("");
+  const [clienteNuevoTelefono, setClienteNuevoTelefono] = useState("");
+  const [clienteNuevoPassword, setClienteNuevoPassword] = useState("");
+  const [clienteNuevoPassword2, setClienteNuevoPassword2] = useState("");
+  const [clienteCreateLoading, setClienteCreateLoading] = useState(false);
+  const [clienteCreateError, setClienteCreateError] = useState<string | null>(
+    null
+  );
+  const [clienteCreateSuccess, setClienteCreateSuccess] = useState<
+    string | null
+  >(null);
+
   const tieneCajaAbierta = caja?.estado === "ABIERTA";
 
-  const [productoPreview, setProductoPreview] = useState<POSProducto | null>(null);
+  const [productoPreview, setProductoPreview] = useState<POSProducto | null>(
+    null
+  );
 
   const subtotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.precio * item.cantidad, 0),
     [cartItems]
   );
 
-  // IVA redondeado a 2 decimales, igual que el backend
   const impuesto = useMemo(
     () => Math.round(subtotal * IVA_RATE * 100) / 100,
     [subtotal]
   );
 
-  // Total también redondeado a 2 decimales
   const totalConImpuesto = useMemo(
     () => Math.round((subtotal + impuesto) * 100) / 100,
     [subtotal, impuesto]
   );
-
-
 
   const totalItems = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.cantidad, 0),
@@ -188,7 +224,6 @@ export default function SellerPOSPage() {
           rol: data.rol,
         });
 
-        // Sucursal por defecto: primera disponible
         if (data.sucursales && data.sucursales.length > 0) {
           setSucursalSeleccionada(data.sucursales[0].id);
         } else {
@@ -218,7 +253,6 @@ export default function SellerPOSPage() {
     try {
       await apiFetch("/api/v1/auth/logout", { method: "POST" });
     } catch {
-      // ignoramos error
     } finally {
       router.push("/login");
     }
@@ -270,8 +304,8 @@ export default function SellerPOSPage() {
 
   // Carrito
   function handleAddToCart(product: POSProducto) {
-    const precioConIVA = Number(product.precio);          // lo que viene del backend
-    const precioBase = precioBaseDesdeConIVA(precioConIVA); // lo convertimos a SIN IVA
+    const precioConIVA = Number(product.precio);
+    const precioBase = precioBaseDesdeConIVA(precioConIVA);
 
     setCartItems((prev) => {
       const id = String(product.variante_id);
@@ -284,7 +318,9 @@ export default function SellerPOSPage() {
 
       if (existing) {
         if (existing.cantidad >= product.stock) {
-          alert("No puedes agregar más unidades, ya alcanzaste el stock disponible.");
+          alert(
+            "No puedes agregar más unidades, ya alcanzaste el stock disponible."
+          );
           return prev;
         }
 
@@ -300,15 +336,13 @@ export default function SellerPOSPage() {
           variante_id: product.variante_id,
           producto_id: product.producto_id,
           nombre: product.nombre,
-          precio: precioBase,   // ✅ ahora precio en el carrito es SIN IVA
+          precio: precioBase,
           cantidad: 1,
           stock: product.stock,
         },
       ];
     });
   }
-
-
 
   function handleChangeQuantity(id: string, delta: number) {
     setCartItems((prev) =>
@@ -318,12 +352,10 @@ export default function SellerPOSPage() {
 
           let nuevaCantidad = item.cantidad + delta;
 
-          // Si baja a 0 o menos, se eliminará luego con el filter
           if (nuevaCantidad <= 0) {
             return { ...item, cantidad: 0 };
           }
 
-          // No pasar del stock
           if (nuevaCantidad > item.stock) {
             alert("No hay más stock disponible de esta variante.");
             return item;
@@ -334,7 +366,6 @@ export default function SellerPOSPage() {
         .filter((item) => item.cantidad > 0)
     );
   }
-
 
   function handleRemoveItem(id: string) {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
@@ -422,7 +453,108 @@ export default function SellerPOSPage() {
     }
   }
 
-  // Cobro REAL conectado al backend
+  // ===== Cliente POS: buscar (sin <form> interno) =====
+  async function handleBuscarCliente() {
+    setClienteError(null);
+    setClienteResultados([]);
+
+    const termino = clienteSearch.trim();
+    if (!termino) {
+      setClienteError("Escribe al menos parte del correo para buscar.");
+      return;
+    }
+
+    try {
+      setClienteLoading(true);
+      const data = (await apiFetch(
+        `/api/v1/pos/clientes/buscar?correo=${encodeURIComponent(termino)}`
+      )) as POSClienteSearchItem[];
+      setClienteResultados(data);
+      if (data.length === 0) {
+        setClienteError("No se encontraron clientes con ese correo.");
+      }
+    } catch (err: any) {
+      setClienteError(
+        err?.message ?? "No se pudo buscar clientes. Inténtalo de nuevo."
+      );
+    } finally {
+      setClienteLoading(false);
+    }
+  }
+
+  function handleSeleccionarCliente(c: POSClienteSearchItem) {
+    setClienteSeleccionado(c);
+    setPagoNombreCliente(c.nombre);
+    setPagoPuntos("");
+    setClienteResultados([]);
+    setClienteError(null);
+  }
+
+  function handleLimpiarCliente() {
+    setClienteSeleccionado(null);
+    setPagoNombreCliente("");
+    setPagoPuntos("");
+    setClienteResultados([]);
+    setClienteError(null);
+  }
+
+  // ===== Cliente POS: crear rápido (sin <form> interno) =====
+  async function handleCrearClientePOS() {
+    setClienteCreateError(null);
+    setClienteCreateSuccess(null);
+
+    if (!clienteNuevoNombre.trim() || !clienteNuevoCorreo.trim()) {
+      setClienteCreateError("Nombre y correo son obligatorios.");
+      return;
+    }
+    if (!clienteNuevoPassword || !clienteNuevoPassword2) {
+      setClienteCreateError("Debes indicar y confirmar la contraseña.");
+      return;
+    }
+
+    try {
+      setClienteCreateLoading(true);
+
+      const body = {
+        nombre: clienteNuevoNombre.trim(),
+        correo: clienteNuevoCorreo.trim(),
+        telefono: clienteNuevoTelefono.trim() || null,
+        password: clienteNuevoPassword,
+        confirm_password: clienteNuevoPassword2,
+      };
+
+      const nuevo = (await apiFetch("/api/v1/pos/clientes", {
+        method: "POST",
+        body: JSON.stringify(body),
+      })) as POSClientePublic;
+
+      setClienteCreateSuccess("Cliente creado correctamente.");
+      setClienteSeleccionado({
+        id: nuevo.id,
+        nombre: nuevo.nombre,
+        correo: nuevo.correo,
+        telefono: nuevo.telefono ?? undefined,
+        puntos_actuales: 0,
+      });
+      setPagoNombreCliente(nuevo.nombre);
+      setPagoPuntos("");
+
+      setClienteNuevoNombre("");
+      setClienteNuevoCorreo("");
+      setClienteNuevoTelefono("");
+      setClienteNuevoPassword("");
+      setClienteNuevoPassword2("");
+      setShowCreateCliente(false);
+    } catch (err: any) {
+      setClienteCreateError(
+        err?.message ?? "No se pudo crear el cliente. Revisa los datos."
+      );
+    } finally {
+      setClienteCreateLoading(false);
+    }
+  }
+
+  // Cobro REAL
   async function handleConfirmarPago(e: React.FormEvent) {
     e.preventDefault();
     if (cartItems.length === 0) return;
@@ -437,9 +569,14 @@ export default function SellerPOSPage() {
     try {
       const total = totalConImpuesto;
 
-
       if (total <= 0) {
         setPagoError("El total debe ser mayor a cero.");
+        setPagoLoading(false);
+        return;
+      }
+
+      if (pagoMetodo === "EFECTIVO" && !tieneCajaAbierta) {
+        setPagoError("Debes tener una caja ABIERTA para cobrar en efectivo.");
         setPagoLoading(false);
         return;
       }
@@ -451,18 +588,29 @@ export default function SellerPOSPage() {
         return;
       }
 
-      // Construir payload para POSVentaCreate del backend
+      const esVentaConCliente = !!clienteSeleccionado;
+
+      if (puntosNumber > 0 && !esVentaConCliente) {
+        setPagoError(
+          "Para usar puntos debes seleccionar un cliente. La venta de mostrador no admite puntos."
+        );
+        setPagoLoading(false);
+        return;
+      }
+
       const body = {
         sucursal_id: sucursalSeleccionada,
-        cliente_id: null,
-        usar_cliente_mostrador: true,
-        nombre_cliente: pagoNombreCliente || "Anónimo",
-        puntos_a_usar: puntosNumber,
+        cliente_id: esVentaConCliente ? clienteSeleccionado!.id : null,
+        usar_cliente_mostrador: !esVentaConCliente,
+        nombre_cliente:
+          pagoNombreCliente ||
+          (esVentaConCliente ? clienteSeleccionado!.nombre : "Anónimo"),
+        puntos_a_usar: esVentaConCliente ? puntosNumber : 0,
         items: cartItems.map((item) => ({
           producto_id: item.producto_id,
           variante_id: item.variante_id,
           cantidad: item.cantidad,
-          precio_unitario: Number(item.precio.toFixed(2)), // opcional, pero sano
+          precio_unitario: Number(item.precio.toFixed(2)),
         })),
         pagos: [
           {
@@ -477,14 +625,16 @@ export default function SellerPOSPage() {
         body: JSON.stringify(body),
       });
 
-      // Limpieza UI
       setCartItems([]);
       setPagoNombreCliente("");
       setPagoPuntos("");
       setPagoMetodo("EFECTIVO");
       setPagoModalOpen(false);
+      setClienteSeleccionado(null);
+      setClienteResultados([]);
+      setClienteSearch("");
+      setClienteError(null);
 
-      // Ir al detalle de la venta POS
       if (venta && (venta as any).id) {
         router.push(`/seller/ventas/${(venta as any).id}`);
       } else {
@@ -530,7 +680,8 @@ export default function SellerPOSPage() {
     );
   }
 
-  const noTieneSucursales = !config.sucursales || config.sucursales.length === 0;
+  const noTieneSucursales =
+    !config.sucursales || config.sucursales.length === 0;
 
   return (
     <div className="min-h-screen bg-[#fdf6e3] flex flex-col">
@@ -542,7 +693,6 @@ export default function SellerPOSPage() {
         <section className="flex-1 flex flex-col gap-3">
           {/* Barra de búsqueda + sucursal */}
           <div className="bg-white rounded-2xl border border-[#e5e7eb] px-4 py-3 shadow-sm flex flex-col gap-3">
-            {/* Sucursal */}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="w-full sm:w-64">
                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">
@@ -629,8 +779,10 @@ export default function SellerPOSPage() {
                 {productos.map((p) => {
                   const imagen = buildMediaUrl(p.imagen_url);
 
-                  const precioConIVA = Number(p.precio);                   // viene del backend
+                  const precioConIVA = Number(p.precio);
                   const precioBase = precioBaseDesdeConIVA(precioConIVA);
+                  const precioReconstruido = precioConIVADesdeBase(precioBase);
+
                   return (
                     <div
                       key={p.variante_id}
@@ -650,13 +802,15 @@ export default function SellerPOSPage() {
                         <p className="text-xs font-semibold text-gray-800 line-clamp-2">
                           {p.nombre}
                         </p>
-                        <p className="mt-1 text-[11px] text-gray-500">SKU: {p.sku}</p>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          SKU: {p.sku}
+                        </p>
                         <p className="mt-1 text-[11px] text-gray-500">
                           Stock: {p.stock} unidades
                         </p>
 
                         <p className="mt-1 text-[11px] text-gray-800 font-semibold">
-                          {currency.format(precioConIVA)} IVA incluido
+                          {currency.format(precioReconstruido)} IVA incluido
                         </p>
 
                         {(p.color || p.talla) && (
@@ -687,7 +841,6 @@ export default function SellerPOSPage() {
                   );
                 })}
               </div>
-
             )}
           </div>
         </section>
@@ -714,12 +867,14 @@ export default function SellerPOSPage() {
                 {caja?.monto_teorico_cierre && (
                   <p>
                     <span className="font-semibold">Teórico:</span>{" "}
-                    {currency.format(Number(caja.monto_teorico_cierre ?? 0))}
+                    {currency.format(
+                      Number(caja.monto_teorico_cierre ?? 0)
+                    )}
                   </p>
                 )}
                 <p className="mt-1 text-[10px] text-gray-500">
-                  Al cerrar caja se calculará el monto teórico según las
-                  ventas en efectivo y otros movimientos de caja.
+                  Al cerrar caja se calculará el monto teórico según las ventas
+                  en efectivo y otros movimientos de caja.
                 </p>
 
                 <button
@@ -782,7 +937,10 @@ export default function SellerPOSPage() {
                 </p>
               ) : (
                 cartItems.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 last:border-b-0" >
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 last:border-b-0"
+                  >
                     <div>
                       <p className="font-semibold text-gray-800">
                         {item.nombre}
@@ -799,22 +957,39 @@ export default function SellerPOSPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => handleChangeQuantity(item.id, -1)} className="w-6 h-6 rounded-full border border-[#e5e7eb] flex items-center justify-center text-xs hover:bg-gray-50" >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleChangeQuantity(item.id, -1)
+                          }
+                          className="w-6 h-6 rounded-full border border-[#e5e7eb] flex items-center justify-center text-xs hover:bg-gray-50"
+                        >
                           -
                         </button>
                         <span className="w-6 text-center text-xs font-semibold">
                           {item.cantidad}
                         </span>
-                        <button type="button" onClick={() => handleChangeQuantity(item.id, +1)} className="w-6 h-6 rounded-full border border-[#e5e7eb] flex items-center justify-center text-xs hover:bg-gray-50" >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleChangeQuantity(item.id, +1)
+                          }
+                          className="w-6 h-6 rounded-full border border-[#e5e7eb] flex items-center justify-center text-xs hover:bg-gray-50"
+                        >
                           +
                         </button>
                       </div>
-                      <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-[10px] text-gray-400 hover:text-red-500" >
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-[10px] text-gray-400 hover:text-red-500"
+                      >
                         Quitar
                       </button>
                     </div>
                   </div>
-                )))}
+                ))
+              )}
             </div>
 
             <div className="pt-3 mt-3 border-t border-gray-200 space-y-1 text-xs">
@@ -847,14 +1022,9 @@ export default function SellerPOSPage() {
 
               <button
                 type="button"
-                disabled={
-                  cartItems.length === 0 ||
-                  !tieneCajaAbierta ||
-                  !sucursalSeleccionada
-                }
+                disabled={cartItems.length === 0 || !sucursalSeleccionada}
                 className="w-full mt-2 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
-                  if (!tieneCajaAbierta) return;
                   if (cartItems.length === 0) return;
                   if (!sucursalSeleccionada) return;
                   setPagoError(null);
@@ -886,12 +1056,18 @@ export default function SellerPOSPage() {
                 className="w-full rounded-lg mb-3"
               />
             )}
-            <p className="text-xs text-gray-600 mb-1">SKU: {productoPreview.sku}</p>
+            <p className="text-xs text-gray-600 mb-1">
+              SKU: {productoPreview.sku}
+            </p>
             {productoPreview.color && (
-              <p className="text-xs text-gray-600 mb-1">Color: {productoPreview.color}</p>
+              <p className="text-xs text-gray-600 mb-1">
+                Color: {productoPreview.color}
+              </p>
             )}
             {productoPreview.talla && (
-              <p className="text-xs text-gray-600 mb-1">Talla: {productoPreview.talla}</p>
+              <p className="text-xs text-gray-600 mb-1">
+                Talla: {productoPreview.talla}
+              </p>
             )}
             <p className="text-sm font-semibold text-[#6b21a8] mt-2">
               {currency.format(Number(productoPreview.precio))}
@@ -919,7 +1095,6 @@ export default function SellerPOSPage() {
         </div>
       )}
 
-
       {/* MODAL COBRO */}
       {pagoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -934,7 +1109,8 @@ export default function SellerPOSPage() {
             </h2>
             <p className="text-xs text-gray-500 mb-4">
               Revisa el total, elige el método de pago y, si quieres, asigna un
-              nombre para el cliente en el ticket. El cliente no es obligatorio.
+              nombre para el cliente en el ticket. Puedes hacer ventas de
+              mostrador o vincular un cliente para usar puntos.
             </p>
 
             <form className="space-y-4" onSubmit={handleConfirmarPago}>
@@ -944,7 +1120,6 @@ export default function SellerPOSPage() {
                   <span className="font-semibold text-[#6b21a8]">
                     {currency.format(totalConImpuesto)}
                   </span>
-
                 </div>
               </div>
 
@@ -974,12 +1149,229 @@ export default function SellerPOSPage() {
                     }
                   )}
                 </div>
+                {pagoMetodo === "EFECTIVO" && !tieneCajaAbierta && (
+                  <p className="mt-1 text-[10px] text-red-600">
+                    Recuerda: para cobrar en efectivo debes tener una caja
+                    ABIERTA.
+                  </p>
+                )}
               </div>
 
-              {/* Cliente */}
+              {/* Cliente: búsqueda y selección */}
+              <div className="border border-[#e5e7eb] rounded-lg p-3 space-y-2">
+                <p className="text-xs font-semibold text-gray-700">
+                  Cliente (opcional)
+                </p>
+
+                {clienteSeleccionado ? (
+                  <div className="flex items-start justify-between gap-2 bg-[#f9fafb] border border-[#e5e7eb] rounded-lg px-2 py-2">
+                    <div className="text-[11px]">
+                      <p className="font-semibold text-gray-800">
+                        {clienteSeleccionado.nombre}
+                      </p>
+                      <p className="text-gray-600">
+                        {clienteSeleccionado.correo}
+                      </p>
+                      {clienteSeleccionado.telefono && (
+                        <p className="text-gray-500">
+                          Tel: {clienteSeleccionado.telefono}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[10px] text-emerald-700">
+                        Puntos actuales:{" "}
+                        <span className="font-semibold">
+                          {clienteSeleccionado.puntos_actuales}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-[10px] text-gray-500 hover:text-red-600"
+                      onClick={handleLimpiarCliente}
+                      disabled={pagoLoading}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="email"
+                        placeholder="Buscar por correo..."
+                        className="flex-1 rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-xs outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]/40"
+                        value={clienteSearch}
+                        onChange={(e) =>
+                          setClienteSearch(e.target.value)
+                        }
+                        disabled={clienteLoading || pagoLoading}
+                      />
+                      <button
+                        type="submit"
+                        disabled={clienteLoading || pagoLoading}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium 
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             hover:bg-[#ede9fe]
+             disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {clienteLoading ? "Buscando..." : "Buscar"}
+                      </button>
+
+                    </div>
+
+                    {clienteResultados.length > 0 && (
+                      <div className="mt-2 max-h-40 overflow-auto border border-[#e5e7eb] rounded-lg">
+                        {clienteResultados.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-[#f9fafb] border-b border-[#f1f5f9] last:border-b-0"
+                            onClick={() => handleSeleccionarCliente(c)}
+                            disabled={pagoLoading}
+                          >
+                            <p className="font-semibold text-gray-800">
+                              {c.nombre}
+                            </p>
+                            <p className="text-gray-600">{c.correo}</p>
+                            <p className="text-[10px] text-gray-500">
+                              Puntos: {c.puntos_actuales}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {clienteError && (
+                      <p className="text-[10px] text-red-600">
+                        {clienteError}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {/* Toggle para crear cliente rápido */}
+                <button
+                  type="button"
+                  className="mt-1 text-[11px] text-[#6b21a8] underline"
+                  onClick={() =>
+                    setShowCreateCliente((prev) => !prev)
+                  }
+                  disabled={pagoLoading}
+                >
+                  {showCreateCliente
+                    ? "Ocultar creación rápida"
+                    : "Crear nuevo cliente desde POS"}
+                </button>
+
+                {showCreateCliente && (
+                  <div className="mt-2 space-y-2 border-t border-[#e5e7eb] pt-2">
+                    <div className="grid grid-cols-1 gap-2 text-[11px]">
+                      <div>
+                        <label className="block mb-1">
+                          Nombre completo
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
+                          value={clienteNuevoNombre}
+                          onChange={(e) =>
+                            setClienteNuevoNombre(e.target.value)
+                          }
+                          disabled={clienteCreateLoading || pagoLoading}
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1">Correo</label>
+                        <input
+                          type="email"
+                          className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
+                          value={clienteNuevoCorreo}
+                          onChange={(e) =>
+                            setClienteNuevoCorreo(e.target.value)
+                          }
+                          disabled={clienteCreateLoading || pagoLoading}
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1">
+                          Teléfono (opcional)
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
+                          value={clienteNuevoTelefono}
+                          onChange={(e) =>
+                            setClienteNuevoTelefono(e.target.value)
+                          }
+                          disabled={clienteCreateLoading || pagoLoading}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block mb-1">
+                            Contraseña
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
+                            value={clienteNuevoPassword}
+                            onChange={(e) =>
+                              setClienteNuevoPassword(e.target.value)
+                            }
+                            disabled={clienteCreateLoading || pagoLoading}
+                          />
+                        </div>
+                        <div>
+                          <label className="block mb-1">
+                            Confirmar
+                          </label>
+                          <input
+                            type="password"
+                            className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
+                            value={clienteNuevoPassword2}
+                            onChange={(e) =>
+                              setClienteNuevoPassword2(e.target.value)
+                            }
+                            disabled={clienteCreateLoading || pagoLoading}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {clienteCreateError && (
+                      <p className="text-[10px] text-red-600">
+                        {clienteCreateError}
+                      </p>
+                    )}
+                    {clienteCreateSuccess && (
+                      <p className="text-[10px] text-emerald-700">
+                        {clienteCreateSuccess}
+                      </p>
+                    )}
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={clienteCreateLoading || pagoLoading}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             hover:bg-[#ede9fe]
+             disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {clienteCreateLoading
+                          ? "Creando..."
+                          : "Crear cliente"}
+                      </button>
+
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Nombre que va en el ticket */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Nombre del cliente (opcional)
+                  Nombre del cliente en el ticket
                 </label>
                 <input
                   type="text"
@@ -1003,8 +1395,13 @@ export default function SellerPOSPage() {
                   placeholder="Ej: 150"
                   value={pagoPuntos}
                   onChange={(e) => setPagoPuntos(e.target.value)}
-                  disabled={pagoLoading}
+                  disabled={pagoLoading || !clienteSeleccionado}
                 />
+                {!clienteSeleccionado && (
+                  <p className="mt-1 text-[10px] text-gray-500">
+                    Para usar puntos primero selecciona o crea un cliente.
+                  </p>
+                )}
               </div>
 
               {pagoError && (
