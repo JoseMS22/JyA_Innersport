@@ -45,7 +45,7 @@ export default function LoginPage() {
 
       // 3) Redirección según rol
       if (me.rol === "ADMIN") {
-        router.push("/admin");
+        router.push("/admin/dashboard");
       } else if (me.rol === "VENDEDOR") {
         router.push("/seller");
       } else {

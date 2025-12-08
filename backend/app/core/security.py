@@ -83,17 +83,26 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> Usuario:
     """
-    Obtiene el usuario actual a partir del token almacenado en la cookie 'access_token'.
+    Obtiene el usuario actual a partir del token almacenado en:
+    1. Cookie 'access_token' (prioridad)
+    2. Header 'Authorization: Bearer {token}' (fallback)
+    
     Bloquea:
     - usuarios inactivos
     - usuarios en proceso de eliminación (US-04)
     - tokens inválidos
     """
 
-    # 1) Verificar que existe el token en cookie
+    # 1) Intentar obtener token de cookie primero
     token = request.cookies.get("access_token")
     
-    # 🔹 DEBUG: Imprimir todas las cookies recibidas
+    # 2) Si no hay cookie, intentar desde header Authorization
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+    
+    # 🔹 DEBUG: Imprimir cookies y token
     print(f"[DEBUG] Cookies recibidas: {request.cookies}")
     print(f"[DEBUG] Token extraído: {token}")
     
@@ -104,7 +113,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 2) Decodificar token
+    # 3) Decodificar token
     payload = _decode_token(token)
     sub = payload.get("sub")
 
@@ -114,7 +123,7 @@ def get_current_user(
             detail="Token sin identificador de usuario.",
         )
 
-    # 3) Cargar usuario desde la base de datos
+    # 4) Cargar usuario desde la base de datos
     try:
         user_id = int(sub)
     except (ValueError, TypeError):
@@ -130,14 +139,14 @@ def get_current_user(
             detail="Usuario no encontrado.",
         )
 
-    # 4) Bloqueo por inactividad
+    # 5) Bloqueo por inactividad
     if not user.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu cuenta está desactivada.",
         )
 
-    # 5) Bloqueo para US-04 (pendiente de eliminación)
+    # 6) Bloqueo para US-04 (pendiente de eliminación)
     if getattr(user, "pendiente_eliminacion", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

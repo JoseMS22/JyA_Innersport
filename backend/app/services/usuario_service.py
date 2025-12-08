@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.models.usuario import Usuario
+from app.models.usuario_sucursal import UsuarioSucursal
 from app.models.direccion import Direccion
-from app.schemas.usuario import UserCreate, UserPublic, UserUpdate, UserCreateAdmin, UserUpdateAdmin
+from app.schemas.usuario import UserCreate, UserPublic, UserUpdate, UserCreateAdmin, UserUpdateAdmin, SucursalMini
 from app.schemas.auth import DeleteAccountSchema, LoginSchema
 from app.core.security import (
     get_password_hash,
@@ -396,10 +397,10 @@ def reset_password_with_token(db: Session, data: ResetPasswordRequest) -> dict:
 # ==========================================
 
 def get_users_admin(
-    db: Session, 
-    skip: int = 0, 
-    limit: int = 10, 
-    rol: str = None, 
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    rol: str = None,
     search: str = None
 ):
     query = db.query(Usuario)
@@ -419,7 +420,25 @@ def get_users_admin(
     total = query.count()
     users = query.order_by(Usuario.created_at.desc()).offset(skip).limit(limit).all()
 
-    return {"total": total, "items": users}
+    # 🆕 mapear manualmente a UserPublic para incluir sucursales
+    items: list[UserPublic] = []
+
+    for u in users:
+        user_public = UserPublic.model_validate(u, from_attributes=True)
+
+        # sucursales_asignadas viene del backref en UsuarioSucursal
+        sucursales: list[SucursalMini] = []
+        for us in getattr(u, "sucursales_asignadas", []):
+            if us.sucursal:
+                sucursales.append(
+                    SucursalMini.model_validate(us.sucursal, from_attributes=True)
+                )
+
+        user_public.sucursales = sucursales
+        items.append(user_public)
+
+    return {"total": total, "items": items}
+
 
 def get_user_by_id(db: Session, user_id: int) -> Usuario:
     user = db.query(Usuario).filter(Usuario.id == user_id).first()
@@ -452,8 +471,21 @@ def create_user_admin(db: Session, user_in: UserCreateAdmin) -> Usuario:
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc)
     )
-    
+
     db.add(db_user)
+    db.flush()  # 🆕 para tener db_user.id antes del commit
+
+    # 🆕 asignar sucursales si es vendedor
+    if db_user.rol == "VENDEDOR" and user_in.sucursales_ids:
+        for sucursal_id in user_in.sucursales_ids:
+            db.add(
+                UsuarioSucursal(
+                    usuario_id=db_user.id,
+                    sucursal_id=sucursal_id,
+                    puede_vender=True,
+                )
+            )
+    
     db.commit()
     db.refresh(db_user)
     return db_user
@@ -466,11 +498,11 @@ def update_user_admin(db: Session, user_id: int, user_in: UserUpdateAdmin) -> Us
             raise HTTPException(status_code=400, detail="El correo ya está en uso")
         user.correo = user_in.correo
 
-    if user_in.nombre:
+    if user_in.nombre is not None:
         user.nombre = user_in.nombre
-    if user_in.telefono:
+    if user_in.telefono is not None:
         user.telefono = user_in.telefono
-    if user_in.rol:
+    if user_in.rol is not None:
         user.rol = user_in.rol
     if user_in.activo is not None:
         user.activo = user_in.activo
@@ -479,11 +511,31 @@ def update_user_admin(db: Session, user_id: int, user_in: UserUpdateAdmin) -> Us
         validate_password_policy(user_in.password)
         user.contrasena_hash = get_password_hash(user_in.password)
 
+    # 🆕 actualizar sucursales si vienen en el payload
+    if user_in.sucursales_ids is not None:
+        # borrar asignaciones anteriores
+        db.query(UsuarioSucursal).filter(
+            UsuarioSucursal.usuario_id == user.id
+        ).delete()
+
+        # solo tiene sentido si el rol del usuario es VENDEDOR
+        rol_efectivo = user_in.rol if user_in.rol is not None else user.rol
+        if rol_efectivo == "VENDEDOR":
+            for sucursal_id in user_in.sucursales_ids:
+                db.add(
+                    UsuarioSucursal(
+                        usuario_id=user.id,
+                        sucursal_id=sucursal_id,
+                        puede_vender=True,
+                    )
+                )
+
     user.updated_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(user)
     return user
+
 
 
 # ==========================================

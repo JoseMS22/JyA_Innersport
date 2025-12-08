@@ -29,6 +29,13 @@ class DireccionPublic(DireccionBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class SucursalMini(BaseModel):
+    id: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 
 # =========================
 # USUARIO
@@ -72,6 +79,8 @@ class UserPublic(UserBase):
     updated_at: datetime
     email_verificado: bool  # 🔹 NUEVO
     direccion: Optional[DireccionPublic] = None
+
+    sucursales: Optional[List[SucursalMini]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -124,6 +133,15 @@ class UsuarioMini(BaseModel):
     class Config:
         from_attributes = True
 
+class UsuarioRead(BaseModel):
+    id: int
+    nombre: str
+    correo: str
+    rol: str
+    activo: bool
+    telefono: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
 
 #=========================
 # ADMIN - GESTIÓN DE USUARIOS
@@ -142,6 +160,8 @@ class UserCreateAdmin(BaseModel):
     activo: bool = True
     telefono: Optional[str] = None
 
+    sucursales_ids: Optional[List[int]] = None
+
 class UserUpdateAdmin(BaseModel):
     """
     Edición completa de usuario por parte de un administrador.
@@ -153,6 +173,8 @@ class UserUpdateAdmin(BaseModel):
     rol: Optional[str] = None
     activo: Optional[bool] = None
     password: Optional[str] = None # Opcional: para resetear contraseña manualmente
+
+    sucursales_ids: Optional[List[int]] = None
 
 class UserListResponse(BaseModel):
     total: int

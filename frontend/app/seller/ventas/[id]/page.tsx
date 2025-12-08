@@ -275,20 +275,20 @@ export default function VentaDetailPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
-                  
+
                   {/* BOTÓN DE RMA (DEVOLUCIÓN) */}
                   {!venta.tiene_rma_activo ? (
-                      <button
-                        onClick={() => router.push(`/seller/ventas/${id}/rma`)}
-                        className="px-3 py-1.5 bg-indigo-600 !text-white rounded-lg hover:bg-indigo-700 text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
-                        Devolución / Cambio
-                      </button>
+                    <button
+                      onClick={() => router.push(`/seller/ventas/${id}/rma`)}
+                      className="px-3 py-1.5 bg-indigo-600 !text-white rounded-lg hover:bg-indigo-700 text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
+                      Devolución / Cambio
+                    </button>
                   ) : (
-                      <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium border border-yellow-200 flex items-center gap-1">
-                          ⚠️ Devolución en proceso
-                      </span>
+                    <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium border border-yellow-200 flex items-center gap-1">
+                      ⚠️ Devolución en proceso
+                    </span>
                   )}
 
                   <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
@@ -301,7 +301,7 @@ export default function VentaDetailPage() {
                     >
                       {venta.estado}
                     </span>
-                    
+
                     <button
                       type="button"
                       onClick={handlePrint}
@@ -316,32 +316,32 @@ export default function VentaDetailPage() {
 
             {/* 🆕 SECCIÓN DE HISTORIAL RMA */}
             {venta.solicitudes_rma && venta.solicitudes_rma.length > 0 && (
-                <section className="space-y-2">
-                    <h3 className="text-sm font-semibold text-gray-800">Historial de Devoluciones</h3>
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {venta.solicitudes_rma.map((rma) => {
-                            const config = ESTADOS_RMA_POS[rma.estado as keyof typeof ESTADOS_RMA_POS] || { label: rma.estado, color: "bg-gray-100" };
-                            return (
-                                <div key={rma.id} className={`p-3 rounded-lg border ${config.color}`}>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-xs uppercase">{config.label}</span>
-                                        <span className="text-[10px] opacity-70">{new Date(rma.fecha).toLocaleDateString()}</span>
-                                    </div>
-                                    <p className="text-xs mb-1 font-medium">{rma.tipo === 'devolucion' ? 'Reembolso' : 'Cambio'}</p>
-                                    <p className="text-xs mb-1 text-gray-700"><strong>Motivo:</strong> {rma.motivo}</p>
-                                    
-                                    {/* Respuesta del Admin */}
-                                    {rma.respuesta_admin && (
-                                        <div className="mt-2 bg-white/60 p-2 rounded text-xs border border-black/5">
-                                            <strong>Resolución:</strong>
-                                            <p className="mt-1 italic">{rma.respuesta_admin}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold text-gray-800">Historial de Devoluciones</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {venta.solicitudes_rma.map((rma) => {
+                    const config = ESTADOS_RMA_POS[rma.estado as keyof typeof ESTADOS_RMA_POS] || { label: rma.estado, color: "bg-gray-100" };
+                    return (
+                      <div key={rma.id} className={`p-3 rounded-lg border ${config.color}`}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-xs uppercase">{config.label}</span>
+                          <span className="text-[10px] opacity-70">{new Date(rma.fecha).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs mb-1 font-medium">{rma.tipo === 'devolucion' ? 'Reembolso' : 'Cambio'}</p>
+                        <p className="text-xs mb-1 text-gray-700"><strong>Motivo:</strong> {rma.motivo}</p>
+
+                        {/* Respuesta del Admin */}
+                        {rma.respuesta_admin && (
+                          <div className="mt-2 bg-white/60 p-2 rounded text-xs border border-black/5">
+                            <strong>Resolución:</strong>
+                            <p className="mt-1 italic">{rma.respuesta_admin}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {/* Panel para cambiar estado de la venta */}
@@ -514,49 +514,131 @@ export default function VentaDetailPage() {
           </>
         )}
       </main>
-      
-      {/* Vista de ticket (mantener código del ticket igual) */}
+
+      {/* Vista de ticket (se imprime SOLO esto) */}
       {venta && (
         <section className="mt-4 mb-6 flex justify-center">
-            {/* ... Ticket existente ... */}
-        </section>
-      )}
-      
-      {/* Añade esta parte del ticket al final si no estaba */}
-       {venta && (
-        <section className="mt-4 mb-6 flex justify-center">
+          {/* Título solo pantalla */}
           <div className="no-print max-w-5xl w-full px-4 mb-2">
-            <h2 className="text-sm font-semibold text-gray-700">Vista previa del ticket</h2>
-            <p className="text-[11px] text-gray-500">Versión para impresora térmica.</p>
+            <h2 className="text-sm font-semibold text-gray-700">
+              Vista previa del ticket
+            </h2>
+            <p className="text-[11px] text-gray-500">
+              Esta es la versión que se imprimirá en la impresora térmica de 80mm.
+            </p>
           </div>
+
           <div className="ticket">
+            {/* Encabezado tienda */}
             <div className="ticket-header">
               <div className="ticket-store-name">JyA Innersport</div>
-              <div className="ticket-store-sub">Ropa deportiva y ropa interior</div>
-              <div className="ticket-store-info">Cédula Jurídica: 3-101-000000<br />Tel: 8888-8888 · San José, Costa Rica</div>
+              <div className="ticket-store-sub">
+                Ropa deportiva y ropa interior
+              </div>
+              <div className="ticket-store-info">
+                Cédula Jurídica: 3-101-000000
+                <br />
+                Tel: 8888-8888 · San José, Costa Rica
+              </div>
               <div className="ticket-separator" />
             </div>
+
+            {/* Datos de la venta */}
             <div className="ticket-section">
-              <div className="ticket-row"><span>Factura:</span><span>#{venta.id}</span></div>
-              <div className="ticket-row"><span>Fecha:</span><span>{new Date(venta.fecha_creacion).toLocaleDateString("es-CR")}</span></div>
-              <div className="ticket-row"><span>Sucursal:</span><span>{venta.sucursal_nombre}</span></div>
+              <div className="ticket-row">
+                <span>Factura:</span>
+                <span>#{venta.id}</span>
+              </div>
+              <div className="ticket-row">
+                <span>Fecha:</span>
+                <span>
+                  {new Date(venta.fecha_creacion).toLocaleString("es-CR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </div>
+              <div className="ticket-row">
+                <span>Sucursal:</span>
+                <span>{venta.sucursal_nombre}</span>
+              </div>
+              <div className="ticket-row">
+                <span>Vendedor:</span>
+                <span>{venta.vendedor_nombre}</span>
+              </div>
+              <div className="ticket-row">
+                <span>Cliente:</span>
+                <span>{venta.nombre_cliente_ticket || "Anónimo"}</span>
+              </div>
               <div className="ticket-separator" />
             </div>
-             <div className="ticket-section">
-              <div className="ticket-row ticket-row-title"><span>Descripción</span><span>Cant</span><span>Importe</span></div>
-              {venta.items.map((item) => (
+
+            {/* Detalle de productos */}
+            <div className="ticket-section">
+              <div className="ticket-row ticket-row-title">
+                <span>Descripción</span>
+                <span>Cant</span>
+                <span>Importe</span>
+              </div>
+              {venta.items.map((item) => {
+                const precioBase = Number(item.precio_unitario);
+                const precioConIVA = precioConIVADesdeBase(precioBase);
+
+                return (
                   <div key={item.id} className="ticket-item">
-                    <div className="ticket-item-name">{item.nombre_producto}</div>
-                    <div className="ticket-item-line"><span>x{item.cantidad}</span><span>{currency.format(Number(item.subtotal))}</span></div>
+                    <div className="ticket-item-name">
+                      {item.nombre_producto || `Producto #${item.producto_id}`}
+                    </div>
+                    <div className="ticket-item-line">
+                      <span>{currency.format(precioConIVA)} c/u</span>
+                      <span>x{item.cantidad}</span>
+                      <span>{currency.format(Number(item.subtotal))}</span>
+                    </div>
+                    <div className="ticket-item-line ticket-row-small">
+                      <span>Base sin IVA: {currency.format(precioBase)}</span>
+                    </div>
                   </div>
-              ))}
+                );
+              })}
+
               <div className="ticket-separator" />
             </div>
+
+            {/* Totales */}
             <div className="ticket-section">
-               <div className="ticket-row ticket-row-total"><span>Total</span><span>{currency.format(Number(venta.total))}</span></div>
-               <div className="ticket-separator" />
+              <div className="ticket-row">
+                <span>Subtotal</span>
+                <span>{currency.format(Number(venta.subtotal))}</span>
+              </div>
+              <div className="ticket-row">
+                <span>Desc. puntos</span>
+                <span>
+                  -{currency.format(Number(venta.descuento_puntos))}
+                </span>
+              </div>
+              <div className="ticket-row">
+                <span>IVA (13%)</span>
+                <span>{currency.format(Number(venta.impuesto))}</span>
+              </div>
+              <div className="ticket-row ticket-row-total">
+                <span>Total</span>
+                <span>{currency.format(Number(venta.total))}</span>
+              </div>
+              <div className="ticket-row ticket-row-small">
+                <span>Puntos ganados:</span>
+                <span>{venta.puntos_ganados}</span>
+              </div>
+              <div className="ticket-separator" />
             </div>
-             <div className="ticket-footer"><div>¡Gracias por su compra!</div></div>
+
+            {/* Footer */}
+            <div className="ticket-footer">
+              <div>¡Gracias por su compra!</div>
+              <div>Síguenos en Instagram: @jyainnersport</div>
+              <div className="ticket-footer-note">
+                Cambios dentro de 8 días con factura física.
+              </div>
+            </div>
           </div>
         </section>
       )}
