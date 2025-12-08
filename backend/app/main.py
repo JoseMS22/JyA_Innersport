@@ -54,6 +54,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.comisiones import router as comisiones_router
 
 from app.api.v1.usuarios import router as usuarios_router
+from app.api.v1.usuario import router as usuario_router
 
 # Inicializar sistema de logging ANTES de crear la app
 setup_logging()
@@ -210,7 +211,7 @@ app.include_router(rma_router, prefix="/api/v1/rma", tags=["RMA"])
 
 # 🆕 US-ADMIN: Gestión de usuario
 app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["Gestión de Usuarios"])
-
+app.include_router(usuario_router, prefix="/api/v1/usuario", tags=["Usuario"])
 
 # =========================
 # ENDPOINTS RAÍZ

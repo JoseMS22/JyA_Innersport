@@ -18,6 +18,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Evitar error si la tabla ya existe (caso de migraciones corridas antes)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    if "auditoria_usuario" in inspector.get_table_names():
+        # Ya existe la tabla (y probablemente los índices), no hacemos nada
+        return
+
     op.create_table(
         "auditoria_usuario",
         sa.Column("id", sa.Integer(), primary_key=True),
