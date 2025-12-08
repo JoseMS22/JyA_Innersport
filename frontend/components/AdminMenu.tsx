@@ -19,7 +19,7 @@ type Props = {
 };
 
 const links = [
-  { href: "/admin", label: "Panel" },
+  //{ href: "/admin", label: "Panel" },
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/comisiones", label: "Comisiones" },
   { href: "/admin/productos", label: "Productos" },
