@@ -1,5 +1,5 @@
 # backend/app/api/v1/comisiones.py
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session, joinedload
@@ -255,14 +255,16 @@ def listar_todas_comisiones(
         joinedload(ComisionVendedor.venta_pos).joinedload(VentaPOS.sucursal)
     )
     
-    # ✅ Filtros con nuevo parser de fechas
+    # ✅ Filtros con nuevo parser de fechas - CORREGIDO
     if fecha_inicio:
         fecha_inicio_date = parse_date_from_iso(fecha_inicio)
         query = query.filter(ComisionVendedor.fecha_venta >= fecha_inicio_date)
     
     if fecha_fin:
         fecha_fin_date = parse_date_from_iso(fecha_fin)
-        query = query.filter(ComisionVendedor.fecha_venta <= fecha_fin_date)
+        # ✅ FIX: Agregar 1 día para incluir todo el día final (hasta las 23:59:59)
+        fecha_fin_inclusiva = fecha_fin_date + timedelta(days=1)
+        query = query.filter(ComisionVendedor.fecha_venta < fecha_fin_inclusiva)
     
     if vendedor_id:
         query = query.filter(ComisionVendedor.vendedor_id == vendedor_id)
@@ -414,14 +416,16 @@ def exportar_reporte_comisiones(
         joinedload(ComisionVendedor.venta_pos).joinedload(VentaPOS.sucursal)
     )
     
-    # ✅ Filtros con nuevo parser de fechas
+    # ✅ Filtros con nuevo parser de fechas - CORREGIDO
     if fecha_inicio:
         fecha_inicio_date = parse_date_from_iso(fecha_inicio)
         query = query.filter(ComisionVendedor.fecha_venta >= fecha_inicio_date)
     
     if fecha_fin:
         fecha_fin_date = parse_date_from_iso(fecha_fin)
-        query = query.filter(ComisionVendedor.fecha_venta <= fecha_fin_date)
+        # ✅ FIX: Agregar 1 día para incluir todo el día final
+        fecha_fin_inclusiva = fecha_fin_date + timedelta(days=1)
+        query = query.filter(ComisionVendedor.fecha_venta < fecha_fin_inclusiva)
     
     if vendedor_id:
         query = query.filter(ComisionVendedor.vendedor_id == vendedor_id)

@@ -1,6 +1,6 @@
 # backend/app/services/comisiones_service.py
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -329,8 +329,10 @@ def obtener_comisiones_vendedor(
         query = query.filter(ComisionVendedor.fecha_venta >= fecha_inicio_dt)
     
     if fecha_fin:
-        fecha_fin_dt = datetime.combine(fecha_fin, datetime.max.time())
-        query = query.filter(ComisionVendedor.fecha_venta <= fecha_fin_dt)
+        # ✅ FIX: Agregar 1 día para incluir todo el día final
+        fecha_fin_inclusiva = fecha_fin + timedelta(days=1)
+        fecha_fin_dt = datetime.combine(fecha_fin_inclusiva, datetime.min.time())
+        query = query.filter(ComisionVendedor.fecha_venta < fecha_fin_dt)
     
     if estado and estado != "TODOS":
         query = query.filter(ComisionVendedor.estado == estado)
