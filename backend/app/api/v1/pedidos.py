@@ -207,6 +207,12 @@ def obtener_detalle_pedido(
     # Datos de dirección de envío
     direccion_data = {}
     if pedido.direccion_envio:
+        if getattr(pedido.direccion_envio, "nombre", None):
+            nombre_envio = pedido.direccion_envio.nombre
+        elif pedido.cliente and getattr(pedido.cliente, "nombre", None):
+            nombre_envio = pedido.cliente.nombre
+        else:
+            nombre_envio = ""
         direccion_data = {
             "provincia": pedido.direccion_envio.provincia,
             "canton": pedido.direccion_envio.canton,
@@ -215,7 +221,7 @@ def obtener_detalle_pedido(
             "pais": pedido.direccion_envio.pais or "Costa Rica",
             "codigo_postal": pedido.direccion_envio.codigo_postal or "",
             "telefono": pedido.direccion_envio.telefono or "",
-            "nombre": pedido.direccion_envio.nombre or "",
+            "nombre": nombre_envio,
             "referencia": pedido.direccion_envio.referencia or "",
         }
 
