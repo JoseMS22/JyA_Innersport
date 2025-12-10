@@ -4,7 +4,8 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { ProductImage } from "@/components/ProductImage"; // 👈 igual que en /account/orders
+import { ProductImage } from "@/components/ProductImage";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type DireccionEnvio = {
   provincia: string;
@@ -55,6 +56,7 @@ const ESTADOS_PEDIDO = [
 export default function PedidoDetalleAdminPage() {
   const params = useParams();
   const router = useRouter();
+  const { success, error: showError, confirm } = useNotifications();
   const id = Number(params?.id);
 
   const [pedido, setPedido] = useState<PedidoDetalle | null>(null);
@@ -62,7 +64,6 @@ export default function PedidoDetalleAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [estadoLocal, setEstadoLocal] = useState<string>("");
   const [savingEstado, setSavingEstado] = useState(false);
-  const [mensajeEstado, setMensajeEstado] = useState<string | null>(null);
 
   async function loadPedido() {
     try {
@@ -75,7 +76,9 @@ export default function PedidoDetalleAdminPage() {
       setEstadoLocal(data.estado);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar el pedido");
+      const errorMsg = err?.message ?? "Error al cargar el pedido";
+      setError(errorMsg);
+      showError("Error", errorMsg);
     } finally {
       setLoading(false);
     }
@@ -91,24 +94,36 @@ export default function PedidoDetalleAdminPage() {
     e.preventDefault();
     if (!pedido) return;
 
-    try {
-      setSavingEstado(true);
-      setMensajeEstado(null);
-      setError(null);
+    // Confirmar cambio de estado
+    confirm(
+      "Confirmar cambio de estado",
+      `¿Estás seguro de cambiar el estado del pedido a ${estadoLocal}? Se enviará un correo automático al cliente.`,
+      async () => {
+        try {
+          setSavingEstado(true);
+          setError(null);
 
-      await apiFetch(`/api/v1/pedidos/${pedido.id}/estado`, {
-        method: "PATCH",
-        body: JSON.stringify({ estado: estadoLocal }),
-      });
+          await apiFetch(`/api/v1/pedidos/${pedido.id}/estado`, {
+            method: "PATCH",
+            body: JSON.stringify({ estado: estadoLocal }),
+          });
 
-      await loadPedido();
-      setMensajeEstado("Estado actualizado y correo enviado al cliente.");
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message ?? "Error al actualizar el estado del pedido");
-    } finally {
-      setSavingEstado(false);
-    }
+          await loadPedido();
+          success(
+            "Estado actualizado",
+            "El estado del pedido se ha actualizado y se ha enviado un correo al cliente."
+          );
+        } catch (err: any) {
+          console.error(err);
+          const errorMsg = err?.message ?? "Error al actualizar el estado del pedido";
+          setError(errorMsg);
+          showError("Error al actualizar", errorMsg);
+        } finally {
+          setSavingEstado(false);
+        }
+      },
+      "Actualizar estado"
+    );
   }
 
   if (loading) {
@@ -156,18 +171,6 @@ export default function PedidoDetalleAdminPage() {
         </button>
       </header>
 
-      {/* Mensajes */}
-      {mensajeEstado && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-          {mensajeEstado}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-          {error}
-        </div>
-      )}
-
       {/* Estado + Totales */}
       <section className="grid md:grid-cols-2 gap-4">
         {/* Estado */}
@@ -199,7 +202,7 @@ export default function PedidoDetalleAdminPage() {
             <div className="pt-1 flex justify-end">
               <button
                 type="submit"
-                disabled={savingEstado}
+                disabled={savingEstado || estadoLocal === pedido.estado}
                 className="px-3 py-1.5 rounded-full 
              bg-[#f5f3ff] text-[#6b21a8] 
              border border-[#a855f7]/40 
