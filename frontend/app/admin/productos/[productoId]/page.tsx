@@ -1,3 +1,5 @@
+// frontend/app/admin/productos/[productoId]/page.tsx
+
 "use client";
 
 import { FormEvent, useEffect, useState, useMemo } from "react";
