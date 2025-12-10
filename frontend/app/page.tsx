@@ -8,6 +8,9 @@ import { MainMenu } from "../components/MainMenu";
 import { SearchBar } from "../components/SearchBar";
 import { useFavorites } from "./context/favoritesContext";
 import { useCart } from "./context/cartContext";
+import { Toast } from "@/components/ui/toast";
+import { Alert } from "@/components/ui/alert";
+import { Footer } from "@/components/ui/footer";
 
 
 // ======================
@@ -17,14 +20,9 @@ type Producto = {
   id: number;
   nombre: string;
   precio_minimo: number;
-
-  // antes solo tenías esto:
   imagen_principal: string | null;
-
-  // 🔹 añadimos campos opcionales:
   marca?: string;
-  imagenes?: string[]; // array de URLs adicionales (si tu API las manda)
-
+  imagenes?: string[];
   categorias: string[];
   tiene_stock: boolean;
 };
@@ -65,15 +63,18 @@ function buildMediaUrl(url: string | null): string {
   return `${API_BASE_URL}${url}`;
 }
 
-// Toast
+// Toast - Ahora usa el tipo del componente
 type ToastState = {
-  type: "success" | "error";
+  type: "success" | "error" | "warning" | "info";
+  title: string;
   message: string;
 } | null;
 
 // Alert de auth
 type AuthAlertState = {
+  title: string;
   message: string;
+  type?: "info" | "warning" | "error" | "success";
 } | null;
 
 type ProductoNuevoCardProps = {
@@ -146,7 +147,7 @@ function ProductoNuevoCard({
       onClick={onOpen}
       className="min-w-[240px] max-w-[300px] md:min-w-[260px] md:max-w-[320px] bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition cursor-pointer group"
     >
-      {/* 🔹 IMAGEN MÁS ALTA + CARRUSEL */}
+      {/* IMAGEN MÁS ALTA + CARRUSEL */}
       <div
         className="relative h-64 bg-gradient-to-br from-[#111827] via-[#4c1d95] to-[#a855f7] overflow-hidden"
         onMouseEnter={startCarousel}
@@ -159,8 +160,9 @@ function ProductoNuevoCard({
                 key={index}
                 src={url}
                 alt={producto.nombre}
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentIndex ? "opacity-100" : "opacity-0"
-                  } ${!tieneVariasImagenes ? "group-hover:scale-105 transition-transform duration-300" : ""}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  index === currentIndex ? "opacity-100" : "opacity-0"
+                } ${!tieneVariasImagenes ? "group-hover:scale-105 transition-transform duration-300" : ""}`}
               />
             ))}
           </div>
@@ -187,7 +189,7 @@ function ProductoNuevoCard({
 
       </div>
 
-      {/* 🔹 TEXTO: marca + nombre + precio */}
+      {/* TEXTO: marca + nombre + precio */}
       <div className="p-4 text-[13px]">
         <p className="text-gray-500 text-[11px] uppercase tracking-wide">
           {producto.marca || "Innersport"}
@@ -388,13 +390,6 @@ export default function HomePage() {
     checkAuth();
   }, []);
 
-  // Auto ocultar toast
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2500);
-    return () => clearTimeout(id);
-  }, [toast]);
-
   // Cargar configuración de portada (pública)
   useEffect(() => {
     async function loadHero() {
@@ -463,22 +458,26 @@ export default function HomePage() {
   function handleAddToCart(producto: Producto) {
     if (checkingAuth) {
       setAuthAlert({
+        title: "Un momento",
         message:
           "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+        type: "info",
       });
       return;
     }
 
     if (!isLoggedIn) {
       setAuthAlert({
+        title: "Iniciar sesión",
         message: "Debes iniciar sesión para agregar productos al carrito.",
+        type: "warning",
       });
       return;
     }
 
-    // Variante mínima (igual que en CatalogoPage)
+    // Variante mínima
     const variante = {
-      id: producto.id, // 👈 aquí asumes que el backend entiende esto como variante
+      id: producto.id,
       precio_actual: producto.precio_minimo,
     };
 
@@ -489,13 +488,13 @@ export default function HomePage() {
 
     const imagenUrl = buildMediaUrl(producto.imagen_principal);
 
-    // 👉 Aquí SÍ lo mandamos al contexto del carrito
     addItem(variante as any, productoInfo as any, 1, imagenUrl);
 
-    // Feedback al usuario
+    // Feedback con Toast
     setToast({
       type: "success",
-      message: "El producto se añadió al carrito.",
+      title: "Producto agregado",
+      message: "El producto se añadió al carrito exitosamente.",
     });
   }
 
@@ -503,15 +502,19 @@ export default function HomePage() {
   function handleToggleFavorite(producto: Producto) {
     if (checkingAuth) {
       setAuthAlert({
+        title: "Un momento",
         message:
           "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
+        type: "info",
       });
       return;
     }
 
     if (!isLoggedIn) {
       setAuthAlert({
+        title: "Iniciar sesión",
         message: "Debes iniciar sesión para guardar productos en favoritos.",
+        type: "warning",
       });
       return;
     }
@@ -527,7 +530,11 @@ export default function HomePage() {
       imagenUrl: buildMediaUrl(producto.imagen_principal),
     };
 
-    setAuthAlert({
+    toggleFavorite(favItem);
+
+    setToast({
+      type: alreadyFav ? "info" : "success",
+      title: alreadyFav ? "Quitado de favoritos" : "Agregado a favoritos",
       message: alreadyFav
         ? "El producto se quitó de favoritos."
         : "Producto guardado en favoritos.",
@@ -553,24 +560,16 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
-      {/* ===================== */}
-      {/* HERO VIDEO SUPERIOR   */}
-      {/* ===================== */}
-
-      {/* ===================== */}
-      {/* HERO VIDEO SUPERIOR   */}
-      {/* ===================== */}
-
+      {/* HERO VIDEO SUPERIOR */}
       <section className="relative w-full pt-[130px]">
-        {/* contenedor del hero tipo Ray-Ban */}
         <div
           className="
       relative w-full 
-      h-[60vh] md:h-[80vh] lg:h-[90vh]  /* alto según viewport */
-      min-h-[480px]                     /* nunca menos de 480px */
-      max-h-[900px]                     /* por si la pantalla es muuuy alta */
+      h-[60vh] md:h-[80vh] lg:h-[90vh]
+      min-h-[480px]
+      max-h-[900px]
       overflow-hidden
-      bg-black                          /* color de fondo detrás del video */
+      bg-black
     "
         >
           {heroConfig && heroConfig.video_url ? (
@@ -584,7 +583,7 @@ export default function HomePage() {
               className="
           absolute inset-0
           w-full h-full
-          object-cover       /* 👈 clave: siempre cubrir, nada de contain */
+          object-cover
         "
             />
           ) : (
@@ -597,10 +596,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===================== */}
       {/* DOS IMÁGENES VERTICALES */}
-      {/* ===================== */}
-
       <section className="w-full py-6">
         <div className="grid md:grid-cols-2 gap-2">
           <div className="w-full aspect-[4/5] bg-gray-200 overflow-hidden flex items-center justify-center">
@@ -635,10 +631,7 @@ export default function HomePage() {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="max-w-6xl mx-auto px-4 py-6">
-
-        {/* ===================== */}
-        {/* SECCIÓN "LO NUEVO"    */}
-        {/* ===================== */}
+        {/* SECCIÓN "LO NUEVO" */}
         <section className="mb-10">
           <div className="flex items-baseline justify-between gap-4 mb-3">
             <div>
@@ -706,8 +699,7 @@ export default function HomePage() {
                     onOpen={() => router.push(`/productos/${producto.id}`)}
                   />
                 ))
-              )
-              }
+              )}
 
             </div>
           </div>
@@ -727,48 +719,28 @@ export default function HomePage() {
         </section>
       </main>
 
+      {/* Footer */}
+      <Footer />
+
+      {/* Alert de autenticación */}
       {authAlert && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
-            <div className="flex items-start gap-3">
-              <div>
-                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
-                <p className="text-gray-700">{authAlert.message}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setAuthAlert(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#a855f7] !text-white text-xs font-semibold hover:bg-[#7e22ce]"
-              >
-                Aceptar
-              </button>
-            </div>
-          </div>
-        </div>
+        <Alert
+          title={authAlert.title}
+          message={authAlert.message}
+          type={authAlert.type}
+          onCancel={() => setAuthAlert(null)}
+        />
       )}
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div
-            className={`flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg text-xs border ${toast.type === "success"
-              ? "bg-white border-[#22c55e]/40 text-[#166534]"
-              : "bg-white border-[#f97316]/40 text-[#9a3412]"
-              }`}
-          >
-            <span className="text-lg">
-              {toast.type === "success" ? "✅" : "⚠️"}
-            </span>
-            <div className="flex flex-col">
-              <span className="font-semibold">
-                {toast.type === "success" ? "Acción realizada" : "Error"}
-              </span>
-              <span>{toast.message}</span>
-            </div>
-          </div>
-        </div>
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+          duration={3000}
+        />
       )}
     </div>
   );

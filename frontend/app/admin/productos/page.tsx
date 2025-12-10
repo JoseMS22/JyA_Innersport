@@ -1,7 +1,11 @@
+// frontend/app/admin/productos/page.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useNotifications } from "@/app/context/NotificationContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -31,7 +35,7 @@ type InventarioItem = {
   id: number;
   sucursal_id: number;
   variante_id: number;
-  cantidad: number;        // 👈 viene del backend
+  cantidad: number;
   min_stock: number;
   max_stock: number | null;
   variante: {
@@ -39,7 +43,6 @@ type InventarioItem = {
     producto_id: number;
   };
 };
-
 
 type InventorySummary = {
   totalUnits: number;
@@ -50,6 +53,8 @@ type InventorySummary = {
 const PAGE_SIZE = 10;
 
 export default function AdminProductosPage() {
+  const { success, error, confirm } = useNotifications();
+  
   const [productos, setProductos] = useState<Producto[]>([]);
   const [inventario, setInventario] = useState<InventarioItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +84,6 @@ export default function AdminProductosPage() {
           res.status,
           res.statusText
         );
-        // Si quieres, puedes hacer return aquí y dejar inventario vacío
         return;
       }
 
@@ -87,10 +91,8 @@ export default function AdminProductosPage() {
       setInventario(data);
     } catch (err) {
       console.error("Error de red al cargar inventario:", err);
-      // Aquí también podrías dejar un estado de error si quieres mostrar algo en UI
     }
   }
-
 
   useEffect(() => {
     async function loadAll() {
@@ -99,6 +101,7 @@ export default function AdminProductosPage() {
         await Promise.all([loadProductos(), loadInventario()]);
       } catch (err) {
         console.error(err);
+        error("Error al cargar", "No se pudieron cargar los productos");
       } finally {
         setLoading(false);
       }
@@ -107,22 +110,27 @@ export default function AdminProductosPage() {
   }, []);
 
   async function desactivarProducto(id: number) {
-    if (!confirm("¿Seguro que quieres desactivar este producto?")) return;
-
-    try {
-      await fetch(`${API_BASE}/api/v1/productos/${id}/desactivar`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-      await loadProductos();
-    } catch (err) {
-      console.error("Error desactivando producto:", err);
-    }
+    confirm(
+      "¿Desactivar producto?",
+      "El producto no estará disponible en la tienda hasta que lo actives nuevamente",
+      async () => {
+        try {
+          await fetch(`${API_BASE}/api/v1/productos/${id}/desactivar`, {
+            method: "PATCH",
+            credentials: "include",
+          });
+          await loadProductos();
+          success("Producto desactivado", "El producto ha sido desactivado correctamente");
+        } catch (err) {
+          console.error("Error desactivando producto:", err);
+          error("Error al desactivar", "No se pudo desactivar el producto");
+        }
+      },
+      "Sí, desactivar"
+    );
   }
 
-  // =========================
-  //  Resumen de inventario por producto
-  // =========================
+  // Resumen de inventario por producto
   const inventorySummaryByProduct: Record<number, InventorySummary> =
     useMemo(() => {
       const summary: Record<number, InventorySummary> = {};
@@ -142,25 +150,17 @@ export default function AdminProductosPage() {
         summary[productId].totalUnits += item.cantidad || 0;
         summary[productId].variants += 1;
 
-        // ⚠️ lógica de mínimo:
-        // si hay un min_stock > 0 y la cantidad es <= min_stock,
-        // marcamos este producto como "stock bajo"
         if (item.min_stock != null && item.min_stock > 0) {
           if (item.cantidad <= item.min_stock) {
             summary[productId].lowStock = true;
           }
         }
-
-        // Si quieres que 0 unidades SIEMPRE cuente como crítico, podrías hacer:
-        // if (item.cantidad === 0) summary[productId].lowStock = true;
       }
 
       return summary;
     }, [inventario]);
 
-  // =========================
-  //  Búsqueda + paginación
-  // =========================
+  // Búsqueda + paginación
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return productos;
@@ -225,7 +225,6 @@ export default function AdminProductosPage() {
             <span className="absolute left-2 top-1.5 text-white text-sm">
               🔍
             </span>
-
           </div>
 
           <Link
@@ -237,7 +236,6 @@ export default function AdminProductosPage() {
           >
             + Nuevo producto
           </Link>
-
         </div>
       </header>
 
@@ -327,7 +325,7 @@ export default function AdminProductosPage() {
                             <span
                               className={
                                 inv.lowStock
-                                  ? "text-[11px] text-red-600 font-semibold"   // 👈 rojo si stock bajo
+                                  ? "text-[11px] text-red-600 font-semibold"
                                   : "text-[11px] text-gray-800"
                               }
                             >
@@ -342,36 +340,36 @@ export default function AdminProductosPage() {
                           )}
                         </td>
 
-
                         {/* Acciones */}
                         <td className="px-3 py-3">
-                          <div className="flex justify-center gap-2 flex-wrap">
-                            <Link
-                              href={`/admin/productos/${p.id}`}
-                              title="Ver y editar producto"
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
-                 bg-sky-50 text-sky-700 border border-sky-100 text-[11px]
-                 hover:bg-sky-100 hover:border-sky-200 transition-colors"
-                            >
-                              <span>👁️</span>
-                              <span>Ver / editar</span>
-                            </Link>
+                          <div className="flex justify-center gap-2">
+                            <Tooltip text="Ver y editar producto" position="top">
+                              <Link
+                                href={`/admin/productos/${p.id}`}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-full
+                                  bg-sky-50 text-sky-700 border border-sky-100 
+                                  hover:bg-sky-100 hover:border-sky-200 
+                                  transition-colors text-sm"
+                              >
+                                👁️
+                              </Link>
+                            </Tooltip>
 
                             {p.activo && (
-                              <button
-                                onClick={() => desactivarProducto(p.id)}
-                                title="Desactivar producto"
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
-                   bg-red-50 text-red-700 border border-red-200 text-[11px]
-                   hover:bg-red-100 hover:border-red-300 transition-colors"
-                              >
-                                <span>🚫</span>
-                                <span>Desactivar</span>
-                              </button>
+                              <Tooltip text="Desactivar producto" position="top">
+                                <button
+                                  onClick={() => desactivarProducto(p.id)}
+                                  className="inline-flex items-center justify-center w-8 h-8 rounded-full
+                                    bg-red-50 text-red-700 border border-red-200 
+                                    hover:bg-red-100 hover:border-red-300 
+                                    transition-colors text-sm"
+                                >
+                                  🚫
+                                </button>
+                              </Tooltip>
                             )}
                           </div>
                         </td>
-
                       </tr>
                     );
                   })}

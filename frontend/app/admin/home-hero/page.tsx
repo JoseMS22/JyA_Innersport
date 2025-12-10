@@ -8,6 +8,7 @@ import {
   ChangeEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type UserMe = {
   id: number;
@@ -48,6 +49,7 @@ function buildMediaUrl(url: string | null) {
 
 export default function AdminHomeHeroPage() {
   const router = useRouter();
+  const { error, success, info } = useNotifications();
 
   const [user, setUser] = useState<UserMe | null>(null);
   const [checkingUser, setCheckingUser] = useState(true);
@@ -55,8 +57,6 @@ export default function AdminHomeHeroPage() {
   const [form, setForm] = useState<HomeHeroFormState>(EMPTY_FORM);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   // Archivos seleccionados en el admin
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -108,7 +108,6 @@ export default function AdminHomeHeroPage() {
     async function loadConfig() {
       try {
         setLoadingConfig(true);
-        setError(null);
 
         const res = await fetch(`${API_BASE_URL}/api/v1/home-hero`, {
           credentials: "include",
@@ -132,7 +131,7 @@ export default function AdminHomeHeroPage() {
         });
       } catch (err: any) {
         console.error(err);
-        setError(err?.message ?? "Error al cargar la configuración");
+        error("Error al cargar", err?.message ?? "No se pudo cargar la configuración");
       } finally {
         setLoadingConfig(false);
       }
@@ -179,8 +178,6 @@ export default function AdminHomeHeroPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setInfo(null);
 
     try {
       let lastConfig: HomeHeroConfig | null = null;
@@ -255,7 +252,7 @@ export default function AdminHomeHeroPage() {
       }
 
       if (!videoFile && !banner1File && !banner2File) {
-        setInfo("No hay cambios nuevos que guardar.");
+        info("Sin cambios", "No hay cambios nuevos que guardar");
         return;
       }
 
@@ -284,10 +281,10 @@ export default function AdminHomeHeroPage() {
         }
       }
 
-      setInfo("Portada actualizada correctamente.");
+      success("¡Actualizada!", "Portada actualizada correctamente");
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al guardar la configuración");
+      error("Error al guardar", err?.message ?? "No se pudo guardar la configuración");
     } finally {
       setSaving(false);
     }
@@ -297,8 +294,6 @@ export default function AdminHomeHeroPage() {
   async function handleDelete() {
     if (!confirm("¿Seguro que deseas limpiar la portada?")) return;
     setSaving(true);
-    setError(null);
-    setInfo(null);
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/home-hero`, {
@@ -330,10 +325,10 @@ export default function AdminHomeHeroPage() {
         setBanner2PreviewLocal(null);
       }
 
-      setInfo("Portada limpiada. La página mostrará los placeholders.");
+      success("Limpiada", "Portada limpiada. La página mostrará los placeholders");
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al eliminar la configuración");
+      error("Error al eliminar", err?.message ?? "No se pudo eliminar la configuración");
     } finally {
       setSaving(false);
     }
@@ -358,7 +353,6 @@ export default function AdminHomeHeroPage() {
   const banner2Preview =
     banner2PreviewLocal || buildMediaUrl(form.banner2_url || null);
 
-  // 👇 Igual que otras páginas de admin: solo el contenido interno
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-[#6b21a8] mb-1">
@@ -372,18 +366,6 @@ export default function AdminHomeHeroPage() {
       {loadingConfig && (
         <div className="text-xs text-gray-500 mb-4">
           Cargando configuración...
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-          {error}
-        </div>
-      )}
-
-      {info && (
-        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-          {info}
         </div>
       )}
 

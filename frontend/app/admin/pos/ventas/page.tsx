@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type VentaPOSListItem = {
     id: number;
@@ -33,25 +35,23 @@ const ESTADOS_POS = [
 
 export default function AdminPosVentasPage() {
     const router = useRouter();
+    const { error } = useNotifications();
 
     const [ventas, setVentas] = useState<VentaPOSListItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [estadoFiltro, setEstadoFiltro] = useState<string>("TODOS");
 
     // 🏬 Filtro por sucursal (TODAS = sin filtro)
     const [sucursalFiltro, setSucursalFiltro] =
         useState<"TODAS" | number>("TODAS");
 
-    // 🔎 Filtro de texto (igual que en /seller/ventas)
+    // 🔎 Filtro de texto
     const [filtroTexto, setFiltroTexto] = useState("");
 
     async function loadVentas() {
         try {
             setLoading(true);
-            setError(null);
 
-            // El backend devuelve todas las ventas POS (ADMIN)
             const data = (await apiFetch("/api/v1/pos/ventas/mias", {
                 method: "GET",
             })) as VentaPOSListItem[];
@@ -59,7 +59,7 @@ export default function AdminPosVentasPage() {
             setVentas(data);
         } catch (err: any) {
             console.error(err);
-            setError(err?.message ?? "Error al cargar ventas POS");
+            error("Error al cargar", err?.message ?? "No se pudieron cargar las ventas POS");
         } finally {
             setLoading(false);
         }
@@ -109,7 +109,7 @@ export default function AdminPosVentasPage() {
                 return false;
             }
 
-            // filtro texto (igual lógica que en SellerVentasPage)
+            // filtro texto
             if (!filtroTexto.trim()) return true;
             const term = filtroTexto.toLowerCase();
 
@@ -166,7 +166,7 @@ export default function AdminPosVentasPage() {
                     ))}
                 </div>
 
-                {/* Sucursal + búsqueda (igual estructura que en SellerVentasPage) */}
+                {/* Sucursal + búsqueda */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
                     {/* 🏬 Filtro por sucursal */}
                     <div className="w-full sm:w-64 text-[11px]">
@@ -204,7 +204,7 @@ export default function AdminPosVentasPage() {
                         </div>
                     </div>
 
-                    {/* 🔎 Buscar (copiado de SellerVentasPage) */}
+                    {/* 🔎 Buscar */}
                     <div className="flex-1">
                         <label className="block text-xs font-semibold text-gray-700 mb-1">
                             Buscar
@@ -219,13 +219,6 @@ export default function AdminPosVentasPage() {
                     </div>
                 </div>
             </section>
-
-            {/* Errores */}
-            {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-                    {error}
-                </div>
-            )}
 
             {/* Tabla de ventas POS */}
             <section className="rounded-2xl bg-white/95 border border-[#e5e7eb] p-4 shadow-sm">
@@ -298,28 +291,29 @@ export default function AdminPosVentasPage() {
                                         </td>
                                         <td className="px-3 py-2">
                                             <div className="flex justify-end">
-                                                <button
-                                                    onClick={() => handleVerDetalle(v.id)}
-                                                    title="Ver detalles"
-                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-full 
-                            bg-sky-50 text-sky-700 border border-sky-100 
-                            hover:bg-sky-100 hover:border-sky-200 
-                            transition-colors text-xs"
-                                                >
-                                                    {/* Ícono de lupa / detalle */}
-                                                    <svg
-                                                        className="w-3.5 h-3.5"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
+                                                <Tooltip text="Ver detalles de la venta" position="top">
+                                                    <button
+                                                        onClick={() => handleVerDetalle(v.id)}
+                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full 
+                                                          bg-sky-50 text-sky-700 border border-sky-100 
+                                                          hover:bg-sky-100 hover:border-sky-200 
+                                                          transition-colors text-xs"
                                                     >
-                                                        <circle cx="11" cy="11" r="6" />
-                                                        <line x1="16" y1="16" x2="20" y2="20" />
-                                                    </svg>
-                                                </button>
+                                                        {/* Ícono de lupa / detalle */}
+                                                        <svg
+                                                            className="w-3.5 h-3.5"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        >
+                                                            <circle cx="11" cy="11" r="6" />
+                                                            <line x1="16" y1="16" x2="20" y2="20" />
+                                                        </svg>
+                                                    </button>
+                                                </Tooltip>
                                             </div>
                                         </td>
                                     </tr>

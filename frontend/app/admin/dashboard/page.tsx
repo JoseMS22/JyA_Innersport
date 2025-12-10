@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 import { MetricCard } from "./_components/MetricCard";
 import { VentasChart } from "./_components/VentasChart";
 import { TopProductos } from "./_components/TopProductos";
@@ -35,9 +36,10 @@ type Metricas = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { error } = useNotifications();
+
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
@@ -58,12 +60,11 @@ export default function DashboardPage() {
       const data = await apiFetch(`/api/v1/dashboard/metricas?${params}`);
       setMetricas(data);
       setLastUpdate(new Date());
-      setErrorMsg(null);
-    } catch (error: any) {
-      console.error("Error cargando métricas:", error);
-      setErrorMsg(error?.message || "Error al cargar métricas");
+    } catch (err: any) {
+      console.error("Error cargando métricas:", err);
+      error("Error al cargar", err?.message || "No se pudieron cargar las métricas del dashboard");
 
-      if (error?.status === 401) {
+      if (err?.status === 401) {
         router.push("/login");
       }
     } finally {
@@ -128,13 +129,6 @@ export default function DashboardPage() {
           }}
         />
       </div>
-
-      {/* Mensajes de error */}
-      {errorMsg && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          {errorMsg}
-        </div>
-      )}
 
       {/* Métricas Principales */}
       {loading ? (

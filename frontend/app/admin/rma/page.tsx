@@ -2,8 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useToast } from "@/app/context/ToastContext"; // 🆕
-import { ConfirmModal } from "@/components/ui/ConfirmModal"; // 🆕
+import { useNotifications } from "@/app/context/NotificationContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -16,8 +15,8 @@ function buildMediaUrl(url: string | undefined) {
 
 interface RMA {
   id: number;
-  pedido_id: number | null;        // ahora puede venir null
-  venta_pos_id: number | null;     // 🆕 para las devoluciones del POS
+  pedido_id: number | null;
+  venta_pos_id: number | null;
   usuario_id: number;
   tipo: string;
   estado: string;
@@ -26,7 +25,6 @@ interface RMA {
   created_at: string;
   respuesta_admin?: string;
 }
-
 
 const ESTADOS_RMA = {
   solicitado: { label: "Solicitado", color: "bg-yellow-100 text-yellow-800" },
@@ -37,15 +35,13 @@ const ESTADOS_RMA = {
 };
 
 export default function AdminRMAPage() {
-  const { showToast } = useToast(); // 🆕 Hook
+  const { success, error, confirm } = useNotifications();
+  
   const [rmas, setRmas] = useState<RMA[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRMA, setSelectedRMA] = useState<RMA | null>(null);
   const [adminResponse, setAdminResponse] = useState("");
   const [updating, setUpdating] = useState(false);
-
-  // 🆕 Estado para el modal de confirmación
-  const [confirmData, setConfirmData] = useState<{ isOpen: boolean, action: string } | null>(null);
 
   const fetchRMAs = async () => {
     try {
@@ -53,7 +49,7 @@ export default function AdminRMAPage() {
       if (res.ok) setRmas(await res.json());
     } catch (err) {
       console.error(err);
-      showToast("Error al cargar RMAs", "error"); // 🆕
+      error("Error al cargar", "No se pudieron cargar las solicitudes RMA");
     } finally {
       setLoading(false);
     }
@@ -63,13 +59,15 @@ export default function AdminRMAPage() {
     fetchRMAs();
   }, []);
 
-  // 🆕 Wrapper para manejar la confirmación antes de actualizar
   const preHandleUpdate = (estado: string) => {
     if (estado === 'completado') {
-      // Abrir modal personalizado
-      setConfirmData({ isOpen: true, action: estado });
+      confirm(
+        "Finalizar Proceso",
+        "¿Estás seguro? Al marcar como completado finalizará el proceso de devolución y se ajustará el inventario automáticamente. Esta acción no se puede deshacer.",
+        () => handleUpdateStatus(estado),
+        "Sí, completar"
+      );
     } else {
-      // Ejecutar directo para otros estados
       handleUpdateStatus(estado);
     }
   };
@@ -77,7 +75,6 @@ export default function AdminRMAPage() {
   const handleUpdateStatus = async (estado: string) => {
     if (!selectedRMA) return;
     setUpdating(true);
-    setConfirmData(null); // Cerrar modal si estaba abierto
 
     try {
       const res = await fetch(`${API_BASE}/api/v1/rma/admin/${selectedRMA.id}`, {
@@ -89,15 +86,16 @@ export default function AdminRMAPage() {
           respuesta_admin: adminResponse
         }),
       });
+      
       if (res.ok) {
-        showToast("Estado actualizado correctamente", "success"); // 🆕
+        success("Estado actualizado", "El estado del RMA se actualizó correctamente");
         setSelectedRMA(null);
         fetchRMAs();
       } else {
         throw new Error();
       }
-    } catch (error) {
-      showToast("Error al actualizar el estado", "error"); // 🆕
+    } catch (err) {
+      error("Error al actualizar", "No se pudo actualizar el estado del RMA");
     } finally {
       setUpdating(false);
     }
@@ -190,13 +188,11 @@ export default function AdminRMAPage() {
               </p>
             </div>
 
-
             {selectedRMA.evidencia_url && (
               <div className="mb-6">
                 <p className="text-gray-700 text-sm font-bold mb-2">📷 Evidencia Adjunta:</p>
                 <div className="border border-gray-200 rounded-lg p-2 bg-gray-50 flex justify-center">
                   <a href={buildMediaUrl(selectedRMA.evidencia_url)} target="_blank" rel="noopener noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={buildMediaUrl(selectedRMA.evidencia_url)} alt="Evidencia RMA" className="max-h-64 object-contain bg-white rounded border border-gray-100 hover:opacity-95" />
                   </a>
                 </div>
@@ -231,16 +227,6 @@ export default function AdminRMAPage() {
           </div>
         </div>
       )}
-
-      {/* 🆕 MODAL DE CONFIRMACIÓN */}
-      <ConfirmModal
-        isOpen={!!confirmData}
-        title="Finalizar Proceso"
-        message="¿Estás seguro? Al marcar como completado finalizará el proceso de devolución y se ajustará el inventario automáticamente. Esta acción no se puede deshacer."
-        confirmText="Sí, completar"
-        onConfirm={() => handleUpdateStatus('completado')}
-        onCancel={() => setConfirmData(null)}
-      />
     </div>
   );
 }

@@ -1,21 +1,18 @@
 /* frontend/app/globals.css */
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   /* Colores de fondo */
   --background: #ffffff;
-  --foreground: #1f2937; /* Gris oscuro 800 - MUCHO MÁS OSCURO */
+  --foreground: #1f2937;
   
   /* Colores de marca */
-  --primary: #6b21a8; /* Púrpura principal */
+  --primary: #6b21a8;
   --primary-light: #a855f7;
-  --secondary: #eab308; /* Amarillo/dorado */
-  
-  /* Colores de texto */
-  --text-primary: #111827; /* Casi negro para títulos */
-  --text-secondary: #374151; /* Gris oscuro para texto normal */
-  --text-muted: #6b7280; /* Gris medio para texto secundario */
-  --text-light: #9ca3af; /* Gris claro para placeholders */
+  --secondary: #eab308;
   
   /* Colores de estado */
   --success: #10b981;
@@ -44,52 +41,156 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Estilos globales para texto */
-h1, h2, h3, h4, h5, h6 {
-  color: var(--text-primary);
-  font-weight: 600;
+/* ========================================== */
+/* TOOLTIP - TEXTO BLANCO PARA LEGIBILIDAD   */
+/* ========================================== */
+
+/* Tooltips deben tener texto blanco sobre fondo oscuro - MÁXIMA PRIORIDAD */
+.text-white,
+.text-white *,
+div.bg-gray-900,
+div.bg-gray-900 *,
+div[class*="bg-gray-900"],
+div[class*="bg-gray-900"] *,
+.bg-gray-900,
+.bg-gray-900 *,
+[role="tooltip"],
+[role="tooltip"] *,
+/* Cualquier elemento con fondo oscuro debe tener texto blanco */
+div.absolute.z-50.bg-gray-900,
+div.absolute.z-50.bg-gray-900 *,
+[class*="bg-gray-900"] span,
+[class*="bg-gray-900"] p,
+[class*="bg-gray-900"] div,
+[class*="bg-gray-800"] *,
+[class*="bg-black"] *,
+/* Regla específica para tooltips con combinación de clases */
+.absolute.z-50.px-2.py-1.text-xs.font-medium.text-white.bg-gray-900,
+.absolute.z-50.px-2.py-1.text-xs.font-medium.text-white.bg-gray-900 * {
+  color: #ffffff !important;
 }
 
-p, span, div {
-  color: var(--text-secondary);
+/* ========================================== */
+/* MEJORA DE CONTRASTE EN FONDOS CLAROS      */
+/* ========================================== */
+
+/* Labels de formularios - texto más oscuro */
+label {
+  color: #1f2937 !important;
 }
 
-/* Clases utilitarias para texto */
-.text-primary {
-  color: var(--text-primary);
+/* Opciones de select - texto oscuro para legibilidad */
+select {
+  color: #111827 !important;
 }
 
-.text-secondary {
-  color: var(--text-secondary);
+select option {
+  color: #111827 !important;
+  background: #ffffff !important;
 }
 
-.text-muted {
-  color: var(--text-muted);
+/* Headers principales - siempre oscuros */
+h1 {
+  color: #111827 !important;
 }
 
-.text-brand {
-  color: var(--primary);
+/* Texto descriptivo - más oscuro en fondos claros */
+p.text-sm.text-gray-600,
+.text-gray-600 {
+  color: #4b5563 !important;
 }
 
-/* Mejoras de accesibilidad y legibilidad */
-button, a {
-  color: inherit;
+/* Headers de tabla - texto oscuro */
+th {
+  color: #111827 !important;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Contenido de celdas de tabla - texto oscuro (excepto en tooltips) */
+td:not([class*="bg-gray-900"] *):not([class*="bg-gray-800"] *) {
+  color: #111827 !important;
 }
 
-/* Inputs y formularios */
-input, textarea, select {
-  color: var(--text-primary);
+/* Descripciones y subtítulos en tablas */
+td .text-xs,
+td .text-sm,
+.text-xs.text-gray-500,
+.text-sm.text-gray-500 {
+  color: #6b7280 !important;
 }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-light);
+/* Texto de contadores y estadísticas */
+p.text-sm,
+span.text-sm {
+  color: #374151 !important;
 }
+
+/* Botones de filtro sin fondo - texto oscuro */
+button:not([class*="bg-"]):not([class*="bg-purple"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]) {
+  color: #111827 !important;
+}
+
+/* Botones con fondo claro o transparente - texto negro (excepto en tooltips) */
+button[class*="bg-white"]:not([class*="bg-gray-900"] *),
+button[class*="bg-gray-50"]:not([class*="bg-gray-900"] *),
+button[class*="bg-gray-100"]:not([class*="bg-gray-900"] *),
+button[class*="border"]:not([class*="bg-gray-900"] *) {
+  color: #111827 !important;
+}
+
+/* Inputs de búsqueda - texto oscuro */
+input[type="text"],
+input[type="search"] {
+  color: #111827 !important;
+}
+
+/* Placeholder de inputs - gris medio */
+input::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Texto general en fondos claros - negro por defecto (excepto en tooltips) */
+body {
+  color: #111827;
+}
+
+/* IMPORTANTE: Sobrescribir color de body para tooltips */
+body .text-white,
+body .bg-gray-900,
+body .bg-gray-900 * {
+  color: #ffffff !important;
+}
+
+/* Excepciones - Elementos que DEBEN mantener sus colores */
+/* Badges y roles */
+[class*="bg-purple-"],
+[class*="bg-green-"],
+[class*="bg-yellow-"],
+[class*="bg-red-"],
+[class*="bg-blue-"],
+.text-purple-600,
+.text-purple-700,
+.text-green-600,
+.text-green-700,
+.text-yellow-700,
+.text-red-600,
+.text-red-700,
+.text-blue-600 {
+  color: inherit !important;
+}
+
+/* Montos en verde - mantener color */
+.text-green-600,
+.text-green-700 {
+  color: #16a34a !important;
+}
+
+/* Texto en morado (roles, badges) */
+.text-purple-600,
+.text-purple-700 {
+  color: #9333ea !important;
+}
+
+/* ========================================== */
 
 /* Scrollbar personalizado */
 ::-webkit-scrollbar {
@@ -114,16 +215,6 @@ textarea::placeholder {
 *:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-}
-
-/* Estilos para links */
-a {
-  text-decoration: none;
-  color: var(--primary);
-}
-
-a:hover {
-  color: var(--primary-light);
 }
 
 /* Utilidades para truncar texto */
@@ -294,4 +385,51 @@ a:hover {
   .no-print {
     display: none !important;
   }
+}
+
+/* ========================================== */
+/* ANIMACIONES PARA COMPONENTES UI           */
+/* ========================================== */
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
 }

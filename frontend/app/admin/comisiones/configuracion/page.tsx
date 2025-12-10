@@ -4,6 +4,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { Toast } from "@/components/ui/toast";
+import { Alert } from "@/components/ui/alert";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type Configuracion = {
   id: number;
@@ -15,13 +18,25 @@ type Configuracion = {
   fecha_actualizacion: string | null;
 };
 
+type ToastState = {
+  type: "success" | "error" | "warning" | "info";
+  title: string;
+  message: string;
+} | null;
+
+type AlertState = {
+  title: string;
+  message: string;
+  type: "info" | "warning" | "error" | "success";
+} | null;
+
 export default function ConfiguracionComisionesPage() {
   const router = useRouter();
   const [configuraciones, setConfiguraciones] = useState<Configuracion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
+  const [alert, setAlert] = useState<AlertState>(null);
 
   const [formData, setFormData] = useState({
     tipo_venta: "POS",
@@ -40,7 +55,11 @@ export default function ConfiguracionComisionesPage() {
       setConfiguraciones(data.configuraciones || []);
     } catch (error: any) {
       console.error("Error cargando configuraciones:", error);
-      setErrorMsg(error?.message || "Error al cargar configuraciones");
+      setToast({
+        type: "error",
+        title: "Error al cargar",
+        message: error?.message || "No se pudieron cargar las configuraciones",
+      });
 
       if (error?.status === 401) {
         router.push("/login");
@@ -54,9 +73,6 @@ export default function ConfiguracionComisionesPage() {
     e.preventDefault();
 
     try {
-      setErrorMsg(null);
-      setSuccessMsg(null);
-
       await apiFetch("/api/v1/comisiones/configuracion", {
         method: "POST",
         body: JSON.stringify({
@@ -66,7 +82,12 @@ export default function ConfiguracionComisionesPage() {
         }),
       });
 
-      setSuccessMsg("Configuración guardada exitosamente");
+      setToast({
+        type: "success",
+        title: "¡Configuración guardada!",
+        message: "La configuración se guardó exitosamente",
+      });
+
       setShowForm(false);
       cargarConfiguraciones();
 
@@ -76,11 +97,13 @@ export default function ConfiguracionComisionesPage() {
         porcentaje: "5.00",
         monto_minimo: "0.00",
       });
-
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (error: any) {
       console.error("Error guardando configuración:", error);
-      setErrorMsg(error?.message || "Error al guardar configuración");
+      setToast({
+        type: "error",
+        title: "Error al guardar",
+        message: error?.message || "No se pudo guardar la configuración",
+      });
     }
   };
 
@@ -110,18 +133,6 @@ export default function ConfiguracionComisionesPage() {
         </button>
       </div>
 
-      {errorMsg && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          {errorMsg}
-        </div>
-      )}
-
-      {successMsg && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-700">
-          {successMsg}
-        </div>
-      )}
-
       {/* Lista de configuraciones */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
@@ -129,12 +140,48 @@ export default function ConfiguracionComisionesPage() {
             Configuraciones Activas
           </h2>
 
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+          {/* Botón con icono + Tooltip */}
+          <Tooltip 
+            text={showForm ? "Cancelar" : "Nueva configuración"} 
+            position="bottom"
           >
-            {showForm ? "Cancelar" : "+ Nueva Configuración"}
-          </button>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="p-2.5 bg-[#b157e0] text-white rounded-lg hover:bg-[#9d4ac4] transition-colors"
+            >
+              {showForm ? (
+                // Icono X (cerrar)
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              ) : (
+                // Icono + (agregar)
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              )}
+            </button>
+          </Tooltip>
         </div>
 
         {loading ? (
@@ -275,7 +322,7 @@ export default function ConfiguracionComisionesPage() {
 
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              className="flex-1 px-4 py-2 bg-[#b157e0] text-white rounded-lg hover:bg-purple-700"
             >
               Guardar Configuración
             </button>
@@ -305,6 +352,27 @@ export default function ConfiguracionComisionesPage() {
           </div>
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+          duration={3500}
+        />
+      )}
+
+      {/* Alert (si lo necesitas para confirmaciones) */}
+      {alert && (
+        <Alert
+          title={alert.title}
+          message={alert.message}
+          type={alert.type}
+          onCancel={() => setAlert(null)}
+        />
+      )}
     </div>
   );
 }

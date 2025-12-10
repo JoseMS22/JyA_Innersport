@@ -2,8 +2,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { useToast } from "@/app/context/ToastContext";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -24,25 +23,20 @@ interface Usuario {
 }
 
 export default function AdminUsuariosPage() {
-    const { showToast } = useToast();
+    const { success, error, confirm } = useNotifications();
 
-    // Estados de datos
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
 
-    // Estados de filtros
     const [page, setPage] = useState(1);
     const limit = 10;
     const [search, setSearch] = useState("");
     const [rolFilter, setRolFilter] = useState("");
 
-    // Estados de Modales
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState<Usuario | null>(null);
-    const [userToDelete, setUserToDelete] = useState<Usuario | null>(null);
 
-    // Formulario
     const [formData, setFormData] = useState({
         nombre: "",
         correo: "",
@@ -51,7 +45,6 @@ export default function AdminUsuariosPage() {
         confirm_password: "",
         rol: "CLIENTE",
         activo: true,
-
         sucursales_ids: [] as number[],
     });
 
@@ -72,9 +65,9 @@ export default function AdminUsuariosPage() {
             const data = await res.json();
             setUsuarios(data.items);
             setTotal(data.total);
-        } catch (error) {
-            console.error(error);
-            showToast("Error al cargar usuarios", "error");
+        } catch (err) {
+            console.error(err);
+            error("Error al cargar", "No se pudieron cargar los usuarios");
         } finally {
             setLoading(false);
         }
@@ -88,7 +81,6 @@ export default function AdminUsuariosPage() {
                 });
                 if (!res.ok) return;
                 const data = await res.json();
-                // ajusta según devuelva tu endpoint (items vs lista directa)
                 setSucursales(data.items ?? data);
             } catch (err) {
                 console.error(err);
@@ -97,7 +89,6 @@ export default function AdminUsuariosPage() {
 
         fetchSucursales();
     }, []);
-
 
     useEffect(() => {
         fetchUsuarios();
@@ -136,16 +127,13 @@ export default function AdminUsuariosPage() {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
-        // Validaciones
         if (!editingUser) {
-            // Creación: Contraseña obligatoria
             if (!formData.password || formData.password !== formData.confirm_password) {
-                return showToast("Las contraseñas no coinciden o están vacías", "error");
+                return error("Error de validación", "Las contraseñas no coinciden o están vacías");
             }
         } else {
-            // Edición: Contraseña opcional, pero si se pone, debe coincidir
             if (formData.password && formData.password !== formData.confirm_password) {
-                return showToast("Las contraseñas no coinciden", "error");
+                return error("Error de validación", "Las contraseñas no coinciden");
             }
         }
 
@@ -155,20 +143,11 @@ export default function AdminUsuariosPage() {
                 : `${API_BASE}/api/v1/usuario/`;
 
             const method = editingUser ? "PUT" : "POST";
-
             const payload: any = { ...formData };
 
-            // LÓGICA CORREGIDA AQUÍ:
             if (editingUser) {
-                // Si estamos editando (PUT):
-                // 1. Si no escribió password, lo quitamos para no enviar string vacío.
                 if (!payload.password) delete payload.password;
-                // 2. El esquema de actualización (UserUpdateAdmin) NO tiene confirm_password, lo borramos.
                 delete payload.confirm_password;
-            } else {
-                // Si estamos creando (POST):
-                // El esquema de creación (UserCreateAdmin) REQUIERE confirm_password.
-                // NO debemos borrarlo.
             }
 
             if (!payload.telefono) payload.telefono = null;
@@ -185,33 +164,41 @@ export default function AdminUsuariosPage() {
                 throw new Error(errData.detail || "Error al guardar usuario");
             }
 
-            showToast(`Usuario ${editingUser ? "actualizado" : "creado"} correctamente`, "success");
+            success(
+                editingUser ? "Usuario actualizado" : "Usuario creado",
+                `El usuario se ha ${editingUser ? "actualizado" : "creado"} correctamente`
+            );
             setShowModal(false);
             fetchUsuarios();
-        } catch (error: any) {
-            showToast(error.message, "error");
+        } catch (err: any) {
+            error("Error al guardar", err.message);
         }
     };
 
-    const handleDelete = async () => {
-        if (!userToDelete) return;
-        try {
-            const res = await fetch(`${API_BASE}/api/v1/usuario/${userToDelete.id}`, {
-                method: "DELETE",
-                credentials: "include"
-            });
+    const handleDeleteUser = (user: Usuario) => {
+        confirm(
+            "Eliminar Usuario",
+            `¿Estás seguro de que deseas eliminar al usuario "${user.nombre}"? Esta acción no se puede deshacer.`,
+            async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/api/v1/usuario/${user.id}`, {
+                        method: "DELETE",
+                        credentials: "include"
+                    });
 
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.detail || "Error al eliminar");
-            }
+                    if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.detail || "Error al eliminar");
+                    }
 
-            showToast("Usuario eliminado correctamente", "success");
-            setUserToDelete(null);
-            fetchUsuarios();
-        } catch (error: any) {
-            showToast(error.message, "error");
-        }
+                    success("Usuario eliminado", "El usuario ha sido eliminado correctamente");
+                    fetchUsuarios();
+                } catch (err: any) {
+                    error("Error al eliminar", err.message);
+                }
+            },
+            "Sí, eliminar"
+        );
     };
 
     const totalPages = Math.ceil(total / limit);
@@ -275,11 +262,11 @@ export default function AdminUsuariosPage() {
                         <tbody className="bg-white divide-y divide-gray-200 text-sm">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">Cargando...</td>
+                                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">Cargando...</td>
                                 </tr>
                             ) : usuarios.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">No se encontraron usuarios.</td>
+                                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">No se encontraron usuarios.</td>
                                 </tr>
                             ) : (
                                 usuarios.map((user) => (
@@ -297,7 +284,6 @@ export default function AdminUsuariosPage() {
                                                 {user.rol}
                                             </span>
                                         </td>
-                                        {/* 🆕 sucursales asignadas */}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {user.rol === "VENDEDOR" && user.sucursales && user.sucursales.length > 0 ? (
                                                 <div className="max-w-[180px] text-[11px] text-gray-600">
@@ -326,7 +312,7 @@ export default function AdminUsuariosPage() {
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                                 </button>
                                                 <button
-                                                    onClick={() => setUserToDelete(user)}
+                                                    onClick={() => handleDeleteUser(user)}
                                                     className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-800 transition-colors"
                                                     title="Eliminar usuario"
                                                 >
@@ -416,7 +402,7 @@ export default function AdminUsuariosPage() {
                                     </div>
                                 </div>
                             </div>
-                            {/* 🆕 Selector de sucursales solo para VENDEDOR */}
+
                             {formData.rol === "VENDEDOR" && (
                                 <div className="mt-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -424,7 +410,6 @@ export default function AdminUsuariosPage() {
                                     </label>
 
                                     <div className="border border-gray-200 rounded-lg p-2 bg-gray-50 max-h-40 overflow-y-auto">
-                                        {/* Opción TODAS */}
                                         <label className="flex items-center gap-2 text-xs mb-1 cursor-pointer">
                                             <input
                                                 type="checkbox"
@@ -446,7 +431,6 @@ export default function AdminUsuariosPage() {
 
                                         <div className="border-t border-gray-200 my-1" />
 
-                                        {/* Lista de sucursales con checkbox */}
                                         {sucursales.map((s) => {
                                             const checked = formData.sucursales_ids.includes(s.id);
                                             return (
@@ -487,7 +471,6 @@ export default function AdminUsuariosPage() {
                                 </div>
                             )}
 
-
                             <div className="border-t pt-4 mt-2">
                                 <p className="text-xs text-gray-500 mb-3 font-semibold uppercase">
                                     {editingUser ? "Cambiar Contraseña (Opcional)" : "Contraseña *"}
@@ -516,16 +499,6 @@ export default function AdminUsuariosPage() {
                     </div>
                 </div>
             )}
-
-            <ConfirmModal
-                isOpen={!!userToDelete}
-                title="Eliminar Usuario"
-                message={`¿Estás seguro de que deseas eliminar al usuario "${userToDelete?.nombre}"? Esta acción no se puede deshacer.`}
-                confirmText="Sí, eliminar"
-                isDestructive={true}
-                onConfirm={handleDelete}
-                onCancel={() => setUserToDelete(null)}
-            />
         </div>
     );
 }

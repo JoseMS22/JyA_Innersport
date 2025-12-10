@@ -4,6 +4,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type Sucursal = {
   id: number;
@@ -33,29 +34,25 @@ type ConfirmMode = "activar" | "desactivar" | null;
 
 export default function AdminSucursalesPage() {
   const router = useRouter();
+  const { success, error } = useNotifications();
 
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [form, setForm] = useState<SucursalFormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // 🔔 Estados para confirmación bonita
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
   const [confirmSucursal, setConfirmSucursal] = useState<Sucursal | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  // =========================
   // Cargar sucursales
-  // =========================
   async function loadSucursales() {
     try {
       setLoading(true);
-      setError(null);
 
       const data = (await apiFetch("/api/v1/sucursales", {
         method: "GET",
@@ -64,7 +61,7 @@ export default function AdminSucursalesPage() {
       setSucursales(data);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar sucursales");
+      error("Error al cargar", err?.message ?? "No se pudieron cargar las sucursales");
     } finally {
       setLoading(false);
     }
@@ -73,10 +70,6 @@ export default function AdminSucursalesPage() {
   useEffect(() => {
     loadSucursales();
   }, []);
-
-  // =========================
-  // Abrir / cerrar modales
-  // =========================
 
   function openCreateModal() {
     setForm(EMPTY_FORM);
@@ -102,14 +95,9 @@ export default function AdminSucursalesPage() {
     setEditingId(null);
   }
 
-  // =========================
-  // Handlers CRUD
-  // =========================
-
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
 
     try {
       const payload = {
@@ -124,11 +112,12 @@ export default function AdminSucursalesPage() {
         body: JSON.stringify(payload),
       });
 
+      success("Sucursal creada", "La sucursal se ha creado correctamente");
       closeModals();
       await loadSucursales();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al crear la sucursal");
+      error("Error al crear", err?.message ?? "No se pudo crear la sucursal");
     } finally {
       setSaving(false);
     }
@@ -139,7 +128,6 @@ export default function AdminSucursalesPage() {
     if (!editingId) return;
 
     setSaving(true);
-    setError(null);
 
     try {
       const payload = {
@@ -154,19 +142,16 @@ export default function AdminSucursalesPage() {
         body: JSON.stringify(payload),
       });
 
+      success("Sucursal actualizada", "Los cambios se han guardado correctamente");
       closeModals();
       await loadSucursales();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al actualizar la sucursal");
+      error("Error al actualizar", err?.message ?? "No se pudo actualizar la sucursal");
     } finally {
       setSaving(false);
     }
   }
-
-  // =========================
-  // Activar / desactivar con modal bonito
-  // =========================
 
   function openConfirmDesactivar(sucursal: Sucursal) {
     setConfirmSucursal(sucursal);
@@ -189,42 +174,34 @@ export default function AdminSucursalesPage() {
 
     try {
       setConfirmLoading(true);
-      setError(null);
 
       if (confirmMode === "desactivar") {
         await apiFetch(`/api/v1/sucursales/${confirmSucursal.id}/desactivar`, {
           method: "PATCH",
         });
+        success("Sucursal desactivada", "La sucursal se ha desactivado correctamente");
       } else {
         await apiFetch(`/api/v1/sucursales/${confirmSucursal.id}/activar`, {
           method: "PATCH",
         });
+        success("Sucursal activada", "La sucursal se ha activado correctamente");
       }
 
       await loadSucursales();
       closeConfirm();
     } catch (err: any) {
       console.error(err);
-      setError(
-        err?.message ??
-        (confirmMode === "desactivar"
-          ? "Error al desactivar la sucursal"
-          : "Error al activar la sucursal")
+      error(
+        confirmMode === "desactivar" ? "Error al desactivar" : "Error al activar",
+        err?.message ?? "No se pudo completar la acción"
       );
       setConfirmLoading(false);
     }
   }
 
-  // =========================
-  // Navegar a inventario de sucursal
-  // =========================
   function handleVerInventario(id: number) {
     router.push(`/admin/sucursales/${id}/inventario`);
   }
-
-  // =========================
-  // Render
-  // =========================
 
   return (
     <div className="space-y-4">
@@ -246,7 +223,6 @@ export default function AdminSucursalesPage() {
 
       {/* Panel principal */}
       <section className="rounded-2xl bg-white/95 border border-[#e5e7eb] p-4 shadow-sm">
-        {/* Barra superior: filtro / leyenda */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />{" "}
@@ -257,14 +233,6 @@ export default function AdminSucursalesPage() {
           </div>
         </div>
 
-        {/* Errores */}
-        {error && (
-          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Lista / tabla */}
         {loading ? (
           <div className="py-6 text-center text-xs text-gray-500">
             Cargando sucursales...
@@ -311,7 +279,6 @@ export default function AdminSucursalesPage() {
                     key={suc.id}
                     className="border-t border-gray-100 hover:bg-gray-50/60"
                   >
-                    {/* Estado */}
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1 text-[11px]">
                         <span
@@ -330,7 +297,6 @@ export default function AdminSucursalesPage() {
                       </span>
                     </td>
 
-                    {/* Nombre */}
                     <td className="px-3 py-2">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-800">
@@ -339,7 +305,6 @@ export default function AdminSucursalesPage() {
                       </div>
                     </td>
 
-                    {/* Dirección */}
                     <td className="px-3 py-2 hidden sm:table-cell text-gray-600">
                       {suc.provincia || (
                         <span className="text-gray-400 text-[11px]">
@@ -348,7 +313,6 @@ export default function AdminSucursalesPage() {
                       )}
                     </td>
 
-                    {/* Dirección */}
                     <td className="px-3 py-2 hidden sm:table-cell text-gray-600">
                       {suc.direccion || (
                         <span className="text-gray-400 text-[11px]">
@@ -357,7 +321,6 @@ export default function AdminSucursalesPage() {
                       )}
                     </td>
 
-                    {/* Teléfono */}
                     <td className="px-3 py-2 hidden md:table-cell text-gray-600">
                       {suc.telefono || (
                         <span className="text-gray-400 text-[11px]">
@@ -366,10 +329,8 @@ export default function AdminSucursalesPage() {
                       )}
                     </td>
 
-                    {/* Acciones */}
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-2 flex-wrap">
-                        {/* Ver inventario */}
                         <button
                           onClick={() => handleVerInventario(suc.id)}
                           title="Ver inventario"
@@ -378,7 +339,6 @@ export default function AdminSucursalesPage() {
                           📦
                         </button>
 
-                        {/* Editar */}
                         <button
                           onClick={() => openEditModal(suc)}
                           title="Editar sucursal"
@@ -387,7 +347,6 @@ export default function AdminSucursalesPage() {
                           ✏️
                         </button>
 
-                        {/* Activar / Desactivar */}
                         {suc.activo ? (
                           <button
                             onClick={() => openConfirmDesactivar(suc)}
@@ -407,7 +366,6 @@ export default function AdminSucursalesPage() {
                         )}
                       </div>
                     </td>
-
                   </tr>
                 ))}
               </tbody>
@@ -456,10 +414,7 @@ export default function AdminSucursalesPage() {
   );
 }
 
-// =========================
 // Componentes auxiliares
-// =========================
-
 type ModalWrapperProps = {
   title: string;
   children: React.ReactNode;
@@ -530,7 +485,6 @@ function SucursalForm({
         />
       </div>
 
-
       <div>
         <label className="block mb-1 font-medium text-gray-700">
           Dirección
@@ -570,15 +524,10 @@ function SucursalForm({
         >
           {saving ? "Guardando..." : actionLabel}
         </button>
-
       </div>
     </form>
   );
 }
-
-// =========================
-// Modal de confirmación
-// =========================
 
 type ConfirmModalProps = {
   mode: "activar" | "desactivar";

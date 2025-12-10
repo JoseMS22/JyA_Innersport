@@ -1,8 +1,10 @@
-// frontend/app/admin/programa-puntos/programa-puntos.tsx
+// frontend/app/admin/programa-puntos/page.tsx
+
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type ProgramaPuntosConfig = {
   id: number;
@@ -33,20 +35,17 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function ProgramaPuntosAdminPage() {
+  const { success, error } = useNotifications();
+  
   const [config, setConfig] = useState<ProgramaPuntosConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  // =========================
   // Cargar configuración
-  // =========================
   async function loadConfig() {
     try {
       setLoading(true);
-      setError(null);
       const data = (await apiFetch("/api/v1/puntos/config", {
         method: "GET",
       })) as ProgramaPuntosConfig;
@@ -68,7 +67,7 @@ export default function ProgramaPuntosAdminPage() {
       });
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar la configuración de puntos.");
+      error("Error al cargar", err?.message ?? "Error al cargar la configuración de puntos");
     } finally {
       setLoading(false);
     }
@@ -78,14 +77,10 @@ export default function ProgramaPuntosAdminPage() {
     loadConfig();
   }, []);
 
-  // =========================
   // Guardar configuración
-  // =========================
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const payload = {
@@ -113,22 +108,20 @@ export default function ProgramaPuntosAdminPage() {
       })) as ProgramaPuntosConfig;
 
       setConfig(updated);
-      setSuccess("Configuración actualizada correctamente.");
+      success("Configuración actualizada", "Los cambios se han guardado correctamente");
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al guardar la configuración.");
+      error("Error al guardar", err?.message ?? "No se pudo guardar la configuración");
     } finally {
       setSaving(false);
     }
   }
 
-  // =========================
   // Helpers de ejemplo
-  // =========================
   const puntosPorColon = Number(form.puntos_por_colon || "0");
   const valorPorPunto = Number(form.valor_colon_por_punto || "0");
 
-  const ejemploCompra = 10000; // ₡10 000 de ejemplo
+  const ejemploCompra = 10000;
   const puntosPorEjemplo =
     puntosPorColon > 0 ? Math.round(ejemploCompra * puntosPorColon) : 0;
   const valorEjemploPuntos =
@@ -156,18 +149,6 @@ export default function ProgramaPuntosAdminPage() {
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Mensajes */}
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-                {success}
-              </div>
-            )}
-
             {/* Estado */}
             <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2">
               <div>
