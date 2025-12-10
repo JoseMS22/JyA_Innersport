@@ -4,6 +4,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type VentaItem = {
   id: number;
@@ -54,20 +55,18 @@ const ESTADOS_VENTA_POS = ["PAGADO", "ENTREGADO", "CANCELADO"] as const;
 export default function AdminPosVentaDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { success, error: showError } = useNotifications();
   const id = Number(params?.id);
 
   const [venta, setVenta] = useState<VentaDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [estadoLocal, setEstadoLocal] = useState<string>("");
   const [savingEstado, setSavingEstado] = useState(false);
-  const [mensajeEstado, setMensajeEstado] = useState<string | null>(null);
 
   async function loadVenta() {
     try {
       setLoading(true);
-      setError(null);
 
       const data = (await apiFetch(`/api/v1/pos/ventas/${id}`, {
         method: "GET",
@@ -77,7 +76,10 @@ export default function AdminPosVentaDetailPage() {
       setEstadoLocal(data.estado);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar la venta POS");
+      showError(
+        "Error al cargar",
+        err?.message ?? "No se pudo cargar la venta POS"
+      );
     } finally {
       setLoading(false);
     }
@@ -95,8 +97,6 @@ export default function AdminPosVentaDetailPage() {
 
     try {
       setSavingEstado(true);
-      setMensajeEstado(null);
-      setError(null);
 
       await apiFetch(`/api/v1/pos/ventas/${venta.id}/estado`, {
         method: "PATCH",
@@ -104,10 +104,16 @@ export default function AdminPosVentaDetailPage() {
       });
 
       await loadVenta();
-      setMensajeEstado("Estado de la venta POS actualizado correctamente.");
+      success(
+        "Estado actualizado",
+        "El estado de la venta POS se actualizó correctamente."
+      );
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al actualizar el estado de la venta POS");
+      showError(
+        "Error al actualizar",
+        err?.message ?? "No se pudo actualizar el estado de la venta POS"
+      );
     } finally {
       setSavingEstado(false);
     }
@@ -121,11 +127,11 @@ export default function AdminPosVentaDetailPage() {
     );
   }
 
-  if (error || !venta) {
+  if (!venta) {
     return (
       <div className="space-y-3">
         <p className="text-xs text-red-600">
-          {error || "No se pudo cargar la venta POS"}
+          No se pudo cargar la venta POS
         </p>
         <button
           onClick={() => router.push("/admin/pos/ventas")}
@@ -175,18 +181,6 @@ export default function AdminPosVentaDetailPage() {
           Volver
         </button>
       </header>
-
-      {/* Mensajes */}
-      {mensajeEstado && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-          {mensajeEstado}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-          {error}
-        </div>
-      )}
 
       {/* Estado + Totales */}
       <section className="grid md:grid-cols-2 gap-4">

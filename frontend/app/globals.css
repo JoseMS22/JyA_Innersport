@@ -42,6 +42,53 @@ body {
 }
 
 /* ========================================== */
+/* MODALES Y ALERTS - TEXTO NEGRO SIEMPRE    */
+/* ========================================== */
+
+/* Forzar texto negro en modales con fondo blanco */
+div[class*="fixed"][class*="bg-black"] > div[class*="bg-white"],
+div[class*="fixed"][class*="bg-black"] > div[class*="bg-white"] *,
+.fixed.inset-0 > .bg-white,
+.fixed.inset-0 > .bg-white *,
+/* Alert message específico */
+.alert-message-override,
+.alert-message-text {
+  color: #111827 !important;
+}
+
+/* Headers en modales - siempre negro */
+div[class*="bg-white"] h2,
+div[class*="bg-white"] h3 {
+  color: #111827 !important;
+}
+
+/* Párrafos en modales */
+div[class*="bg-white"] p:not([class*="bg-gray-900"] *):not([class*="bg-purple"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]) {
+  color: #111827 !important;
+}
+
+/* Labels en modales */
+div[class*="bg-white"] label {
+  color: #1f2937 !important;
+}
+
+/* Inputs en modales */
+div[class*="bg-white"] input:not([type="checkbox"]):not([type="radio"]) {
+  color: #111827 !important;
+}
+
+/* Selects en modales */
+div[class*="bg-white"] select {
+  color: #111827 !important;
+}
+
+/* Texto pequeño en modales */
+div[class*="bg-white"] .text-xs,
+div[class*="bg-white"] .text-sm {
+  color: #4b5563 !important;
+}
+
+/* ========================================== */
 /* TOOLTIP - TEXTO BLANCO PARA LEGIBILIDAD   */
 /* ========================================== */
 
@@ -139,7 +186,9 @@ button[class*="border"]:not([class*="bg-gray-900"] *) {
 
 /* Inputs de búsqueda - texto oscuro */
 input[type="text"],
-input[type="search"] {
+input[type="search"],
+input[type="email"],
+input[type="password"] {
   color: #111827 !important;
 }
 

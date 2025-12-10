@@ -1,9 +1,10 @@
 // frontend/app/admin/productos/[productoId]/page.tsx
-
 "use client";
 
 import { FormEvent, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Tooltip } from "@/components/ui/tooltip";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -61,6 +62,7 @@ function buildMediaUrl(url: string) {
 export default function EditarProductoPage() {
   const { productoId } = useParams();
   const router = useRouter();
+  const { success, error: showError, confirm } = useNotifications();
 
   const [producto, setProducto] = useState<Producto | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -69,29 +71,16 @@ export default function EditarProductoPage() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [activo, setActivo] = useState(true);
-  const [marca, setMarca] = useState(""); // Marca única del producto
+  const [marca, setMarca] = useState("");
 
   const [variantes, setVariantes] = useState<VarianteRow[]>([]);
   const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
-
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [savingMediaOrder, setSavingMediaOrder] = useState(false);
-
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  function showSuccess(message: string) {
-    setSuccessMsg(message);
-    setErrorMsg(null);
-
-    setTimeout(() => {
-      setSuccessMsg(null);
-    }, 3000);
-  }
 
   // =========================
   // Cargar datos
@@ -132,7 +121,6 @@ export default function EditarProductoPage() {
       );
       setSelectedCatIds(catIds);
 
-      // Marca tomada de la primera variante (si existe)
       if (vData && vData.length > 0) {
         setMarca(vData[0].marca || "");
       } else {
@@ -149,7 +137,7 @@ export default function EditarProductoPage() {
       setMediaList(sortedMedia);
     } catch (err) {
       console.error("Error cargando producto:", err);
-      setErrorMsg("No se pudo cargar el producto.");
+      showError("Error", "No se pudo cargar el producto.");
     } finally {
       setLoading(false);
     }
@@ -177,7 +165,6 @@ export default function EditarProductoPage() {
     if (!producto) return;
 
     setSaving(true);
-    setErrorMsg(null);
 
     try {
       const res = await fetch(
@@ -203,10 +190,10 @@ export default function EditarProductoPage() {
       }
 
       await loadData();
-      showSuccess("Los datos del producto se guardaron correctamente.");
+      success("¡Guardado!", "Los datos del producto se guardaron correctamente.");
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Error al guardar cambios.");
+      showError("Error", err.message || "Error al guardar cambios.");
     } finally {
       setSaving(false);
     }
@@ -243,7 +230,6 @@ export default function EditarProductoPage() {
     setVariantes((prev) => [...prev, nueva]);
   }
 
-  // Agregar nueva talla dentro de un color existente
   function addSizeForColor(color: string) {
     const nueva: VarianteRow = {
       id: 0,
@@ -294,8 +280,14 @@ export default function EditarProductoPage() {
   }
 
   function removeColorGroup(indices: number[]) {
-    setVariantes((prev) =>
-      prev.filter((_, idx) => !indices.includes(idx))
+    confirm(
+      "Eliminar grupo de color",
+      "¿Estás seguro de eliminar todas las variantes de este color?",
+      () => {
+        setVariantes((prev) =>
+          prev.filter((_, idx) => !indices.includes(idx))
+        );
+      }
     );
   }
 
@@ -305,7 +297,6 @@ export default function EditarProductoPage() {
 
     try {
       if (v._isNew) {
-        // Crear variante
         const res = await fetch(
           `${API_BASE}/api/v1/variantes/productos/${producto.id}/variantes`,
           {
@@ -330,7 +321,6 @@ export default function EditarProductoPage() {
           );
         }
       } else {
-        // Actualizar variante existente
         const res = await fetch(
           `${API_BASE}/api/v1/variantes/variantes/${v.id}`,
           {
@@ -358,10 +348,10 @@ export default function EditarProductoPage() {
       }
 
       await loadData();
-      showSuccess("La variante se guardó correctamente.");
+      success("¡Guardado!", "La variante se guardó correctamente.");
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Error al guardar la variante.");
+      showError("Error", err.message || "Error al guardar la variante.");
     }
   }
 
@@ -372,28 +362,32 @@ export default function EditarProductoPage() {
       return;
     }
 
-    if (!confirm("¿Eliminar (desactivar) esta variante?")) return;
-
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/variantes/variantes/${v.id}/desactivar`,
-        {
-          method: "PATCH",
-          credentials: "include",
+    confirm(
+      "Eliminar variante",
+      "¿Estás seguro de desactivar esta variante?",
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/v1/variantes/variantes/${v.id}/desactivar`,
+            {
+              method: "PATCH",
+              credentials: "include",
+            }
+          );
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(
+              errData?.detail || "No se pudo desactivar la variante."
+            );
+          }
+          await loadData();
+          success("¡Eliminado!", "La variante se desactivó correctamente.");
+        } catch (err: any) {
+          console.error(err);
+          showError("Error", err.message || "Error al desactivar la variante.");
         }
-      );
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(
-          errData?.detail || "No se pudo desactivar la variante."
-        );
       }
-      await loadData();
-      showSuccess("La variante se desactivo correctamente.");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Error al desactivar la variante.");
-    }
+    );
   }
 
   // =========================
@@ -426,10 +420,10 @@ export default function EditarProductoPage() {
       }
 
       await loadData();
-      showSuccess("La imagen se guardó correctamente.");
+      success("¡Subido!", "Las imágenes se guardaron correctamente.");
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Error al subir la imagen.");
+      showError("Error", err.message || "Error al subir las imágenes.");
     } finally {
       setUploading(false);
       if (e.target) e.target.value = "";
@@ -438,28 +432,33 @@ export default function EditarProductoPage() {
 
   async function eliminarMedia(mediaId: number) {
     if (!producto) return;
-    if (!confirm("¿Eliminar esta imagen?")) return;
 
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/productos/media/${mediaId}`,
-        {
-          method: "DELETE",
-          credentials: "include",
+    confirm(
+      "Eliminar imagen",
+      "¿Estás seguro de eliminar esta imagen?",
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/v1/productos/media/${mediaId}`,
+            {
+              method: "DELETE",
+              credentials: "include",
+            }
+          );
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(
+              errData?.detail || "No se pudo eliminar la imagen."
+            );
+          }
+          await loadData();
+          success("¡Eliminado!", "La imagen se eliminó correctamente.");
+        } catch (err: any) {
+          console.error(err);
+          showError("Error", err.message || "Error al eliminar la imagen.");
         }
-      );
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(
-          errData?.detail || "No se pudo eliminar la imagen."
-        );
       }
-      await loadData();
-      showSuccess("La imagen se elimino correctamente.");
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Error al eliminar la imagen.");
-    }
+    );
   }
 
   function moveMedia(mediaId: number, direction: "up" | "down") {
@@ -506,10 +505,10 @@ export default function EditarProductoPage() {
       }
 
       await loadData();
-      showSuccess("El orden de las imágenes se guardó correctamente.");
+      success("¡Guardado!", "El orden de las imágenes se guardó correctamente.");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Error al guardar el orden de las imágenes.");
+      showError("Error", err.message || "Error al guardar el orden de las imágenes.");
     } finally {
       setSavingMediaOrder(false);
     }
@@ -582,7 +581,7 @@ export default function EditarProductoPage() {
               <label className="font-medium text-gray-700 text-[11px]">
                 Estado
               </label>
-              <div className="flex items.center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1">
                 <input
                   id="activo"
                   type="checkbox"
@@ -664,36 +663,28 @@ export default function EditarProductoPage() {
           </div>
         </section>
 
-        {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-[11px] text-red-700">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800">
-            {successMsg}
-          </div>
-        )}
-
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => router.push("/admin/productos")}
-            className="px-3 py-1.5 text-xs rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-1.5 text-xs rounded-full
-             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
-             font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
-             disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </button>
+          <Tooltip text="Descartar cambios y volver">
+            <button
+              type="button"
+              onClick={() => router.push("/admin/productos")}
+              className="px-3 py-1.5 text-xs rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+          </Tooltip>
+          <Tooltip text="Guardar los datos del producto">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-1.5 text-xs rounded-full
+               bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+               font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+               disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </Tooltip>
         </div>
       </form>
 
@@ -708,16 +699,18 @@ export default function EditarProductoPage() {
               Gestiona tallas, colores, SKU, código de barras y precio.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={addNewVarianteRow}
-            className="inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
-             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
-             hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
-          >
-            <span>➕</span>
-            <span>Nueva variante</span>
-          </button>
+          <Tooltip text="Crear una nueva variante del producto">
+            <button
+              type="button"
+              onClick={addNewVarianteRow}
+              className="inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
+               bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+               hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
+            >
+              <span>➕</span>
+              <span>Nueva variante</span>
+            </button>
+          </Tooltip>
         </div>
 
         {variantes.length === 0 ? (
@@ -814,16 +807,18 @@ export default function EditarProductoPage() {
                     </div>
                   ))}
 
-                  <button
-                    type="button"
-                    onClick={() => addSizeForColor(group.color)}
-                    className="mt-1 inline-flex.items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
-           bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
-           hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
-                  >
-                    <span>➕</span>
-                    <span>Agregar talla</span>
-                  </button>
+                  <Tooltip text="Agregar una nueva talla para este color">
+                    <button
+                      type="button"
+                      onClick={() => addSizeForColor(group.color)}
+                      className="mt-1 inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full
+             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+             hover:bg-[#ede9fe] hover:border-[#c4b5fd] shadow-sm transition-colors"
+                    >
+                      <span>➕</span>
+                      <span>Agregar talla</span>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             ))}
@@ -857,23 +852,25 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            <label
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
-             bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
-             text-[11px] cursor-pointer hover:bg-[#ede9fe] hover:border-[#c4b5fd]
-             shadow-sm transition-colors"
-            >
-              <span>📸</span>
-              <span>{uploading ? "Subiendo..." : "Subir imágenes"}</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                multiple
-                onChange={handleUpload}
-                disabled={uploading}
-              />
-            </label>
+            <Tooltip text="Subir nuevas imágenes del producto">
+              <label
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                 bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
+                 text-[11px] cursor-pointer hover:bg-[#ede9fe] hover:border-[#c4b5fd]
+                 shadow-sm transition-colors"
+              >
+                <span>📸</span>
+                <span>{uploading ? "Subiendo..." : "Subir imágenes"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+              </label>
+            </Tooltip>
 
             {mediaList.length > 1 && (
               <button
@@ -929,14 +926,14 @@ export default function EditarProductoPage() {
                     type="button"
                     onClick={() => moveMedia(m.id, "down")}
                     disabled={index === mediaList.length - 1}
-                    className="text-[10px] bg-white/80 text-gray-800 px-1.5 py-0.5 rounded-full border border-gray-200.disabled:opacity-40"
+                    className="text-[10px] bg-white/80 text-gray-800 px-1.5 py-0.5 rounded-full border border-gray-200 disabled:opacity-40"
                     title="Bajar"
                   >
                     ▼
                   </button>
                   <button
                     onClick={() => eliminarMedia(m.id)}
-                    className="text-[10px] bg-red-600 text.white px-1.5 py-0.5 rounded-full hover:bg-red-700"
+                    className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full hover:bg-red-700"
                     title="Eliminar"
                   >
                     ✕
@@ -991,7 +988,7 @@ function VariantEditModal({
               Talla
             </label>
             <input
-              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
               value={variante.talla || ""}
               onChange={(e) => onChange("talla", e.target.value)}
               placeholder="Ej: M"
@@ -1003,7 +1000,7 @@ function VariantEditModal({
               SKU
             </label>
             <input
-              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
               value={variante.sku || ""}
               onChange={(e) => onChange("sku", e.target.value)}
               placeholder="Código interno"
@@ -1015,7 +1012,7 @@ function VariantEditModal({
               Código de barras
             </label>
             <input
-              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
               value={variante.barcode || ""}
               onChange={(e) => onChange("barcode", e.target.value)}
               placeholder="Opcional"
@@ -1030,7 +1027,7 @@ function VariantEditModal({
               type="number"
               min={0}
               step="0.01"
-              className="w-full border border-gray-200 rounded px-2.py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
+              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]"
               value={variante.precio_actual}
               onChange={(e) =>
                 onChange("precio_actual", Number(e.target.value) || 0)
@@ -1084,10 +1081,10 @@ function VariantEditModal({
                 onSave();
                 onClose();
               }}
-              className="px-4.py-1.5 text-xs rounded-full
+              className="px-4 py-1.5 text-xs rounded-full
                        bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
                        font-semibold hover:bg-[#ede9fe] hover:border-[#c4b5fd]
-                      .disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Guardar cambios
             </button>
