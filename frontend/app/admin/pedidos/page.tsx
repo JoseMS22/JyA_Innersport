@@ -4,6 +4,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type PedidoHistorial = {
   id: number;
@@ -11,7 +13,7 @@ type PedidoHistorial = {
   estado: string;
   fecha_creacion: string;
   sucursal_id: number | null;
-  sucursal_nombre?: string | null; // 👈 nuevo
+  sucursal_nombre?: string | null;
   cancelado: boolean;
   numero_pedido?: string | null;
 };
@@ -27,10 +29,10 @@ const ESTADOS = [
 
 export default function AdminPedidosPage() {
   const router = useRouter();
+  const { error } = useNotifications();
 
   const [pedidos, setPedidos] = useState<PedidoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [estadoFiltro, setEstadoFiltro] = useState<string>("TODOS");
 
   // 🏬 Filtro por sucursal (TODAS = sin filtro)
@@ -41,7 +43,6 @@ export default function AdminPedidosPage() {
   async function loadPedidos(selectedEstado: string) {
     try {
       setLoading(true);
-      setError(null);
 
       const params =
         selectedEstado === "TODOS"
@@ -55,7 +56,7 @@ export default function AdminPedidosPage() {
       setPedidos(data);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar pedidos");
+      error("Error al cargar", err?.message ?? "No se pudieron cargar los pedidos");
     } finally {
       setLoading(false);
     }
@@ -126,7 +127,7 @@ export default function AdminPedidosPage() {
           ))}
         </div>
 
-        {/* 🏬 Filtro por sucursal (bonito y moderno) */}
+        {/* 🏬 Filtro por sucursal */}
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-gray-500 hidden sm:inline">
             Filtrar por sucursal:
@@ -160,13 +161,6 @@ export default function AdminPedidosPage() {
           </div>
         </div>
       </div>
-
-      {/* Errores */}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-          {error}
-        </div>
-      )}
 
       {/* Tabla de pedidos */}
       <section className="rounded-2xl bg-white/95 border border-[#e5e7eb] p-4 shadow-sm">
@@ -229,29 +223,29 @@ export default function AdminPedidosPage() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end">
-                        <button
-                          onClick={() => handleVerDetalle(p.id)}
-                          title="Ver detalles"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full 
-             bg-sky-50 text-sky-700 border border-sky-100 
-             hover:bg-sky-100 hover:border-sky-200 
-             transition-colors text-xs"
-                        >
-                          {/* Ícono de lupa / detalle */}
-                          <svg
-                            className="w-3.5 h-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        <Tooltip text="Ver detalles del pedido" position="top">
+                          <button
+                            onClick={() => handleVerDetalle(p.id)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full 
+                              bg-sky-50 text-sky-700 border border-sky-100 
+                              hover:bg-sky-100 hover:border-sky-200 
+                              transition-colors text-xs"
                           >
-                            <circle cx="11" cy="11" r="6" />
-                            <line x1="16" y1="16" x2="20" y2="20" />
-                          </svg>
-                        </button>
-
+                            {/* Ícono de lupa / detalle */}
+                            <svg
+                              className="w-3.5 h-3.5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="11" cy="11" r="6" />
+                              <line x1="16" y1="16" x2="20" y2="20" />
+                            </svg>
+                          </button>
+                        </Tooltip>
                       </div>
                     </td>
                   </tr>

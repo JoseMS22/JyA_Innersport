@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useNotifications } from "@/app/context/NotificationContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -23,7 +25,6 @@ type HistorialPrecio = {
   id: number;
   precio: number;
   vigente_desde: string;
-  // opcional si tu schema lo tiene
   vigente_hasta?: string | null;
 };
 
@@ -41,21 +42,21 @@ type ProductoHistSummary = {
   producto: Producto;
   variantesCount: number;
   historialTotalRegistros: number;
-  totalCambios: number; // registros - número de variantes (asumiendo 1 inicial)
+  totalCambios: number;
 };
 
 export default function HistorialPreciosResumenPage() {
+  const { error } = useNotifications();
+
   const [productos, setProductos] = useState<Producto[]>([]);
   const [summaries, setSummaries] = useState<ProductoHistSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        setErrorMsg(null);
 
         // 1) Cargar productos
         const resProd = await fetch(`${API_BASE}/api/v1/productos`, {
@@ -77,7 +78,6 @@ export default function HistorialPreciosResumenPage() {
           );
 
           if (!resVar.ok) {
-            // si falla uno, seguimos con los demás, pero lo anotamos en log
             console.error(
               `Error cargando variantes para producto ${p.id}`,
               await resVar.text()
@@ -93,8 +93,6 @@ export default function HistorialPreciosResumenPage() {
             const len = v.historial_precios?.length || 0;
             totalRegistros += len;
             if (len > 0) {
-              // asumimos que el primer registro es el precio inicial,
-              // por lo que cambios = len - 1
               totalCambios += Math.max(len - 1, 0);
             }
           }
@@ -110,8 +108,9 @@ export default function HistorialPreciosResumenPage() {
         setSummaries(summariesTemp);
       } catch (err: any) {
         console.error(err);
-        setErrorMsg(
-          err?.message || "Ocurrió un error al cargar el historial."
+        error(
+          "Error al cargar",
+          err?.message || "No se pudo cargar el historial de precios"
         );
       } finally {
         setLoading(false);
@@ -180,7 +179,6 @@ export default function HistorialPreciosResumenPage() {
             <span className="absolute left-2 top-1.5 text-white text-sm">
               🔍
             </span>
-
           </div>
         </div>
       </header>
@@ -191,10 +189,6 @@ export default function HistorialPreciosResumenPage() {
           <p className="text-gray-500 text-xs">
             Cargando historial de precios...
           </p>
-        ) : errorMsg ? (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-[11px] text-red-700">
-            {errorMsg}
-          </div>
         ) : filtered.length === 0 ? (
           <p className="text-gray-500 text-xs">
             No hay datos de historial para mostrar.
@@ -307,30 +301,30 @@ export default function HistorialPreciosResumenPage() {
 
                         {/* Acciones */}
                         <td className="px-3 py-3 text-center align-top">
-                          <Link
-                            href={`/admin/historial-precios/${p.id}`}
-                            title="Ver detalles del historial"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full
-               bg-sky-50 text-sky-700 border border-sky-100
-               hover:bg-sky-100 hover:border-sky-200
-               transition-colors"
-                          >
-                            {/* Ícono de lupa */}
-                            <svg
-                              className="w-3.5 h-3.5"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                          <Tooltip text="Ver detalles del historial" position="top">
+                            <Link
+                              href={`/admin/historial-precios/${p.id}`}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full
+                                bg-sky-50 text-sky-700 border border-sky-100
+                                hover:bg-sky-100 hover:border-sky-200
+                                transition-colors"
                             >
-                              <circle cx="11" cy="11" r="6" />
-                              <line x1="16" y1="16" x2="20" y2="20" />
-                            </svg>
-                          </Link>
+                              {/* Ícono de lupa */}
+                              <svg
+                                className="w-3.5 h-3.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <circle cx="11" cy="11" r="6" />
+                                <line x1="16" y1="16" x2="20" y2="20" />
+                              </svg>
+                            </Link>
+                          </Tooltip>
                         </td>
-
                       </tr>
                     );
                   })}

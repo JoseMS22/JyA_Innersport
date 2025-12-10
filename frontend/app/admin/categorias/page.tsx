@@ -3,6 +3,8 @@
 
 import { useEffect, useState, FormEvent, Dispatch, SetStateAction } from "react";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type CategoriaLite = {
   id: number;
@@ -39,10 +41,11 @@ const EMPTY_FORM: CategoriaFormState = {
 type ConfirmMode = "activar" | "desactivar" | null;
 
 export default function AdminCategoriasPage() {
+  const { error, success, showAlert } = useNotifications();
+
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -62,7 +65,6 @@ export default function AdminCategoriasPage() {
   async function loadCategorias() {
     try {
       setLoading(true);
-      setError(null);
 
       const data = (await apiFetch("/api/v1/categorias", {
         method: "GET",
@@ -71,7 +73,7 @@ export default function AdminCategoriasPage() {
       setCategorias(data);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al cargar categorías");
+      error("Error al cargar", err?.message ?? "No se pudieron cargar las categorías");
     } finally {
       setLoading(false);
     }
@@ -117,12 +119,12 @@ export default function AdminCategoriasPage() {
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
 
     try {
       // Validación: si es secundaria, debe tener al menos una principal
       if (form.secundaria && form.principales_ids.length === 0) {
-        setError(
+        error(
+          "Categoría incompleta",
           "Una categoría secundaria debe tener al menos una categoría principal asociada."
         );
         setSaving(false);
@@ -142,11 +144,12 @@ export default function AdminCategoriasPage() {
         body: JSON.stringify(payload),
       });
 
+      success("¡Creada!", "Categoría creada exitosamente");
       closeModals();
       await loadCategorias();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al crear la categoría");
+      error("Error al crear", err?.message ?? "No se pudo crear la categoría");
     } finally {
       setSaving(false);
     }
@@ -157,12 +160,12 @@ export default function AdminCategoriasPage() {
     if (!editingId) return;
 
     setSaving(true);
-    setError(null);
 
     try {
       // Validación: si es secundaria, debe tener al menos una principal
       if (form.secundaria && form.principales_ids.length === 0) {
-        setError(
+        error(
+          "Categoría incompleta",
           "Una categoría secundaria debe tener al menos una categoría principal asociada."
         );
         setSaving(false);
@@ -182,11 +185,12 @@ export default function AdminCategoriasPage() {
         body: JSON.stringify(payload),
       });
 
+      success("¡Actualizada!", "Categoría actualizada exitosamente");
       closeModals();
       await loadCategorias();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message ?? "Error al actualizar la categoría");
+      error("Error al actualizar", err?.message ?? "No se pudo actualizar la categoría");
     } finally {
       setSaving(false);
     }
@@ -217,27 +221,26 @@ export default function AdminCategoriasPage() {
 
     try {
       setConfirmLoading(true);
-      setError(null);
 
       if (confirmMode === "desactivar") {
         await apiFetch(`/api/v1/categorias/${confirmCategoria.id}/desactivar`, {
           method: "PATCH",
         });
+        success("Desactivada", "Categoría desactivada exitosamente");
       } else {
         await apiFetch(`/api/v1/categorias/${confirmCategoria.id}/activar`, {
           method: "PATCH",
         });
+        success("Activada", "Categoría activada exitosamente");
       }
 
       await loadCategorias();
       closeConfirm();
     } catch (err: any) {
       console.error(err);
-      setError(
-        err?.message ??
-        (confirmMode === "desactivar"
-          ? "Error al desactivar la categoría"
-          : "Error al activar la categoría")
+      error(
+        confirmMode === "desactivar" ? "Error al desactivar" : "Error al activar",
+        err?.message ?? "No se pudo completar la operación"
       );
       setConfirmLoading(false);
     }
@@ -311,13 +314,6 @@ export default function AdminCategoriasPage() {
             </div>
           </div>
         </div>
-
-        {/* Errores */}
-        {error && (
-          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-            {error}
-          </div>
-        )}
 
         {/* Lista / tabla */}
         {loading ? (
@@ -431,35 +427,37 @@ export default function AdminCategoriasPage() {
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-2 flex-wrap">
                         {/* Editar */}
-                        <button
-                          onClick={() => openEditModal(cat)}
-                          title="Editar categoría"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 text-sm"
-                        >
-                          ✏️
-                        </button>
+                        <Tooltip text="Editar categoría" position="top">
+                          <button
+                            onClick={() => openEditModal(cat)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 text-sm"
+                          >
+                            ✏️
+                          </button>
+                        </Tooltip>
 
                         {/* Activar / Desactivar */}
                         {cat.activo ? (
-                          <button
-                            onClick={() => openConfirmDesactivar(cat)}
-                            title="Desactivar categoría"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-sm"
-                          >
-                            🗑️
-                          </button>
+                          <Tooltip text="Desactivar categoría" position="top">
+                            <button
+                              onClick={() => openConfirmDesactivar(cat)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-sm"
+                            >
+                              🗑️
+                            </button>
+                          </Tooltip>
                         ) : (
-                          <button
-                            onClick={() => openConfirmActivar(cat)}
-                            title="Activar categoría"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 text-sm"
-                          >
-                            ✅
-                          </button>
+                          <Tooltip text="Activar categoría" position="top">
+                            <button
+                              onClick={() => openConfirmActivar(cat)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 text-sm"
+                            >
+                              ✅
+                            </button>
+                          </Tooltip>
                         )}
                       </div>
                     </td>
-
                   </tr>
                 ))}
               </tbody>
@@ -550,7 +548,6 @@ type CategoriaFormProps = {
   categorias: Categoria[];
   currentId: number | null;
 };
-
 
 function CategoriaForm({
   form,
