@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading || !email}
-            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Enviando..." : "Enviar enlace de recuperación"}
           </button>
@@ -107,14 +107,14 @@ export default function ForgotPasswordPage() {
             <button
               type="button"
               onClick={() => router.push("/login")}
-              className="w-full text-center text-sm text-[#6b21a8] hover:text-[#a855f7] font-medium"
+              className="w-full text-center text-sm text-[#6b21a8] !hover:text-[#a855f7] hover:underline underline-offset-2 font-medium transition-colors"
             >
               ← Volver a iniciar sesión
             </button>
             <button
               type="button"
               onClick={() => router.push("/register")}
-              className="w-full text-center text-xs text-gray-600 hover:text-[#6b21a8]"
+              className="w-full text-center text-xs text-gray-600 !hover:text-[#a855f7] hover:underline underline-offset-2 transition-colors"
             >
               ¿No tienes cuenta? Regístrate aquí
             </button>

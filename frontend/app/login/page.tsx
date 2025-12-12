@@ -123,7 +123,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => router.push("/forgot-password")}
-              className="text-xs text-[#6b21a8] hover:text-[#a855f7] font-medium"
+              className="text-xs text-[#6b21a8] hover:text-[#a855f7] hover:underline underline-offset-2 font-medium"
             >
               ¿Olvidaste tu contraseña?
             </button>
@@ -140,7 +140,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </button>
@@ -152,7 +152,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => router.push("/register")}
-                className="text-[#6b21a8] hover:text-[#a855f7] font-medium"
+                className="text-[#6b21a8] hover:text-[#a855f7] hover:underline underline-offset-2 font-medium transition-colors"
               >
                 Regístrate aquí
               </button>

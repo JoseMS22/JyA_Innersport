@@ -4,7 +4,9 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
+import { RecommendedFooter } from "@/components/RecommendedFooter";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type Direccion = {
   id: number;
@@ -48,11 +50,10 @@ const PROVINCIAS = [
 
 export default function AddressesPage() {
   const router = useRouter();
+  const { success, error: showError, confirm } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Modo edición/creación
   const [editando, setEditando] = useState<number | "nueva" | null>(null);
@@ -80,23 +81,17 @@ export default function AddressesPage() {
   async function loadDirecciones() {
     try {
       setLoading(true);
-      setErrorMsg(null);
       const data = await apiFetch("/api/v1/direcciones/");
       setDirecciones(data);
     } catch (err: any) {
-      setErrorMsg(err?.message || "No se pudieron cargar las direcciones");
+      showError(
+        "Error al cargar",
+        err?.message || "No se pudieron cargar las direcciones"
+      );
     } finally {
       setLoading(false);
     }
   }
-
-  // Auto-hide mensajes
-  useEffect(() => {
-    if (successMsg) {
-      const timer = setTimeout(() => setSuccessMsg(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMsg]);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -125,8 +120,6 @@ export default function AddressesPage() {
       predeterminada: false,
     });
     setEditando("nueva");
-    setErrorMsg(null);
-    setSuccessMsg(null);
   }
 
   function iniciarEdicion(direccion: Direccion) {
@@ -143,8 +136,6 @@ export default function AddressesPage() {
       predeterminada: direccion.predeterminada,
     });
     setEditando(direccion.id);
-    setErrorMsg(null);
-    setSuccessMsg(null);
   }
 
   function cancelarEdicion() {
@@ -161,13 +152,10 @@ export default function AddressesPage() {
       referencia: "",
       predeterminada: false,
     });
-    setErrorMsg(null);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setGuardando(true);
 
     try {
@@ -177,20 +165,23 @@ export default function AddressesPage() {
           method: "POST",
           body: JSON.stringify(form),
         });
-        setSuccessMsg("Dirección creada correctamente");
+        success("Dirección creada", "La dirección se ha guardado correctamente");
       } else if (typeof editando === "number") {
         // Actualizar existente
         await apiFetch(`/api/v1/direcciones/${editando}`, {
           method: "PUT",
           body: JSON.stringify(form),
         });
-        setSuccessMsg("Dirección actualizada correctamente");
+        success("Dirección actualizada", "Los cambios se han guardado correctamente");
       }
 
       setEditando(null);
       await loadDirecciones();
     } catch (err: any) {
-      setErrorMsg(err?.message || "Error al guardar la dirección");
+      showError(
+        "Error al guardar",
+        err?.message || "No se pudo guardar la dirección"
+      );
     } finally {
       setGuardando(false);
     }
@@ -198,32 +189,39 @@ export default function AddressesPage() {
 
   async function marcarPredeterminada(id: number) {
     try {
-      setErrorMsg(null);
       await apiFetch(`/api/v1/direcciones/${id}/predeterminada`, {
         method: "PATCH",
       });
-      setSuccessMsg("Dirección predeterminada actualizada");
+      success("Dirección actualizada", "Se ha marcado como predeterminada");
       await loadDirecciones();
     } catch (err: any) {
-      setErrorMsg(err?.message || "Error al actualizar dirección predeterminada");
+      showError(
+        "Error al actualizar",
+        err?.message || "No se pudo actualizar la dirección predeterminada"
+      );
     }
   }
 
-  async function eliminarDireccion(id: number) {
-    if (!confirm("¿Estás seguro de que deseas eliminar esta dirección?")) {
-      return;
-    }
-
-    try {
-      setErrorMsg(null);
-      await apiFetch(`/api/v1/direcciones/${id}`, {
-        method: "DELETE",
-      });
-      setSuccessMsg("Dirección eliminada correctamente");
-      await loadDirecciones();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Error al eliminar la dirección");
-    }
+  function eliminarDireccion(id: number) {
+    confirm(
+      "Eliminar dirección",
+      "¿Estás seguro de que deseas eliminar esta dirección? Esta acción no se puede deshacer.",
+      async () => {
+        try {
+          await apiFetch(`/api/v1/direcciones/${id}`, {
+            method: "DELETE",
+          });
+          success("Dirección eliminada", "La dirección se ha eliminado correctamente");
+          await loadDirecciones();
+        } catch (err: any) {
+          showError(
+            "Error al eliminar",
+            err?.message || "No se pudo eliminar la dirección"
+          );
+        }
+      },
+      "Eliminar"
+    );
   }
 
   if (loading) {
@@ -243,27 +241,35 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fdf6e3]">
+    <div className="min-h-screen bg-[#fdf6e3] flex flex-col">
       <MainMenu />
 
-      <main className="max-w-4xl mx-auto px-4 py-8 pt-[140px]">
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-4">
+      <main className="flex-1 max-w-4xl mx-auto px-4 py-11 pt-[140px]">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm">
           <button
             onClick={() => router.push("/")}
-            className="hover:text-[#6b21a8] hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Inicio
           </button>
-          <span className="mx-1">›</span>
+          <span className="text-gray-400">›</span>
           <button
             onClick={() => router.push("/account/profile")}
-            className="hover:text-[#6b21a8] hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
             Mi cuenta
           </button>
-          <span className="mx-1">›</span>
-          <span className="text-gray-800 font-medium">Mis direcciones</span>
+          <span className="text-gray-400">›</span>
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+            Mis direcciones
+          </span>
         </div>
 
         {/* Header */}
@@ -280,31 +286,15 @@ export default function AddressesPage() {
           {!editando && (
             <button
               onClick={iniciarNueva}
-              className="px-4 py-2 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium rounded-lg text-sm transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium rounded-lg text-sm transition-colors shadow-lg shadow-purple-500/30"
             >
-              + Nueva dirección
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nueva dirección
             </button>
           )}
         </div>
-
-        {/* Mensajes */}
-        {errorMsg && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <span className="text-red-500 text-lg">⚠️</span>
-              <p className="text-sm text-red-700 flex-1">{errorMsg}</p>
-            </div>
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <span className="text-emerald-500 text-lg">✓</span>
-              <p className="text-sm text-emerald-700 flex-1">{successMsg}</p>
-            </div>
-          </div>
-        )}
 
         {/* Formulario de edición/creación */}
         {editando && (
@@ -315,9 +305,12 @@ export default function AddressesPage() {
               </h2>
               <button
                 onClick={cancelarEdicion}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-600 transition-colors"
               >
-                ✕ Cancelar
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancelar
               </button>
             </div>
 
@@ -484,14 +477,14 @@ export default function AddressesPage() {
                 <button
                   type="button"
                   onClick={cancelarEdicion}
-                  className="flex-1 rounded-lg border border-gray-300 text-gray-700 py-2 text-sm hover:bg-gray-50"
+                  className="flex-1 rounded-lg border-2 border-gray-300 text-gray-700 py-2 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="flex-1 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2 text-sm disabled:opacity-60"
+                  className="flex-1 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold py-2 text-sm disabled:opacity-60 shadow-lg shadow-purple-500/30 transition-all"
                 >
                   {guardando ? "Guardando..." : "Guardar dirección"}
                 </button>
@@ -514,8 +507,11 @@ export default function AddressesPage() {
                 </p>
                 <button
                   onClick={iniciarNueva}
-                  className="px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold rounded-xl"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold rounded-xl shadow-lg shadow-purple-500/30 transition-all"
                 >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
                   Agregar dirección
                 </button>
               </div>
@@ -523,7 +519,7 @@ export default function AddressesPage() {
               direcciones.map((direccion) => (
                 <div
                   key={direccion.id}
-                  className="bg-white/90 rounded-2xl shadow border border-gray-200 p-6 hover:border-[#a855f7]/40 transition-colors"
+                  className="bg-white/90 rounded-2xl shadow border border-gray-200 p-6 hover:border-[#a855f7]/40 hover:shadow-lg transition-all"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -572,20 +568,20 @@ export default function AddressesPage() {
                     {!direccion.predeterminada && (
                       <button
                         onClick={() => marcarPredeterminada(direccion.id)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-[#a855f7] hover:text-[#a855f7]"
+                        className="text-xs px-3 py-1.5 rounded-lg border-2 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400 font-medium transition-colors"
                       >
                         Marcar predeterminada
                       </button>
                     )}
                     <button
                       onClick={() => iniciarEdicion(direccion)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-[#a855f7] hover:text-[#a855f7]"
+                      className="text-xs px-3 py-1.5 rounded-lg border-2 border-[#a855f7] text-[#a855f7] hover:bg-[#a855f7] hover:text-white font-medium transition-colors"
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => eliminarDireccion(direccion.id)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50"
+                      className="text-xs px-3 py-1.5 rounded-lg border-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 font-medium transition-colors"
                     >
                       Eliminar
                     </button>
@@ -615,6 +611,8 @@ export default function AddressesPage() {
           </div>
         )}
       </main>
+
+      <RecommendedFooter />
     </div>
   );
 }

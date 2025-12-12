@@ -1,3 +1,5 @@
+//frontend/app/nuevo/page.tsx
+
 import { CatalogoPage } from "@/components/CatalogoPage";
 
 export default function NuevoPage() {

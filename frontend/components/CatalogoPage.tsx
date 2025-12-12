@@ -1,3 +1,5 @@
+//frontend/components/CatalogoPage.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { useCart } from "@/app/context/cartContext";
 import { useFavorites } from "@/app/context/favoritesContext";
+import { RecommendedFooter } from "@/components/RecommendedFooter";
+
 
 // ======================
 // Tipos del catálogo real (API)
@@ -521,64 +525,56 @@ export function CatalogoPage({
 
       {/* más ancho para que parezca sitio real de tienda */}
       <main className="w-full max-w-[1400px] mx-auto px-4 pt-38 md:pt-36 lg:pt-40 pb-10">
-        {/* Breadcrumb */}
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-3 flex items-center flex-wrap gap-1">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm flex-wrap">
           {/* Inicio */}
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="hover:text-[#6b21a8] hover:underline underline-offset-2"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Inicio
           </button>
 
           {/* Si hay principal y secundaria: /categorias/ropa-deportiva/mujer */}
           {initialPrincipalSlug && initialSecundariaSlug && (
             <>
-              <span className="mx-1">›</span>
+              <span className="text-gray-400">›</span>
               <button
                 type="button"
                 onClick={() => router.push(`/categorias/${initialPrincipalSlug}`)}
-                className="hover:text-[#6b21a8] hover:underline underline-offset-2"
+                className="px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
               >
                 {prettyFromSlug(initialPrincipalSlug)}
               </button>
 
-              <span className="mx-1">›</span>
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `/categorias/${initialPrincipalSlug}/${initialSecundariaSlug}`
-                  )
-                }
-                className="text-gray-800 font-medium hover:text-[#6b21a8] hover:underline underline-offset-2"
-              >
+              <span className="text-gray-400">›</span>
+              <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
                 {prettyFromSlug(initialSecundariaSlug)}
-              </button>
+              </span>
             </>
           )}
 
           {/* Si solo hay una categoría (ej. /categorias/ropa-deportiva) */}
           {!initialPrincipalSlug && initialCategoriaSlug && (
             <>
-              <span className="mx-1">›</span>
-              <button
-                type="button"
-                onClick={() => router.push(`/categorias/${initialCategoriaSlug}`)}
-                className="text-gray-800 font-medium hover:text-[#6b21a8] hover:underline underline-offset-2"
-              >
+              <span className="text-gray-400">›</span>
+              <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
                 {prettyFromSlug(initialCategoriaSlug)}
-              </button>
+              </span>
             </>
           )}
 
           {/* Fallback: páginas que solo usan titulo (ej. /nuevo) */}
           {!initialPrincipalSlug && !initialCategoriaSlug && titulo && (
             <>
-              <span className="mx-1">›</span>
-              <span className="text-gray-800 font-medium">{titulo}</span>
+              <span className="text-gray-400">›</span>
+              <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+                {titulo}
+              </span>
             </>
           )}
         </div>
@@ -1053,6 +1049,7 @@ export function CatalogoPage({
           </div>
         </div>
       )}
+      <RecommendedFooter />
     </div>
   );
 }

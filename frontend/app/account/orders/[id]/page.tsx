@@ -3,7 +3,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { MainMenu } from "@/components/MainMenu";
+import { RecommendedFooter } from "@/components/RecommendedFooter";
 import { ProductImage } from "@/components/ProductImage";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -57,16 +60,15 @@ interface PedidoDetalle {
 }
 
 const ESTADOS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  PENDIENTE: { label: "Pendiente", color: "text-yellow-700", bgColor: "bg-yellow-100" },
-  CONFIRMADO: { label: "Confirmado", color: "text-blue-700", bgColor: "bg-blue-100" },
-  EN_PROCESO: { label: "En Proceso", color: "text-purple-700", bgColor: "bg-purple-100" },
-  ENVIADO: { label: "Enviado", color: "text-indigo-700", bgColor: "bg-indigo-100" },
-  ENTREGADO: { label: "Entregado", color: "text-green-700", bgColor: "bg-green-100" },
-  CANCELADO: { label: "Cancelado", color: "text-red-700", bgColor: "bg-red-100" },
-  PAGADO: { label: "Pagado", color: "text-green-700", bgColor: "bg-green-100" },
+  PENDIENTE: { label: "Pendiente", color: "text-yellow-700", bgColor: "bg-yellow-100 border-yellow-300" },
+  CONFIRMADO: { label: "Confirmado", color: "text-blue-700", bgColor: "bg-blue-100 border-blue-300" },
+  EN_PROCESO: { label: "En Proceso", color: "text-purple-700", bgColor: "bg-purple-100 border-purple-300" },
+  ENVIADO: { label: "Enviado", color: "text-indigo-700", bgColor: "bg-indigo-100 border-indigo-300" },
+  ENTREGADO: { label: "Entregado", color: "text-green-700", bgColor: "bg-green-100 border-green-300" },
+  CANCELADO: { label: "Cancelado", color: "text-red-700", bgColor: "bg-red-100 border-red-300" },
+  PAGADO: { label: "Pagado", color: "text-green-700", bgColor: "bg-green-100 border-green-300" },
 };
 
-// Usamos lowercase en las claves para coincidir con el backend
 const ESTADOS_RMA_CLIENTE: Record<string, { label: string; color: string }> = {
   solicitado: { label: "Solicitud Recibida", color: "bg-yellow-50 text-yellow-800 border-yellow-200" },
   en_revision: { label: "En Revisión", color: "bg-blue-50 text-blue-800 border-blue-200" },
@@ -79,10 +81,10 @@ export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
+  const { success, error: showError, confirm } = useNotifications();
 
   const [pedido, setPedido] = useState<PedidoDetalle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [canceling, setCanceling] = useState(false);
@@ -100,9 +102,9 @@ export default function OrderDetailPage() {
 
       if (!res.ok) {
         if (res.status === 404) {
-          setError("Pedido no encontrado");
+          showError("Pedido no encontrado", "No se pudo encontrar el pedido solicitado");
         } else {
-          setError("Error al cargar el pedido");
+          showError("Error al cargar", "No se pudo cargar el detalle del pedido");
         }
         return;
       }
@@ -111,7 +113,7 @@ export default function OrderDetailPage() {
       setPedido(data);
     } catch (err) {
       console.error("Error:", err);
-      setError("Error de conexión");
+      showError("Error de conexión", "No se pudo conectar con el servidor");
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,7 @@ export default function OrderDetailPage() {
 
   const handleCancelar = async () => {
     if (!cancelReason.trim()) {
-      alert("Por favor ingresa un motivo de cancelación");
+      showError("Motivo requerido", "Por favor ingresa un motivo de cancelación");
       return;
     }
 
@@ -137,12 +139,12 @@ export default function OrderDetailPage() {
         throw new Error(errorData.detail || "Error al cancelar");
       }
 
-      alert("Pedido cancelado exitosamente");
+      success("Pedido cancelado", "Tu pedido ha sido cancelado exitosamente");
       setShowCancelModal(false);
       fetchPedidoDetalle();
     } catch (err: any) {
       console.error("Error:", err);
-      alert(err.message || "Error al cancelar el pedido");
+      showError("Error al cancelar", err.message || "No se pudo cancelar el pedido");
     } finally {
       setCanceling(false);
     }
@@ -150,21 +152,24 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-12 h-12 border-4 border-[#a855f7] border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-sm text-gray-600">Cargando detalle del pedido...</p>
+        </div>
       </div>
     );
   }
 
-  if (error || !pedido) {
+  if (!pedido) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">{error}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button
             onClick={() => router.push("/account/orders")}
-            className="text-purple-600 hover:text-purple-700 font-medium"
+            className="text-[#a855f7] hover:text-[#7e22ce] font-medium"
           >
             ← Volver a Mis Pedidos
           </button>
@@ -176,22 +181,54 @@ export default function OrderDetailPage() {
   const estadoConfig = ESTADOS_CONFIG[pedido.estado] || {
     label: pedido.estado,
     color: "text-gray-700",
-    bgColor: "bg-gray-100",
+    bgColor: "bg-gray-100 border-gray-300",
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
+    <div className="min-h-screen bg-[#fdf6e3] flex flex-col">
+      <MainMenu />
+
+      <main className="flex-1 max-w-6xl mx-auto px-4 py-8 pt-[140px]">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center gap-2 py-3 mb-6 text-sm flex-wrap">
+          <button
+            onClick={() => router.push("/")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Inicio
+          </button>
+          <span className="text-gray-400">›</span>
+          <button
+            onClick={() => router.push("/account/profile")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Mi cuenta
+          </button>
+          <span className="text-gray-400">›</span>
           <button
             onClick={() => router.push("/account/orders")}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
-            <span className="mr-2">←</span>
-            Volver a Mis Pedidos
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            Mis pedidos
           </button>
+          <span className="text-gray-400">›</span>
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+            Pedido #{pedido.numero_pedido}
+          </span>
+        </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        {/* Header del pedido */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 Pedido #{pedido.numero_pedido}
@@ -204,19 +241,18 @@ export default function OrderDetailPage() {
                 })}
               </p>
             </div>
-            <div className="mt-4 sm:mt-0">
-              <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${estadoConfig.bgColor} ${estadoConfig.color}`}>
-                {estadoConfig.label}
-              </span>
-            </div>
+            <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold border-2 ${estadoConfig.bgColor} ${estadoConfig.color}`}>
+              {estadoConfig.label}
+            </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* COLUMNA IZQUIERDA: DETALLES PRODUCTOS Y DIRECCIÓN */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            {/* Productos */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <span className="mr-2">📦</span>
                 Productos ({pedido.productos.length})
@@ -248,7 +284,8 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            {/* Dirección de envío */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <span className="mr-2">📍</span>
                 Dirección de Envío
@@ -267,7 +304,8 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            {/* Método de envío */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <span className="mr-2">🚚</span>
                 Método de Envío
@@ -282,7 +320,8 @@ export default function OrderDetailPage() {
 
           {/* COLUMNA DERECHA: RESUMEN Y ACCIONES */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            {/* Resumen */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Resumen del Pedido</h2>
 
               <div className="space-y-3 text-sm">
@@ -310,8 +349,9 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
+            {/* Puntos ganados */}
             {pedido.puntos_ganados > 0 && (
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg shadow-sm p-6 border border-purple-100">
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-sm p-6 border-2 border-purple-200">
                 <div className="flex items-center mb-2">
                   <span className="mr-2">⭐</span>
                   <h3 className="font-semibold text-gray-900">Puntos Acumulados</h3>
@@ -321,13 +361,16 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* BOTÓN CANCELAR (SOLO SI APLICA) */}
+            {/* Botón cancelar */}
             {pedido.puede_cancelar && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  className="w-full px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-600 !text-white rounded-xl hover:bg-red-700 transition-colors font-semibold shadow-lg shadow-red-500/30"
                 >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                   Cancelar Pedido
                 </button>
                 {pedido.fecha_limite_cancelacion && (
@@ -340,69 +383,68 @@ export default function OrderDetailPage() {
 
             {/* SECCIÓN DE DEVOLUCIONES / RMA */}
             <div className="space-y-4">
-                
-                {/* 1. HISTORIAL DE SOLICITUDES (SIMPRE VISIBLE SI EXISTEN) */}
-                {pedido.solicitudes_rma && pedido.solicitudes_rma.length > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                        <h3 className="font-semibold text-gray-900 mb-4 border-b pb-2">Estado de Devoluciones</h3>
-                        <div className="space-y-4">
-                            {pedido.solicitudes_rma.map((rma) => {
-                                // Aseguramos usar la configuración correcta (fallback seguro)
-                                const config = ESTADOS_RMA_CLIENTE[rma.estado.toLowerCase()] || 
-                                              { label: rma.estado, color: "bg-gray-100 border-gray-200" };
-                                
-                                return (
-                                    <div key={rma.id} className={`p-4 rounded-lg border ${config.color}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="font-bold text-xs uppercase tracking-wide">{config.label}</span>
-                                            <span className="text-[10px] opacity-75">{new Date(rma.fecha).toLocaleDateString()}</span>
-                                        </div>
-                                        
-                                        <p className="text-sm mb-1 font-medium">
-                                            {rma.tipo === 'devolucion' ? 'Solicitud de Reembolso' : 'Solicitud de Cambio'}
-                                        </p>
-                                        
-                                        {/* Motivo del cliente */}
-                                        <p className="text-xs italic mb-2 opacity-80">"{rma.motivo}"</p>
 
-                                        {/* Respuesta del admin (IMPORTANTE VISUALIZARLA SIEMPRE) */}
-                                        {rma.respuesta_admin && (
-                                            <div className="mt-3 bg-white/60 p-2 rounded text-xs border border-black/5">
-                                                <strong>Respuesta de la tienda:</strong>
-                                                <p className="mt-1">{rma.respuesta_admin}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+              {/* Historial de solicitudes */}
+              {pedido.solicitudes_rma && pedido.solicitudes_rma.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-4 border-b pb-2">Estado de Devoluciones</h3>
+                  <div className="space-y-4">
+                    {pedido.solicitudes_rma.map((rma) => {
+                      const config = ESTADOS_RMA_CLIENTE[rma.estado.toLowerCase()] ||
+                        { label: rma.estado, color: "bg-gray-100 border-gray-200" };
+
+                      return (
+                        <div key={rma.id} className={`p-4 rounded-lg border-2 ${config.color}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold text-xs uppercase tracking-wide">{config.label}</span>
+                            <span className="text-[10px] opacity-75">{new Date(rma.fecha).toLocaleDateString()}</span>
+                          </div>
+
+                          <p className="text-sm mb-1 font-medium">
+                            {rma.tipo === 'devolucion' ? 'Solicitud de Reembolso' : 'Solicitud de Cambio'}
+                          </p>
+
+                          <p className="text-xs italic mb-2 opacity-80">"{rma.motivo}"</p>
+
+                          {rma.respuesta_admin && (
+                            <div className="mt-3 bg-white/60 p-2 rounded text-xs border border-black/5">
+                              <strong>Respuesta de la tienda:</strong>
+                              <p className="mt-1">{rma.respuesta_admin}</p>
+                            </div>
+                          )}
                         </div>
-                    </div>
-                )}
-
-                {/* 2. BOTÓN PARA NUEVA SOLICITUD */}
-                {/* Solo se muestra si está entregado Y NO hay una solicitud activa */}
-                {/* Si fue rechazada, 'tiene_rma_activo' es false, así que el botón vuelve a aparecer para reintentar */}
-                {pedido.estado === "ENTREGADO" && !pedido.tiene_rma_activo && (
-                  <div className="bg-white rounded-lg shadow-sm p-6 border border-indigo-100">
-                    <h3 className="font-semibold text-gray-900 mb-2">¿Problemas con tu pedido?</h3>
-                    <button
-                      onClick={() => router.push(`/account/orders/${orderId}/rma`)}
-                      className="w-full px-4 py-2 bg-indigo-600 !text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex justify-center items-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
-                      Solicitar Devolución o Cambio
-                    </button>
+                      );
+                    })}
                   </div>
-                )}
-            </div>
+                </div>
+              )}
 
+              {/* Botón para nueva solicitud */}
+              {pedido.estado === "ENTREGADO" && !pedido.tiene_rma_activo && (
+                <div className="bg-white rounded-2xl shadow-sm p-6 border-2 border-indigo-200">
+                  <h3 className="font-semibold text-gray-900 mb-2">¿Problemas con tu pedido?</h3>
+                  <button
+                    onClick={() => router.push(`/account/orders/${orderId}/rma`)}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 !text-white rounded-xl hover:bg-indigo-700 transition-colors font-semibold shadow-lg shadow-indigo-500/30"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                    </svg>
+                    Solicitar Devolución o Cambio
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
+      <RecommendedFooter />
+
+      {/* Modal de cancelación */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-scale-in">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Cancelar Pedido #{pedido.numero_pedido}
             </h3>
@@ -422,7 +464,7 @@ export default function OrderDetailPage() {
               <p className="text-xs text-gray-500 mt-1">{cancelReason.length}/500 caracteres</p>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-yellow-800">
                 <strong>Importante:</strong> Esta acción no se puede deshacer. El pedido será cancelado permanentemente.
               </p>
@@ -434,7 +476,7 @@ export default function OrderDetailPage() {
                   setShowCancelModal(false);
                   setCancelReason("");
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
                 disabled={canceling}
               >
                 Volver
@@ -442,7 +484,7 @@ export default function OrderDetailPage() {
               <button
                 onClick={handleCancelar}
                 disabled={canceling || !cancelReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-red-600 !text-white rounded-lg hover:bg-red-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30"
               >
                 {canceling ? "Cancelando..." : "Cancelar Pedido"}
               </button>

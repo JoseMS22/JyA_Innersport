@@ -1023,7 +1023,7 @@ export default function SellerPOSPage() {
               <button
                 type="button"
                 disabled={cartItems.length === 0 || !sucursalSeleccionada}
-                className="w-full mt-2 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-2 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   if (cartItems.length === 0) return;
                   if (!sucursalSeleccionada) return;
@@ -1422,7 +1422,7 @@ export default function SellerPOSPage() {
                 <button
                   type="submit"
                   disabled={pagoLoading || cartItems.length === 0}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-[#a855f7] hover:bg-[#7e22ce] text-white font-semibold disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold disabled:opacity-50"
                 >
                   {pagoLoading ? "Procesando..." : "Confirmar cobro"}
                 </button>
