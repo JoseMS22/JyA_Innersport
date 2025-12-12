@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
 import { useCart } from "../context/cartContext";
+import { useNotifications } from "../context/NotificationContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -54,14 +55,6 @@ type LimitePuntos = {
   saldo_puntos: number;
 };
 
-type ToastState =
-  | {
-    type: "success" | "warning";
-    title: string;
-    message: string;
-  }
-  | null;
-
 const PROVINCIAS = [
   "San José",
   "Alajuela",
@@ -75,13 +68,14 @@ const PROVINCIAS = [
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
+  const { success, error: showError, warning } = useNotifications();
+  
   // IVA Costa Rica (ajusta si usas otro)
   const TAX_RATE = 0.13;
 
   // Si "total" YA incluye impuesto, sacamos el impuesto y el subtotal sin impuesto
   const subtotalSinImpuesto = total / (1 + TAX_RATE);
   const impuestoTotal = total - subtotalSinImpuesto;
-
 
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [direccionSeleccionada, setDireccionSeleccionada] =
@@ -94,7 +88,6 @@ export default function CheckoutPage() {
   const [calculando, setCalculando] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Puntos
@@ -116,9 +109,6 @@ export default function CheckoutPage() {
 
   // Bloquear botón mientras se procesa el pedido
   const [procesandoPago, setProcesandoPago] = useState(false);
-
-  // Toast bonito
-  const [toast, setToast] = useState<ToastState>(null);
 
   // ========= 1) Verificar sesión y cargar datos iniciales =========
   useEffect(() => {
@@ -166,7 +156,6 @@ export default function CheckoutPage() {
   async function cargarDirecciones() {
     try {
       setLoading(true);
-      setError(null);
 
       const res = await fetch(`${API_BASE}/api/v1/direcciones/`, {
         credentials: "include",
@@ -186,7 +175,7 @@ export default function CheckoutPage() {
         await calcularEnvio(predeterminada.id);
       }
     } catch (err: any) {
-      setError(err.message || "No se pudieron cargar las direcciones");
+      showError("Error", err.message || "No se pudieron cargar las direcciones");
     } finally {
       setLoading(false);
     }
@@ -196,7 +185,6 @@ export default function CheckoutPage() {
   async function calcularEnvio(direccionId: number) {
     try {
       setCalculando(true);
-      setError(null);
 
       const res = await fetch(
         `${API_BASE}/api/v1/envio/calcular?direccion_id=${direccionId}&peso_kg=1`,
@@ -215,7 +203,7 @@ export default function CheckoutPage() {
         setMetodoSeleccionado(data[0]);
       }
     } catch (err: any) {
-      setError(err.message || "No se pudo calcular el costo de envío");
+      showError("Error", err.message || "No se pudo calcular el costo de envío");
       setMetodosEnvio([]);
     } finally {
       setCalculando(false);
@@ -236,13 +224,12 @@ export default function CheckoutPage() {
       !nuevaDireccion.distrito ||
       !nuevaDireccion.detalle
     ) {
-      setError("Por favor completa todos los campos obligatorios (*)");
+      showError("Campos incompletos", "Por favor completa todos los campos obligatorios (*)");
       return;
     }
 
     try {
       setGuardando(true);
-      setError(null);
 
       const res = await fetch(`${API_BASE}/api/v1/direcciones/`, {
         method: "POST",
@@ -269,8 +256,10 @@ export default function CheckoutPage() {
         referencia: "",
         predeterminada: false,
       });
+
+      success("Dirección guardada", "Tu nueva dirección se guardó correctamente");
     } catch (err: any) {
-      setError(err.message || "No se pudo crear la dirección");
+      showError("Error", err.message || "No se pudo crear la dirección");
     } finally {
       setGuardando(false);
     }
@@ -324,7 +313,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (direccionSeleccionada && metodoSeleccionado) {
       const totalCompra =
-        total + Number(metodoSeleccionado?.costo ?? 0); // subtotal + envío
+        total + Number(metodoSeleccionado?.costo ?? 0);
       if (totalCompra > 0) {
         calcularLimitePuntos(totalCompra);
       }
@@ -335,18 +324,17 @@ export default function CheckoutPage() {
   // ========= 8) Confirmar pedido (simulado) + crear Pedido real =========
   async function handleContinuarPago() {
     if (!direccionSeleccionada || !metodoSeleccionado) {
-      setError("Por favor selecciona una dirección y método de envío");
+      showError("Información incompleta", "Por favor selecciona una dirección y método de envío");
       return;
     }
 
     if (items.length === 0) {
-      setError("Tu carrito está vacío");
+      showError("Carrito vacío", "Tu carrito está vacío");
       return;
     }
 
     try {
       setProcesandoPago(true);
-      setError(null);
 
       // 1️⃣ Crear Pedido real en el backend
       const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout`, {
@@ -365,63 +353,58 @@ export default function CheckoutPage() {
       if (!resPedido.ok) {
         const errData = await resPedido.json().catch(() => null);
         console.error("Error creando pedido:", errData);
-        setError(
-          errData?.detail ||
-          "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
+        showError(
+          "Error al crear pedido",
+          errData?.detail || "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
         );
         return;
       }
 
-      const pedido = await resPedido.json(); // PedidoRead
+      const pedido = await resPedido.json();
 
-      // 2️⃣ Confirmar compra y procesar puntos (SIEMPRE, aunque puntosUsados sea 0)
+      // 2️⃣ Confirmar compra y procesar puntos
       let dataPuntos: any = null;
       let huboErrorPuntos = false;
 
       try {
-          const resPuntos = await fetch(
-            `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
-            {
-              method: "POST",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                // Enviar subtotal (productos) y costo_envio por separado
-                subtotal: Number(pedido.subtotal ?? total),
-                costo_envio: Number(pedido.costo_envio ?? metodoSeleccionado.costo),
-                puntos_a_usar: puntosUsados, // puede ser 0
-                order_id: pedido.id, // enlazar movimiento con el pedido creado
-              }),
-            }
-          );
+        const resPuntos = await fetch(
+          `${API_BASE}/api/v1/puntos/me/confirmar-compra`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              subtotal: Number(pedido.subtotal ?? total),
+              costo_envio: Number(pedido.costo_envio ?? metodoSeleccionado.costo),
+              puntos_a_usar: puntosUsados,
+              order_id: pedido.id,
+            }),
+          }
+        );
 
         if (!resPuntos.ok) {
           const err = await resPuntos.json().catch(() => null);
           console.error("Error al confirmar puntos:", err);
           huboErrorPuntos = true;
-          setToast({
-            type: "warning",
-            title: "Pedido creado, pero hubo un detalle",
-            message:
-              "Tu pedido se registró correctamente, pero ocurrió un problema al aplicar o registrar los puntos. Podrás verlo en tu historial de pedidos.",
-          });
+          warning(
+            "Pedido creado, pero hubo un detalle",
+            "Tu pedido se registró correctamente, pero ocurrió un problema al aplicar o registrar los puntos. Podrás verlo en tu historial de pedidos."
+          );
         } else {
           dataPuntos = await resPuntos.json();
         }
       } catch (e) {
         console.error("Error de red al confirmar puntos:", e);
         huboErrorPuntos = true;
-        setToast({
-          type: "warning",
-          title: "Pedido creado, pero hubo un detalle",
-          message:
-            "Tu pedido se registró correctamente, pero no se pudieron registrar los puntos por un problema de conexión.",
-        });
+        warning(
+          "Pedido creado, pero hubo un detalle",
+          "Tu pedido se registró correctamente, pero no se pudieron registrar los puntos por un problema de conexión."
+        );
       }
 
-      // 3️⃣ Calcular totales mostrados (para el toast)
+      // 3️⃣ Calcular totales mostrados
       const descuentoAplicado = dataPuntos
         ? Number(dataPuntos.descuento_aplicado || 0)
         : descuento;
@@ -431,28 +414,21 @@ export default function CheckoutPage() {
         : total + Number(metodoSeleccionado.costo) - descuentoAplicado;
 
       const subtotalMostrar = Number(pedido.subtotal ?? total);
-
       const envioMostrar = Number(pedido.costo_envio ?? metodoSeleccionado.costo);
-      
-      setToast({
-        type: "success",
-        title: `Pedido #${pedido.id} creado correctamente 🎉`,
-        message: `Subtotal: ₡${subtotalMostrar.toLocaleString(
-          "es-CR"
-        )} · Envío: ₡${envioMostrar.toLocaleString(
-          "es-CR"
-        )} · Total: ₡${totalFinal.toLocaleString("es-CR")}${huboErrorPuntos
-            ? " (con observaciones en los puntos)."
-            : " · ¡Gracias por tu compra!"
-          }`,
-      });
 
-      // 4️⃣ Limpiar carrito y redirigir a pedidos
+      if (!huboErrorPuntos) {
+        success(
+          `Pedido #${pedido.id} creado correctamente 🎉`,
+          `Subtotal: ₡${subtotalMostrar.toLocaleString("es-CR")} · Envío: ₡${envioMostrar.toLocaleString("es-CR")} · Total: ₡${totalFinal.toLocaleString("es-CR")} · ¡Gracias por tu compra!`
+        );
+      }
+
+      // 4️⃣ Limpiar carrito y redirigir
       clearCart();
       router.push("/account/orders");
     } catch (err) {
       console.error("Error finalizando compra", err);
-      setError("Hubo un problema al procesar el pago.");
+      showError("Error", "Hubo un problema al procesar el pago.");
     } finally {
       setProcesandoPago(false);
     }
@@ -469,26 +445,6 @@ export default function CheckoutPage() {
             <p className="text-sm text-gray-600">Cargando información...</p>
           </div>
         </div>
-
-        {/* Toast mientras carga (por si acaso) */}
-        {toast && (
-          <div
-            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
-                ? "bg-white border-green-200"
-                : "bg-white border-yellow-200"
-              }`}
-          >
-            <p
-              className={`font-semibold mb-1 ${toast.type === "success"
-                  ? "text-green-700"
-                  : "text-yellow-700"
-                }`}
-            >
-              {toast.title}
-            </p>
-            <p className="text-gray-700">{toast.message}</p>
-          </div>
-        )}
       </div>
     );
   }
@@ -514,26 +470,6 @@ export default function CheckoutPage() {
             </button>
           </div>
         </div>
-
-        {/* Toast en vista carrito vacío */}
-        {toast && (
-          <div
-            className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border ${toast.type === "success"
-                ? "bg-white border-green-200"
-                : "bg-white border-yellow-200"
-              }`}
-          >
-            <p
-              className={`font-semibold mb-1 ${toast.type === "success"
-                  ? "text-green-700"
-                  : "text-yellow-700"
-                }`}
-            >
-              {toast.title}
-            </p>
-            <p className="text-gray-700">{toast.message}</p>
-          </div>
-        )}
       </div>
     );
   }
@@ -558,23 +494,31 @@ export default function CheckoutPage() {
       <MainMenu />
 
       <main className="max-w-4xl mx-auto px-4 py-8 pt-[140px]">
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-4">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm flex-wrap">
           <button
             onClick={() => router.push("/")}
-            className="hover:text-[#6b21a8] hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Inicio
           </button>
-          <span className="mx-1">›</span>
+          <span className="text-gray-400">›</span>
           <button
             onClick={() => router.push("/cart")}
-            className="hover:text-[#6b21a8] hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
             Carrito
           </button>
-          <span className="mx-1">›</span>
-          <span className="text-gray-800 font-medium">Checkout</span>
+          <span className="text-gray-400">›</span>
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+            Checkout
+          </span>
         </div>
 
         {/* Título */}
@@ -585,16 +529,6 @@ export default function CheckoutPage() {
           Selecciona tu dirección de envío, método de entrega y aplica tus
           puntos.
         </p>
-
-        {/* Error global */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-2">
-              <span className="text-red-500 text-lg">⚠️</span>
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
 
         {/* Resumen rápido del carrito */}
         <div className="bg-white rounded-2xl border border-[#e5e7eb] p-4 mb-6">
@@ -975,7 +909,7 @@ export default function CheckoutPage() {
                     setPuntosUsados(val);
                     setDescuento(val * factorPuntoEnColones);
                   }}
-                  className="px-3 py-2 bg-[#a855f7] text-white rounded-lg text-sm hover:bg-[#7e22ce]"
+                  className="px-3 py-2 bg-[#a855f7] !text-white rounded-lg text-sm hover:bg-[#7e22ce]"
                 >
                   Usar todos
                 </button>
@@ -1044,7 +978,6 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-
             {/* Info envío */}
             <div className="bg-[#faf5ff] rounded-lg p-3 mb-4 text-xs">
               <div className="space-y-2">
@@ -1107,33 +1040,6 @@ export default function CheckoutPage() {
           </div>
         )}
       </main>
-
-      {/* Toast flotante global */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 max-w-sm rounded-2xl shadow-xl px-4 py-3 text-sm border z-50 ${toast.type === "success"
-              ? "bg-white border-green-200"
-              : "bg-white border-yellow-200"
-            }`}
-        >
-          <div className="flex items-start gap-2">
-            <div className="mt-0.5">
-              {toast.type === "success" ? "✅" : "⚠️"}
-            </div>
-            <div>
-              <p
-                className={`font-semibold mb-1 ${toast.type === "success"
-                    ? "text-green-700"
-                    : "text-yellow-700"
-                  }`}
-              >
-                {toast.title}
-              </p>
-              <p className="text-gray-700">{toast.message}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

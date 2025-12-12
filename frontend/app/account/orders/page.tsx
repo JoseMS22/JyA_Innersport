@@ -114,7 +114,7 @@ export default function OrdersPage() {
 
       <main className="flex-1 max-w-4xl mx-auto px-4 py-8 pt-[140px]">
         {/* Breadcrumb mejorado */}
-        <div className="flex items-center py-3 gap-2 mb-6 text-sm">
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm flex-wrap">
           <button
             onClick={() => router.push("/")}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
