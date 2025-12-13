@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type UserMe = {
   id: number;
@@ -16,14 +17,14 @@ type UserMe = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { error: showError } = useNotifications();
+  
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
     setLoading(true);
 
     const payload = {
@@ -69,7 +70,7 @@ export default function LoginPage() {
         return;
       }
 
-      setErrorMsg(msg);
+      showError("Error al iniciar sesión", msg);
     } finally {
       setLoading(false);
     }
@@ -123,24 +124,17 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => router.push("/forgot-password")}
-              className="text-xs text-[#6b21a8] hover:text-[#a855f7] font-medium"
+              className="text-xs text-[#6b21a8] hover:text-[#a855f7] hover:underline underline-offset-2 font-medium"
             >
               ¿Olvidaste tu contraseña?
             </button>
           </div>
 
-          {/* Error */}
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs text-red-700">{errorMsg}</p>
-            </div>
-          )}
-
           {/* Botón */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </button>
@@ -152,7 +146,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => router.push("/register")}
-                className="text-[#6b21a8] hover:text-[#a855f7] font-medium"
+                className="text-[#6b21a8] hover:text-[#a855f7] hover:underline underline-offset-2 font-medium transition-colors"
               >
                 Regístrate aquí
               </button>

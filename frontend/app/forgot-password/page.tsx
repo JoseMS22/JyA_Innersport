@@ -5,18 +5,17 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { success, error: showError } = useNotifications();
+  
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [email, setEmail] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setLoading(true);
 
     try {
@@ -25,14 +24,20 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ correo: email }),
       });
 
-      setSuccessMsg(response.message);
+      success(
+        "Enlace enviado",
+        "Revisa tu bandeja de entrada y spam. El enlace expirará en 30 minutos."
+      );
       setEmail(""); // Limpiar campo
     } catch (err: any) {
       // Manejar rate limiting
       if (err.message?.includes("Demasiados intentos")) {
-        setErrorMsg(err.message);
+        showError("Demasiados intentos", err.message);
       } else {
-        setErrorMsg("Error al procesar la solicitud. Por favor intenta de nuevo.");
+        showError(
+          "Error al procesar solicitud",
+          "No pudimos procesar tu solicitud. Por favor intenta de nuevo."
+        );
       }
     } finally {
       setLoading(false);
@@ -70,34 +75,11 @@ export default function ForgotPasswordPage() {
             />
           </div>
 
-          {/* Mensajes */}
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs text-red-700">{errorMsg}</p>
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-emerald-600 text-lg">✓</span>
-                <div className="flex-1">
-                  <p className="text-xs text-emerald-700 font-medium">
-                    {successMsg}
-                  </p>
-                  <p className="text-xs text-emerald-600 mt-1">
-                    Revisa tu bandeja de entrada y spam. El enlace expirará en 30 minutos.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Botón */}
           <button
             type="submit"
             disabled={loading || !email}
-            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-medium py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Enviando..." : "Enviar enlace de recuperación"}
           </button>
@@ -107,14 +89,14 @@ export default function ForgotPasswordPage() {
             <button
               type="button"
               onClick={() => router.push("/login")}
-              className="w-full text-center text-sm text-[#6b21a8] hover:text-[#a855f7] font-medium"
+              className="w-full text-center text-sm text-[#6b21a8] hover:text-[#a855f7] hover:underline underline-offset-2 font-medium transition-colors"
             >
               ← Volver a iniciar sesión
             </button>
             <button
               type="button"
               onClick={() => router.push("/register")}
-              className="w-full text-center text-xs text-gray-600 hover:text-[#6b21a8]"
+              className="w-full text-center text-xs text-gray-600 hover:text-[#a855f7] hover:underline underline-offset-2 transition-colors"
             >
               ¿No tienes cuenta? Regístrate aquí
             </button>

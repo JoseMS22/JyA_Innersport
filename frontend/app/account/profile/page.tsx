@@ -4,6 +4,8 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
+import { RecommendedFooter } from "@/components/RecommendedFooter";
+import { useNotifications } from "../../context/NotificationContext";
 import { apiFetch } from "@/lib/api";
 
 type UserProfile = {
@@ -19,11 +21,10 @@ type UserProfile = {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { success, error, info } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
@@ -33,7 +34,7 @@ export default function ProfilePage() {
     telefono: "",
   });
 
-  // ---- Nuevo: estado para puntos ----
+  // ---- Estado para puntos ----
   const [puntosSaldo, setPuntosSaldo] = useState<number | null>(null);
   const [puntosValorAprox, setPuntosValorAprox] = useState<number | null>(null);
   const [cargandoPuntos, setCargandoPuntos] = useState(false);
@@ -43,7 +44,6 @@ export default function ProfilePage() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        setErrorMsg(null);
         const data = await apiFetch("/api/v1/auth/me");
 
         setProfile(data);
@@ -55,13 +55,11 @@ export default function ProfilePage() {
         // ---- Cargar puntos junto con el perfil ----
         cargarSaldoPuntos();
       } catch (err: any) {
-        setErrorMsg(
-          err?.message ??
-            "No se pudo cargar tu perfil. Intenta iniciar sesión nuevamente."
+        error(
+          "Error al cargar perfil",
+          err?.message ?? "No se pudo cargar tu perfil. Intenta iniciar sesión nuevamente."
         );
         setLoading(false);
-      } finally {
-        // Nota: no seteamos loading=false aquí si fallo la carga de puntos; lo hacemos abajo.
       }
     }
 
@@ -91,14 +89,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Auto-hide mensajes
-  useEffect(() => {
-    if (successMsg) {
-      const timer = setTimeout(() => setSuccessMsg(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMsg]);
-
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -106,8 +96,6 @@ export default function ProfilePage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setSaving(true);
 
     try {
@@ -116,11 +104,11 @@ export default function ProfilePage() {
         body: JSON.stringify(form),
       });
 
-      setSuccessMsg("Perfil actualizado correctamente");
+      success("Perfil actualizado", "Tus cambios se han guardado correctamente");
     } catch (err: any) {
-      setErrorMsg(
-        err?.message ??
-          "Ocurrió un error al actualizar tu perfil. Inténtalo de nuevo."
+      error(
+        "Error al actualizar",
+        err?.message ?? "Ocurrió un error al actualizar tu perfil. Inténtalo de nuevo."
       );
     } finally {
       setSaving(false);
@@ -170,16 +158,21 @@ export default function ProfilePage() {
       <MainMenu />
 
       <main className="max-w-3xl mx-auto px-4 py-8 pt-[140px]">
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-4">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm">
           <button
             onClick={() => router.push("/")}
-            className="hover:text-[#6b21a8] hover:underline"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Inicio
           </button>
-          <span className="mx-1">›</span>
-          <span className="text-gray-800 font-medium">Mi cuenta</span>
+          <span className="text-gray-400">›</span>
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+            Mis direcciones
+          </span>
         </div>
 
         {/* Header */}
@@ -259,19 +252,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Mensajes */}
-              {errorMsg && (
-                <div className="text-xs text-red-600 whitespace-pre-line p-3 bg-red-50 rounded-lg border border-red-200">
-                  {errorMsg}
-                </div>
-              )}
-
-              {successMsg && (
-                <div className="text-xs text-emerald-700 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                  {successMsg}
-                </div>
-              )}
-
               {/* Botón guardar */}
               <button
                 type="submit"
@@ -282,8 +262,6 @@ export default function ProfilePage() {
               </button>
             </form>
           </div>
-
-          
 
           {/* Tarjeta: Direcciones (ahora ocupa 1 columna en md) */}
           <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
@@ -309,7 +287,7 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          {/* Tarjeta: Puntos (nueva) */}
+          {/* Tarjeta: Puntos */}
           <div className="bg-white/90 rounded-2xl shadow border border-[#e5e7eb] p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-[#eef2ff] flex items-center justify-center text-2xl">
@@ -394,6 +372,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+
+      {/* Footer con productos recomendados */}
+      <RecommendedFooter />
     </div>
   );
 }

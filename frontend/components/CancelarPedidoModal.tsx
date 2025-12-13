@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type ImpactoCancelacion = {
   puede_cancelar: boolean;
@@ -25,6 +26,8 @@ export function CancelarPedidoModal({
   onClose,
   onSuccess,
 }: CancelarPedidoModalProps) {
+  const { success, error: showError } = useNotifications();
+  
   const [paso, setPaso] = useState<"verificando" | "advertencia" | "formulario">(
     "verificando"
   );
@@ -102,13 +105,19 @@ export function CancelarPedidoModal({
 
       const data = await res.json();
 
-      // Mostrar mensaje de éxito
-      alert(data.mensaje);
+      // Mostrar notificación de éxito usando NotificationContext
+      success(
+        "Pedido cancelado",
+        data.mensaje || "Tu pedido ha sido cancelado exitosamente"
+      );
 
       // Cerrar modal y notificar éxito
       onSuccess();
     } catch (err: any) {
-      setError(err.message || "Error al cancelar pedido");
+      // Mostrar error en el modal y también como notificación
+      const errorMsg = err.message || "Error al cancelar pedido";
+      setError(errorMsg);
+      showError("Error al cancelar", errorMsg);
     } finally {
       setCancelando(false);
     }
@@ -154,29 +163,40 @@ export function CancelarPedidoModal({
             <div className="space-y-4">
               {!impacto.puede_cancelar && error ? (
                 // Error - no se puede cancelar
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <svg
-                      className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-semibold text-red-800">
-                        No se puede cancelar
-                      </p>
-                      <p className="text-xs text-red-700 mt-1">{error}</p>
+                <>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg
+                        className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-red-800">
+                          No se puede cancelar
+                        </p>
+                        <p className="text-xs text-red-700 mt-1">{error}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={onClose}
+                      className="px-6 py-2 rounded-xl bg-gray-600 text-white text-sm font-semibold hover:bg-gray-700 transition-all"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </>
               ) : (
                 // Advertencias
                 <>
@@ -204,13 +224,13 @@ export function CancelarPedidoModal({
                   <div className="flex gap-2">
                     <button
                       onClick={onClose}
-                      className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+                      className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-all"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={() => setPaso("formulario")}
-                      className="flex-1 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700"
+                      className="flex-1 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all"
                     >
                       Continuar
                     </button>
@@ -263,16 +283,23 @@ export function CancelarPedidoModal({
                 <button
                   onClick={onClose}
                   disabled={cancelando}
-                  className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                  className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   Volver
                 </button>
                 <button
                   onClick={handleCancelar}
                   disabled={cancelando || motivo.trim().length < 10}
-                  className="flex-1 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
-                  {cancelando ? "Cancelando..." : "Cancelar Pedido"}
+                  {cancelando ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Cancelando...
+                    </span>
+                  ) : (
+                    "Cancelar Pedido"
+                  )}
                 </button>
               </div>
             </div>

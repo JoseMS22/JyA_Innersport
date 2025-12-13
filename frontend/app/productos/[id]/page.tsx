@@ -7,6 +7,7 @@ import { MainMenu } from "@/components/MainMenu";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
 import { useCart } from "../../context/cartContext";
 import { useFavorites } from "../../context/favoritesContext";
+import { useNotifications } from "../../context/NotificationContext";
 import { RecommendedFooter } from "@/components/RecommendedFooter";
 
 const API_BASE =
@@ -65,15 +66,6 @@ type InventarioDisponibilidad = {
   total_stock: number;
 };
 
-type ToastState = {
-  type: "success" | "error";
-  message: string;
-} | null;
-
-type AuthAlertState = {
-  message: string;
-} | null;
-
 // 🎨 Mapa de colores para hexadecimales
 const COLOR_HEX_MAP: Record<string, string> = {
   // Básicos
@@ -116,12 +108,12 @@ function getColorHex(colorName: string | null): string {
 export default function ProductDetailPage() {
   const { addItem } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { success, error, info, confirm } = useNotifications();
   const router = useRouter();
   const params = useParams();
   const productoId = params.id as string;
 
   // Estados de la página
-  const [authAlert, setAuthAlert] = useState<AuthAlertState>(null);
   const [loading, setLoading] = useState(true);
   const [producto, setProducto] = useState<ProductoDetalle | null>(null);
   const [inventarios, setInventarios] =
@@ -129,7 +121,6 @@ export default function ProductDetailPage() {
   // Estado de autenticación
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [toast, setToast] = useState<ToastState>(null);
 
   const [selectedVariante, setSelectedVariante] = useState<Variante | null>(
     null
@@ -165,13 +156,6 @@ export default function ProductDetailPage() {
 
     checkAuth();
   }, []);
-
-  // Auto ocultar toast
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2500);
-    return () => clearTimeout(id);
-  }, [toast]);
 
   // Cargar producto
   useEffect(() => {
@@ -342,24 +326,17 @@ export default function ProductDetailPage() {
 
   function handleToggleFavorite() {
     if (checkingAuth) {
-      setAuthAlert({
-        message:
-          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
-      });
+      info("Verificando sesión", "Inténtalo de nuevo en un momento.");
       return;
     }
 
     if (!isLoggedIn) {
-      setAuthAlert({
-        message: "Debes iniciar sesión para guardar productos en favoritos.",
-      });
+      error("Sesión requerida", "Debes iniciar sesión para guardar favoritos.");
       return;
     }
 
     if (!producto || !selectedVariante) {
-      setAuthAlert({
-        message: "Selecciona color y talla antes de guardar en favoritos.",
-      });
+      info("Selección incompleta", "Selecciona color y talla primero.");
       return;
     }
 
@@ -378,11 +355,11 @@ export default function ProductDetailPage() {
 
     toggleFavorite(favItem);
 
-    setAuthAlert({
-      message: yaEraFavorito
-        ? "El producto se quitó de favoritos."
-        : "Producto guardado en favoritos.",
-    });
+    if (yaEraFavorito) {
+      info("Favoritos", "El producto se quitó de favoritos.");
+    } else {
+      success("Favoritos", "Producto guardado en favoritos.");
+    }
   }
 
   const isCurrentFavorite =
@@ -390,22 +367,15 @@ export default function ProductDetailPage() {
 
   function handleAddToCart() {
     if (checkingAuth) {
-      setAuthAlert({
-        message:
-          "Estamos verificando tu sesión, inténtalo de nuevo en un momento.",
-      });
+      info("Verificando sesión", "Inténtalo de nuevo en un momento.");
       return;
     }
     if (!isLoggedIn) {
-      setAuthAlert({
-        message: "Debes iniciar sesión para agregar productos al carrito.",
-      });
+      error("Sesión requerida", "Debes iniciar sesión para agregar al carrito.");
       return;
     }
     if (!selectedVariante || !producto) {
-      setAuthAlert({
-        message: "Por favor selecciona una variante válida.",
-      });
+      info("Selección incompleta", "Selecciona una variante válida.");
       return;
     }
 
@@ -413,20 +383,15 @@ export default function ProductDetailPage() {
       inventarios[selectedVariante.id]?.total_stock || 0;
 
     if (stockDisponible === 0) {
-      setAuthAlert({
-        message: "Esta variante no tiene stock disponible.",
-      });
+      error("Sin stock", "Esta variante no tiene stock disponible.");
       return;
     }
 
     if (cantidad > stockDisponible) {
-      setAuthAlert({
-        message: `Solo hay ${stockDisponible} unidades disponibles.`,
-      });
+      error("Cantidad excedida", `Solo hay ${stockDisponible} unidades disponibles.`);
       return;
     }
 
-    // Construimos los objetos mínimos que espera el contexto
     const varianteForCart = {
       id: selectedVariante.id,
       sku: selectedVariante.sku,
@@ -448,7 +413,6 @@ export default function ProductDetailPage() {
 
     const imagenUrl = imagenActual ? buildMediaUrl(imagenActual.url) : null;
 
-    // El contexto se encarga de llamar al backend o usar localStorage
     addItem(
       varianteForCart as any,
       productoForCart as any,
@@ -456,15 +420,10 @@ export default function ProductDetailPage() {
       imagenUrl
     );
 
-    // ✅ Mensaje moderno en vez de alert()
-    setToast({
-      type: "success",
-      message: `Agregado al carrito: ${cantidad} x ${producto.nombre} (${selectedVariante.sku})`,
-    });
-
-    setAuthAlert({
-      message: "El producto se añadió al carrito.",
-    });
+    success(
+      "Añadido al carrito",
+      `${cantidad} x ${producto.nombre} (${selectedVariante.sku})`
+    );
   }
 
   function incrementCantidad() {
@@ -539,31 +498,58 @@ export default function ProductDetailPage() {
       <MainMenu />
 
       <main className="max-w-6xl mx-auto px-4 py-6 pt-38">
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-6">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center gap-2 mb-6 text-sm flex-wrap">
           <button
             onClick={() => router.push("/")}
-            className="hover:text-[#6b21a8]"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
           >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+              />
+            </svg>
             Inicio
           </button>
-          <span className="mx-2">›</span>
+
+          <span className="text-gray-400">›</span>
+
           {producto.categorias.length > 0 && (
             <>
               <button
                 onClick={() =>
-                  router.push(
-                    `/?categoria=${producto.categorias[0].nombre}`
-                  )
+                  router.push(`/?categoria=${producto.categorias[0].nombre}`)
                 }
-                className="hover:text-[#6b21a8]"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
               >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                  />
+                </svg>
                 {producto.categorias[0].nombre}
               </button>
-              <span className="mx-2">›</span>
+              <span className="text-gray-400">›</span>
             </>
           )}
-          <span className="text-gray-800 font-medium">
+
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
             {producto.nombre}
           </span>
         </div>
@@ -688,7 +674,7 @@ export default function ProductDetailPage() {
 
             {/* Descripción */}
             {producto.descripcion && (
-              <div className="p-4 bg.white/70 rounded-xl border border-gray-200">
+              <div className="p-4 bg-white/70 rounded-xl border border-gray-200">
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {producto.descripcion}
                 </p>
@@ -937,54 +923,6 @@ export default function ProductDetailPage() {
           isOpen={showZoom}
           onClose={() => setShowZoom(false)}
         />
-      )}
-
-      {/* Toast moderno */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div
-            className={`flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg text-xs border ${
-              toast.type === "success"
-                ? "bg-white/95 border-[#22c55e]/40 text-[#166534]"
-                : "bg-white/95 border-[#f97316]/40 text-[#9a3412]"
-            }`}
-          >
-            <span className="text-lg">
-              {toast.type === "success" ? "✅" : "⚠️"}
-            </span>
-            <div className="flex flex-col">
-              <span className="font-semibold">
-                {toast.type === "success"
-                  ? "Acción realizada"
-                  : "No se pudo completar"}
-              </span>
-              <span>{toast.message}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de atención (authAlert) */}
-      {authAlert && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full px-6 py-5 text-sm">
-            <div className="flex items-start gap-3">
-              <div>
-                <h2 className="font-semibold text-gray-900 mb-1">Atención</h2>
-                <p className="text-gray-700">{authAlert.message}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setAuthAlert(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#a855f7] text-white text-xs font-semibold hover:bg-[#7e22ce]"
-              >
-                Aceptar
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

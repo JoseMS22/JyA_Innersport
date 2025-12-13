@@ -1,17 +1,19 @@
 // frontend/app/change-password/page.tsx
+
 "use client";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainMenu } from "@/components/MainMenu";
+import { RecommendedFooter } from "@/components/RecommendedFooter";
 import { PasswordInput } from "@/components/PasswordInput";
+import { useNotifications } from "../context/NotificationContext";
 import { apiFetch } from "@/lib/api";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { success, error } = useNotifications();
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Estados para validación en tiempo real
   const [passwords, setPasswords] = useState({
@@ -62,8 +64,6 @@ export default function ChangePasswordPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setLoading(true);
 
     const payload = {
@@ -78,28 +78,28 @@ export default function ChangePasswordPage() {
         body: JSON.stringify(payload),
       });
 
-      setSuccessMsg("Contraseña actualizada correctamente. Redirigiendo...");
-      
+      success("Contraseña actualizada", "Tu contraseña se ha cambiado correctamente");
+
       // Limpiar formulario
       setPasswords({ current: "", new: "", confirm: "" });
-      
+
       // Redirigir después de 2 segundos
       setTimeout(() => {
         router.push("/");
       }, 2000);
     } catch (err: any) {
       let errorMessage = err.message ?? "Error al cambiar contraseña";
-      
+
       if (typeof errorMessage === "string" && errorMessage.includes("[")) {
         try {
           const errors = JSON.parse(errorMessage);
           if (Array.isArray(errors)) {
             errorMessage = errors.join("\n");
           }
-        } catch {}
+        } catch { }
       }
-      
-      setErrorMsg(errorMessage);
+
+      error("Error al cambiar contraseña", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -111,14 +111,32 @@ export default function ChangePasswordPage() {
     <div className="min-h-screen bg-[#fdf6e3]">
       <MainMenu />
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-6">
-          <button onClick={() => router.push("/")} className="hover:text-[#6b21a8]">
+      <main className="max-w-2xl mx-auto px-4 py-8 pt-[140px]">
+        {/* Breadcrumb mejorado */}
+        <div className="flex items-center py-3 gap-2 mb-6 text-sm">
+          <button
+            onClick={() => router.push("/")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
             Inicio
           </button>
-          <span className="mx-2">›</span>
-          <span className="text-gray-800 font-medium">Cambiar contraseña</span>
+          <span className="text-gray-400">›</span>
+          <button
+            onClick={() => router.push("/account/profile")}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-gray-600 hover:text-white hover:bg-[#a855f7] transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Mi cuenta
+          </button>
+          <span className="text-gray-400">›</span>
+          <span className="px-3 py-1.5 rounded-lg bg-[#a855f7] text-white font-medium">
+            Mis direcciones
+          </span>
         </div>
 
         {/* Card principal */}
@@ -214,23 +232,6 @@ export default function ChangePasswordPage() {
               )}
             </div>
 
-            {/* Mensajes */}
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs text-red-700 whitespace-pre-line">
-                  {errorMsg}
-                </p>
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-xs text-emerald-700 font-medium">
-                  {successMsg}
-                </p>
-              </div>
-            )}
-
             {/* Botones */}
             <div className="flex gap-3 pt-2">
               <button
@@ -264,6 +265,9 @@ export default function ChangePasswordPage() {
           </ul>
         </div>
       </main>
+
+      {/* Footer con productos recomendados */}
+      <RecommendedFooter />
     </div>
   );
 }
