@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 type UserMe = {
   id: number;
@@ -16,14 +17,14 @@ type UserMe = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { error: showError } = useNotifications();
+  
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
     setLoading(true);
 
     const payload = {
@@ -69,7 +70,7 @@ export default function LoginPage() {
         return;
       }
 
-      setErrorMsg(msg);
+      showError("Error al iniciar sesión", msg);
     } finally {
       setLoading(false);
     }
@@ -128,13 +129,6 @@ export default function LoginPage() {
               ¿Olvidaste tu contraseña?
             </button>
           </div>
-
-          {/* Error */}
-          {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs text-red-700">{errorMsg}</p>
-            </div>
-          )}
 
           {/* Botón */}
           <button

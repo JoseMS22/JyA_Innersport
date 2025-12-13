@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { Logo } from "../../components/Logo";
 import { PasswordInput } from "@/components/PasswordInput";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/app/context/NotificationContext";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { success, error: showError } = useNotifications();
+  
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Estados para contraseñas
   const [password, setPassword] = useState("");
@@ -59,8 +60,6 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
     setLoading(true);
 
     const form = e.currentTarget;
@@ -85,8 +84,9 @@ export default function RegisterPage() {
         body: JSON.stringify(payload),
       });
 
-      setSuccessMsg(
-        "¡Cuenta creada exitosamente! Revisa tu correo y haz clic en el enlace de verificación para activar tu cuenta."
+      success(
+        "¡Cuenta creada exitosamente!",
+        "Revisa tu correo y haz clic en el enlace de verificación para activar tu cuenta."
       );
       
       // Limpiar formulario
@@ -107,12 +107,12 @@ export default function RegisterPage() {
         try {
           const errors = JSON.parse(errorMessage);
           if (Array.isArray(errors)) {
-            errorMessage = errors.join("\n");
+            errorMessage = errors.join(" • ");
           }
         } catch {}
       }
       
-      setErrorMsg(errorMessage);
+      showError("Error al registrarse", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -137,7 +137,7 @@ export default function RegisterPage() {
 
         {/* Columna derecha: Formulario */}
         <div>
-          <h1 className="text-xl font-semibold text-[#6b21a8] mb-4">
+          <h1 className="text-xl !text-white font-semibold text-[#6b21a8] mb-4">
             Crear cuenta
           </h1>
 
@@ -284,37 +284,11 @@ export default function RegisterPage() {
               disabled={loading}
             />
 
-            {/* Mensajes de error */}
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs text-red-700 whitespace-pre-line">
-                  {errorMsg}
-                </p>
-              </div>
-            )}
-
-            {/* Mensaje de éxito */}
-            {successMsg && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <span className="text-emerald-600 text-lg">✓</span>
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-700 font-medium">
-                      {successMsg}
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      Redirigiendo al inicio de sesión...
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Botón de registro */}
             <button
               type="submit"
               disabled={loading || !allValid}
-              className="mt-2 w-full rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] text-white font-medium py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="mt-2 w-full rounded-lg bg-[#a855f7] !text-white hover:bg-[#7e22ce] text-white font-medium py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Registrando..." : "Crear cuenta"}
             </button>

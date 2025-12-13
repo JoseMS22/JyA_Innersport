@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SellerMenu } from "@/components/SellerMenu";
+import { useNotifications } from "../../context/NotificationContext";
 
 // ========= Tipos auxiliares =========
 
@@ -55,12 +56,11 @@ type UserMeForMenu = {
 
 type MetodoPago = "EFECTIVO" | "TARJETA" | "SINPE" | "OTRO";
 
-// Producto que viene del backend para el POS
 type POSProducto = {
   variante_id: number;
   producto_id: number;
   nombre: string;
-  precio: string; // viene como Decimal -> string
+  precio: string;
   sku: string;
   sucursal_id: number;
   stock: number;
@@ -69,7 +69,6 @@ type POSProducto = {
   talla?: string | null;
 };
 
-// Cliente que viene de /pos/clientes/buscar
 type POSClienteSearchItem = {
   id: number;
   nombre: string;
@@ -78,7 +77,6 @@ type POSClienteSearchItem = {
   puntos_actuales: number;
 };
 
-// Cliente creado desde /pos/clientes
 type POSClientePublic = {
   id: number;
   nombre: string;
@@ -86,13 +84,12 @@ type POSClientePublic = {
   telefono?: string | null;
 };
 
-// Ítem en el carrito listo para enviar al backend
 type CartItem = {
-  id: string; // usamos variante_id como string
+  id: string;
   variante_id: number;
   producto_id: number;
   nombre: string;
-  precio: number; // SIN IVA
+  precio: number;
   cantidad: number;
   stock: number;
 };
@@ -116,6 +113,7 @@ const currency = new Intl.NumberFormat("es-CR", {
 
 export default function SellerPOSPage() {
   const router = useRouter();
+  const { success, error: showError, warning, info } = useNotifications();
 
   const [config, setConfig] = useState<POSConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -123,7 +121,6 @@ export default function SellerPOSPage() {
 
   const [userMenu, setUserMenu] = useState<UserMeForMenu | null>(null);
 
-  // Sucursal seleccionada para vender
   const [sucursalSeleccionada, setSucursalSeleccionada] =
     useState<number | null>(null);
 
@@ -132,7 +129,6 @@ export default function SellerPOSPage() {
   const [montoApertura, setMontoApertura] = useState("");
   const [montoCierreReal, setMontoCierreReal] = useState("");
   const [cajaLoading, setCajaLoading] = useState(false);
-  const [cajaError, setCajaError] = useState<string | null>(null);
   const [showCerrarCajaModal, setShowCerrarCajaModal] = useState(false);
 
   // Productos POS
@@ -150,15 +146,13 @@ export default function SellerPOSPage() {
   const [pagoNombreCliente, setPagoNombreCliente] = useState("");
   const [pagoPuntos, setPagoPuntos] = useState("");
   const [pagoLoading, setPagoLoading] = useState(false);
-  const [pagoError, setPagoError] = useState<string | null>(null);
 
-  // Cliente para el POS (búsqueda / selección / creación)
+  // Cliente
   const [clienteSearch, setClienteSearch] = useState("");
   const [clienteResultados, setClienteResultados] = useState<
     POSClienteSearchItem[]
   >([]);
   const [clienteLoading, setClienteLoading] = useState(false);
-  const [clienteError, setClienteError] = useState<string | null>(null);
   const [clienteSeleccionado, setClienteSeleccionado] =
     useState<POSClienteSearchItem | null>(null);
 
@@ -169,12 +163,6 @@ export default function SellerPOSPage() {
   const [clienteNuevoPassword, setClienteNuevoPassword] = useState("");
   const [clienteNuevoPassword2, setClienteNuevoPassword2] = useState("");
   const [clienteCreateLoading, setClienteCreateLoading] = useState(false);
-  const [clienteCreateError, setClienteCreateError] = useState<string | null>(
-    null
-  );
-  const [clienteCreateSuccess, setClienteCreateSuccess] = useState<
-    string | null
-  >(null);
 
   const tieneCajaAbierta = caja?.estado === "ABIERTA";
 
@@ -312,13 +300,14 @@ export default function SellerPOSPage() {
       const existing = prev.find((i) => i.id === id);
 
       if (product.stock <= 0) {
-        alert("No hay stock disponible de esta variante.");
+        showError("Sin stock", "No hay stock disponible de esta variante.");
         return prev;
       }
 
       if (existing) {
         if (existing.cantidad >= product.stock) {
-          alert(
+          warning(
+            "Stock máximo alcanzado",
             "No puedes agregar más unidades, ya alcanzaste el stock disponible."
           );
           return prev;
@@ -357,7 +346,10 @@ export default function SellerPOSPage() {
           }
 
           if (nuevaCantidad > item.stock) {
-            alert("No hay más stock disponible de esta variante.");
+            warning(
+              "Stock insuficiente",
+              "No hay más stock disponible de esta variante."
+            );
             return item;
           }
 
@@ -375,24 +367,24 @@ export default function SellerPOSPage() {
     if (cartItems.length === 0) return;
     if (!confirm("¿Vaciar carrito?")) return;
     setCartItems([]);
+    info("Carrito vaciado", "Se eliminaron todos los productos del carrito.");
   }
 
-  // Caja
+  // Caja - Abrir
   async function handleAbrirCaja() {
     if (!montoApertura) {
-      setCajaError("Debes indicar el monto de apertura.");
+      showError("Campo requerido", "Debes indicar el monto de apertura.");
       return;
     }
 
     const montoNumber = Number(montoApertura.replace(",", "."));
     if (Number.isNaN(montoNumber) || montoNumber < 0) {
-      setCajaError("El monto de apertura no es válido.");
+      showError("Monto inválido", "El monto de apertura no es válido.");
       return;
     }
 
     try {
       setCajaLoading(true);
-      setCajaError(null);
 
       const body = { monto_apertura: montoNumber };
 
@@ -403,8 +395,13 @@ export default function SellerPOSPage() {
 
       setCaja(nuevaCaja);
       setMontoApertura("");
+      success(
+        "Caja abierta",
+        `Caja abierta con ${currency.format(montoNumber)} de apertura.`
+      );
     } catch (err: any) {
-      setCajaError(
+      showError(
+        "Error al abrir caja",
         err?.message ?? "No se pudo abrir la caja. Inténtalo de nuevo."
       );
     } finally {
@@ -413,24 +410,23 @@ export default function SellerPOSPage() {
   }
 
   function openCerrarCajaModal() {
-    setCajaError(null);
     setMontoCierreReal("");
     setShowCerrarCajaModal(true);
   }
 
+  // Caja - Cerrar
   async function handleCerrarCaja(e: React.FormEvent) {
     e.preventDefault();
     if (!tieneCajaAbierta) return;
 
     const montoNumber = Number(montoCierreReal.replace(",", "."));
     if (Number.isNaN(montoNumber) || montoNumber < 0) {
-      setCajaError("El monto de cierre no es válido.");
+      showError("Monto inválido", "El monto de cierre no es válido.");
       return;
     }
 
     try {
       setCajaLoading(true);
-      setCajaError(null);
 
       const body = {
         monto_real_cierre: montoNumber,
@@ -444,8 +440,27 @@ export default function SellerPOSPage() {
 
       setCaja(cajaCerrada);
       setShowCerrarCajaModal(false);
+      
+      const diferencia = cajaCerrada.diferencia 
+        ? Number(cajaCerrada.diferencia) 
+        : 0;
+      
+      if (diferencia === 0) {
+        success("Caja cerrada", "La caja se cerró correctamente sin diferencias.");
+      } else if (diferencia > 0) {
+        warning(
+          "Caja cerrada con sobrante",
+          `Se cerró la caja con un sobrante de ${currency.format(Math.abs(diferencia))}.`
+        );
+      } else {
+        warning(
+          "Caja cerrada con faltante",
+          `Se cerró la caja con un faltante de ${currency.format(Math.abs(diferencia))}.`
+        );
+      }
     } catch (err: any) {
-      setCajaError(
+      showError(
+        "Error al cerrar caja",
         err?.message ?? "No se pudo cerrar la caja. Inténtalo de nuevo."
       );
     } finally {
@@ -453,14 +468,13 @@ export default function SellerPOSPage() {
     }
   }
 
-  // ===== Cliente POS: buscar (sin <form> interno) =====
+  // Cliente - Buscar
   async function handleBuscarCliente() {
-    setClienteError(null);
     setClienteResultados([]);
 
     const termino = clienteSearch.trim();
     if (!termino) {
-      setClienteError("Escribe al menos parte del correo para buscar.");
+      showError("Campo vacío", "Escribe al menos parte del correo para buscar.");
       return;
     }
 
@@ -471,10 +485,11 @@ export default function SellerPOSPage() {
       )) as POSClienteSearchItem[];
       setClienteResultados(data);
       if (data.length === 0) {
-        setClienteError("No se encontraron clientes con ese correo.");
+        info("Sin resultados", "No se encontraron clientes con ese correo.");
       }
     } catch (err: any) {
-      setClienteError(
+      showError(
+        "Error en búsqueda",
         err?.message ?? "No se pudo buscar clientes. Inténtalo de nuevo."
       );
     } finally {
@@ -487,7 +502,7 @@ export default function SellerPOSPage() {
     setPagoNombreCliente(c.nombre);
     setPagoPuntos("");
     setClienteResultados([]);
-    setClienteError(null);
+    success("Cliente seleccionado", `${c.nombre} - ${c.puntos_actuales} puntos disponibles`);
   }
 
   function handleLimpiarCliente() {
@@ -495,20 +510,16 @@ export default function SellerPOSPage() {
     setPagoNombreCliente("");
     setPagoPuntos("");
     setClienteResultados([]);
-    setClienteError(null);
   }
 
-  // ===== Cliente POS: crear rápido (sin <form> interno) =====
+  // Cliente - Crear
   async function handleCrearClientePOS() {
-    setClienteCreateError(null);
-    setClienteCreateSuccess(null);
-
     if (!clienteNuevoNombre.trim() || !clienteNuevoCorreo.trim()) {
-      setClienteCreateError("Nombre y correo son obligatorios.");
+      showError("Campos incompletos", "Nombre y correo son obligatorios.");
       return;
     }
     if (!clienteNuevoPassword || !clienteNuevoPassword2) {
-      setClienteCreateError("Debes indicar y confirmar la contraseña.");
+      showError("Contraseña requerida", "Debes indicar y confirmar la contraseña.");
       return;
     }
 
@@ -528,7 +539,6 @@ export default function SellerPOSPage() {
         body: JSON.stringify(body),
       })) as POSClientePublic;
 
-      setClienteCreateSuccess("Cliente creado correctamente.");
       setClienteSeleccionado({
         id: nuevo.id,
         nombre: nuevo.nombre,
@@ -545,8 +555,11 @@ export default function SellerPOSPage() {
       setClienteNuevoPassword("");
       setClienteNuevoPassword2("");
       setShowCreateCliente(false);
+
+      success("Cliente creado", `${nuevo.nombre} fue creado correctamente.`);
     } catch (err: any) {
-      setClienteCreateError(
+      showError(
+        "Error al crear cliente",
         err?.message ?? "No se pudo crear el cliente. Revisa los datos."
       );
     } finally {
@@ -559,31 +572,30 @@ export default function SellerPOSPage() {
     e.preventDefault();
     if (cartItems.length === 0) return;
     if (!sucursalSeleccionada) {
-      setPagoError("Debes seleccionar una sucursal para registrar la venta.");
+      showError("Sucursal no seleccionada", "Debes seleccionar una sucursal para registrar la venta.");
       return;
     }
 
-    setPagoError(null);
     setPagoLoading(true);
 
     try {
       const total = totalConImpuesto;
 
       if (total <= 0) {
-        setPagoError("El total debe ser mayor a cero.");
+        showError("Total inválido", "El total debe ser mayor a cero.");
         setPagoLoading(false);
         return;
       }
 
       if (pagoMetodo === "EFECTIVO" && !tieneCajaAbierta) {
-        setPagoError("Debes tener una caja ABIERTA para cobrar en efectivo.");
+        showError("Caja cerrada", "Debes tener una caja ABIERTA para cobrar en efectivo.");
         setPagoLoading(false);
         return;
       }
 
       const puntosNumber = pagoPuntos ? parseInt(pagoPuntos, 10) : 0;
       if (Number.isNaN(puntosNumber) || puntosNumber < 0) {
-        setPagoError("Los puntos a usar deben ser un número válido.");
+        showError("Puntos inválidos", "Los puntos a usar deben ser un número válido.");
         setPagoLoading(false);
         return;
       }
@@ -591,7 +603,8 @@ export default function SellerPOSPage() {
       const esVentaConCliente = !!clienteSeleccionado;
 
       if (puntosNumber > 0 && !esVentaConCliente) {
-        setPagoError(
+        showError(
+          "Cliente requerido para puntos",
           "Para usar puntos debes seleccionar un cliente. La venta de mostrador no admite puntos."
         );
         setPagoLoading(false);
@@ -633,15 +646,18 @@ export default function SellerPOSPage() {
       setClienteSeleccionado(null);
       setClienteResultados([]);
       setClienteSearch("");
-      setClienteError(null);
+
+      success(
+        "Venta registrada",
+        `Venta por ${currency.format(total)} registrada correctamente.`
+      );
 
       if (venta && (venta as any).id) {
         router.push(`/seller/ventas/${(venta as any).id}`);
-      } else {
-        alert("Venta registrada correctamente.");
       }
     } catch (err: any) {
-      setPagoError(
+      showError(
+        "Error al procesar cobro",
         err?.message ??
         "Ocurrió un error al procesar el cobro. Verifica la caja, stock y datos de la venta."
       );
@@ -649,6 +665,9 @@ export default function SellerPOSPage() {
       setPagoLoading(false);
     }
   }
+
+  // PARTE 2/2 - UI COMPLETA (Continúa desde la Parte 1)
+// Copia todo el código de la Parte 1 y agrega esto después de handleConfirmarPago:
 
   if (loadingConfig) {
     return (
@@ -671,7 +690,7 @@ export default function SellerPOSPage() {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="text-sm px-4 py-2 rounded-lg bg-gray-800 text-white"
+            className="text-sm px-4 py-2 rounded-lg bg-gray-800 !text-white"
           >
             Volver al inicio
           </button>
@@ -852,11 +871,6 @@ export default function SellerPOSPage() {
             <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
               Caja del vendedor
             </h2>
-            {cajaError && (
-              <div className="mb-2 p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700">
-                {cajaError}
-              </div>
-            )}
 
             {tieneCajaAbierta ? (
               <div className="text-[11px] text-gray-600 space-y-1">
@@ -1027,7 +1041,6 @@ export default function SellerPOSPage() {
                 onClick={() => {
                   if (cartItems.length === 0) return;
                   if (!sucursalSeleccionada) return;
-                  setPagoError(null);
                   setPagoModalOpen(true);
                 }}
               >
@@ -1038,6 +1051,7 @@ export default function SellerPOSPage() {
         </aside>
       </main>
 
+      {/* Modal preview producto */}
       {productoPreview && (
         <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
           <button
@@ -1103,7 +1117,7 @@ export default function SellerPOSPage() {
             className="absolute inset-0 bg-black/30 backdrop-blur-sm"
             onClick={() => !pagoLoading && setPagoModalOpen(false)}
           />
-          <div className="relative z-10 max-w-md w-full bg-white rounded-2xl shadow-xl border border-[#e5e7eb] p-5">
+          <div className="relative z-10 max-w-md w-full bg-white rounded-2xl shadow-xl border border-[#e5e7eb] p-5 max-h-[90vh] overflow-y-auto">
             <h2 className="text-sm font-semibold text-gray-800 mb-2">
               Cobrar venta
             </h2>
@@ -1207,7 +1221,8 @@ export default function SellerPOSPage() {
                         disabled={clienteLoading || pagoLoading}
                       />
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleBuscarCliente}
                         disabled={clienteLoading || pagoLoading}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium 
              bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
@@ -1216,7 +1231,6 @@ export default function SellerPOSPage() {
                       >
                         {clienteLoading ? "Buscando..." : "Buscar"}
                       </button>
-
                     </div>
 
                     {clienteResultados.length > 0 && (
@@ -1239,12 +1253,6 @@ export default function SellerPOSPage() {
                           </button>
                         ))}
                       </div>
-                    )}
-
-                    {clienteError && (
-                      <p className="text-[10px] text-red-600">
-                        {clienteError}
-                      </p>
                     )}
                   </>
                 )}
@@ -1314,20 +1322,6 @@ export default function SellerPOSPage() {
                           <input
                             type="password"
                             className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
-                            value={clienteNuevoPassword}
-                            onChange={(e) =>
-                              setClienteNuevoPassword(e.target.value)
-                            }
-                            disabled={clienteCreateLoading || pagoLoading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block mb-1">
-                            Confirmar
-                          </label>
-                          <input
-                            type="password"
-                            className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5 text-xs"
                             value={clienteNuevoPassword2}
                             onChange={(e) =>
                               setClienteNuevoPassword2(e.target.value)
@@ -1338,20 +1332,10 @@ export default function SellerPOSPage() {
                       </div>
                     </div>
 
-                    {clienteCreateError && (
-                      <p className="text-[10px] text-red-600">
-                        {clienteCreateError}
-                      </p>
-                    )}
-                    {clienteCreateSuccess && (
-                      <p className="text-[10px] text-emerald-700">
-                        {clienteCreateSuccess}
-                      </p>
-                    )}
-
                     <div className="flex justify-end">
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleCrearClientePOS}
                         disabled={clienteCreateLoading || pagoLoading}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium
              bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff]
@@ -1362,7 +1346,6 @@ export default function SellerPOSPage() {
                           ? "Creando..."
                           : "Crear cliente"}
                       </button>
-
                     </div>
                   </div>
                 )}
@@ -1403,12 +1386,6 @@ export default function SellerPOSPage() {
                   </p>
                 )}
               </div>
-
-              {pagoError && (
-                <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700">
-                  {pagoError}
-                </div>
-              )}
 
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -1463,12 +1440,6 @@ export default function SellerPOSPage() {
                   disabled={cajaLoading}
                 />
               </div>
-
-              {cajaError && (
-                <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700">
-                  {cajaError}
-                </div>
-              )}
 
               <div className="flex justify-end gap-2">
                 <button
