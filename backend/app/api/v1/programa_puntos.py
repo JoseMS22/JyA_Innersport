@@ -147,12 +147,15 @@ def get_limite_redencion(
         total_compra_colones=total_compra,
     )
 
+    config = obtener_config_activa(db)
+
     return LimiteRedencionOut(
         puede_usar_puntos=data["puede_usar_puntos"],
         motivo=data["motivo"],
         descuento_maximo_colones=data["descuento_maximo_colones"],
         puntos_necesarios_para_maximo=data["puntos_necesarios_para_maximo"],
         saldo_puntos=data["saldo_puntos"],
+        valor_colon_por_punto=config.valor_colon_por_punto,
     )
 
 @router.get(
@@ -188,12 +191,15 @@ def get_limite_redencion_cliente(
         total_compra_colones=total_compra,
     )
 
+    config = obtener_config_activa(db)
+
     return LimiteRedencionOut(
         puede_usar_puntos=data["puede_usar_puntos"],
         motivo=data.get("motivo"),
         descuento_maximo_colones=data["descuento_maximo_colones"],
         puntos_necesarios_para_maximo=data["puntos_necesarios_para_maximo"],
         saldo_puntos=data["saldo_puntos"],
+        valor_colon_por_punto=config.valor_colon_por_punto,
     )
 
 

@@ -55,6 +55,11 @@ type LimitePuntos = {
   saldo_puntos: number;
 };
 
+type MetodoPago = "SINPE" | "TARJETA" | null;
+
+const SINPE_NUMERO = process.env.NEXT_PUBLIC_SINPE_NUMERO || "8888-8888";
+
+
 const PROVINCIAS = [
   "San José",
   "Alajuela",
@@ -69,7 +74,18 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
   const { success, error: showError, warning } = useNotifications();
-  
+
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>(null);
+  const [sinpeFile, setSinpeFile] = useState<File | null>(null);
+  const [sinpePreview, setSinpePreview] = useState<string | null>(null);
+
+  // 🔧 evitar memory leak de objectURL
+  useEffect(() => {
+    return () => {
+      if (sinpePreview) URL.revokeObjectURL(sinpePreview);
+    };
+  }, [sinpePreview]);
+
   // IVA Costa Rica (ajusta si usas otro)
   const TAX_RATE = 0.13;
 
@@ -328,6 +344,19 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!metodoPago) {
+      showError("Falta método de pago", "Selecciona SINPE o Tarjeta");
+      return;
+    }
+    if (metodoPago === "TARJETA") {
+      warning("Tarjeta no disponible", "Esta opción aún no está habilitada. Usa SINPE por ahora.");
+      return;
+    }
+    if (metodoPago === "SINPE" && !sinpeFile) {
+      showError("Falta comprobante", "Sube la imagen del comprobante SINPE para continuar.");
+      return;
+    }
+
     if (items.length === 0) {
       showError("Carrito vacío", "Tu carrito está vacío");
       return;
@@ -336,26 +365,25 @@ export default function CheckoutPage() {
     try {
       setProcesandoPago(true);
 
-      // 1️⃣ Crear Pedido real en el backend
-      const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout`, {
+      // ✅ SINPE: crear pedido con multipart + imagen
+      const fd = new FormData();
+      fd.append("direccion_envio_id", String(direccionSeleccionada.id));
+      fd.append("metodo_envio", metodoSeleccionado.metodo_nombre);
+      fd.append("comprobante", sinpeFile!);
+      fd.append("puntos_a_usar", String(puntosUsados));
+
+      const resPedido = await fetch(`${API_BASE}/api/v1/pedidos/checkout-sinpe`, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          direccion_envio_id: direccionSeleccionada.id,
-          metodo_pago: "SIMULADO",
-          metodo_envio: metodoSeleccionado?.metodo_nombre,
-        }),
+        body: fd,
       });
 
       if (!resPedido.ok) {
         const errData = await resPedido.json().catch(() => null);
-        console.error("Error creando pedido:", errData);
+        console.error("Error creando pedido SINPE:", errData);
         showError(
-          "Error al crear pedido",
-          errData?.detail || "No se pudo crear el pedido. Intenta de nuevo en unos minutos."
+          "Error al crear pedido SINPE",
+          errData?.detail || "No se pudo crear el pedido. Intenta de nuevo."
         );
         return;
       }
@@ -714,8 +742,8 @@ export default function CheckoutPage() {
                   key={dir.id}
                   onClick={() => handleSeleccionarDireccion(dir)}
                   className={`w-full text-left p-4 rounded-xl border-2 transition-all ${direccionSeleccionada?.id === dir.id
-                      ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
-                      : "border-gray-200 hover:border-[#a855f7]"
+                    ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
+                    : "border-gray-200 hover:border-[#a855f7]"
                     }`}
                 >
                   <div className="flex items-start justify-between">
@@ -786,9 +814,9 @@ export default function CheckoutPage() {
                     key={metodo.metodo_envio_id}
                     onClick={() => setMetodoSeleccionado(metodo)}
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all ${metodoSeleccionado?.metodo_envio_id ===
-                        metodo.metodo_envio_id
-                        ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
-                        : "border-gray-200 hover:border-[#a855f7]"
+                      metodo.metodo_envio_id
+                      ? "border-[#a855f7] bg-[#faf5ff] shadow-sm"
+                      : "border-gray-200 hover:border-[#a855f7]"
                       }`}
                   >
                     <div className="flex items-start justify-between">
@@ -923,6 +951,83 @@ export default function CheckoutPage() {
           )}
         </div>
 
+        {/* 4. Método de pago */}
+        <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">4. Método de pago</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              onClick={() => {
+                setMetodoPago("SINPE");
+              }}
+              className={`p-4 rounded-xl border-2 text-left ${metodoPago === "SINPE"
+                  ? "border-[#a855f7] bg-[#faf5ff]"
+                  : "border-gray-200 hover:border-[#a855f7]"
+                }`}
+            >
+              <p className="font-semibold">SINPE Móvil</p>
+              <p className="text-xs text-gray-500">Sube el comprobante para validar el pago</p>
+            </button>
+
+            <button
+              onClick={() => {
+                setMetodoPago("TARJETA");
+                // ✅ limpiar comprobante si se pasa a tarjeta
+                setSinpeFile(null);
+                setSinpePreview(null);
+              }}
+              className={`p-4 rounded-xl border-2 text-left ${metodoPago === "TARJETA"
+                  ? "border-[#a855f7] bg-[#faf5ff]"
+                  : "border-gray-200 hover:border-[#a855f7]"
+                }`}
+            >
+              <p className="font-semibold">Tarjeta</p>
+              <p className="text-xs text-gray-500">Próximamente (pasarela en el futuro)</p>
+            </button>
+          </div>
+
+          {metodoPago === "TARJETA" && (
+            <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-sm text-yellow-800">
+              Esta opción aún no está habilitada. En el futuro se integrará una pasarela de pago.
+            </div>
+          )}
+
+          {metodoPago === "SINPE" && (
+            <div className="mt-4 p-4 rounded-xl bg-[#faf5ff] border border-[#e9d5ff]">
+              <p className="text-sm text-gray-700">
+                Realiza el SINPE al número:{" "}
+                <strong className="text-[#6b21a8]">{SINPE_NUMERO}</strong>
+              </p>
+
+              <div className="mt-3">
+                <label className="text-xs text-gray-600 font-semibold">Comprobante (imagen) *</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full text-sm"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+
+                    // liberar preview anterior
+                    if (sinpePreview) URL.revokeObjectURL(sinpePreview);
+
+                    setSinpeFile(f);
+                    setSinpePreview(f ? URL.createObjectURL(f) : null);
+                  }}
+                />
+                {sinpePreview && (
+                  <img
+                    src={sinpePreview}
+                    alt="Comprobante"
+                    className="mt-3 w-full max-w-sm rounded-lg border"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+
         {/* 4. Resumen final */}
         {direccionSeleccionada && metodoSeleccionado && (
           <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
@@ -1029,7 +1134,7 @@ export default function CheckoutPage() {
               <span>
                 {procesandoPago
                   ? "Procesando pedido..."
-                  : "Confirmar pedido (simulado)"}
+                  : "Confirmar pedido (SINPE)"}
               </span>
               {!procesandoPago && <span>→</span>}
             </button>

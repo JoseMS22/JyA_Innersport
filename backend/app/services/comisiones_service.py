@@ -3,7 +3,7 @@ from decimal import Decimal
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 
 from app.models.comision_vendedor import ComisionVendedor
 from app.models.configuracion_comision import ConfiguracionComision
@@ -383,3 +383,53 @@ def obtener_resumen_comisiones_vendedor(
         "total_liquidado": float(liquidado),
         "cantidad_ventas": cantidad
     }
+
+def crear_comision_pos_si_aplica(db, venta: VentaPOS):
+    print("[COMISION] estado:", venta.estado)
+    print("[COMISION] cancelado:", getattr(venta, "cancelado", None))
+    print("[COMISION] venta_id:", venta.id)
+    print("[COMISION] total:", venta.total)
+
+    # Solo si está pagada
+    if venta.estado not in ("PAGADO", "COMPLETADO"):
+        return None
+
+    # Si manejás cancelación con estado, quitá venta.cancelado (ver punto 2)
+    if getattr(venta, "cancelado", False):
+        return None
+
+    # Evitar duplicados (idempotente)
+    existe = db.query(ComisionVendedor.id).filter(
+        ComisionVendedor.venta_pos_id == venta.id
+    ).first()
+    print("[COMISION] ya_existe?:", bool(existe))
+    if existe:
+        return None
+
+    config = obtener_configuracion_activa(db, "POS")
+    print("[COMISION] config:", config)
+
+    if not config:
+        print("[COMISION] NO HAY CONFIG POS ACTIVA")
+        return None
+
+    print("[COMISION] porcentaje:", config.porcentaje, "monto_minimo:", config.monto_minimo)
+
+    if config.monto_minimo and venta.total < config.monto_minimo:
+        return None
+
+    monto_comision = (venta.total * config.porcentaje) / Decimal("100")
+
+    comision = ComisionVendedor(
+        vendedor_id=venta.vendedor_id,
+        venta_pos_id=venta.id,
+        monto_venta=venta.total,
+        porcentaje_aplicado=config.porcentaje,
+        monto_comision=monto_comision,
+        tipo_venta="POS",
+        estado="PENDIENTE",
+        fecha_venta=venta.fecha_creacion,
+    )
+    db.add(comision)
+    db.flush()
+    return comision

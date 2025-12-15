@@ -38,10 +38,21 @@ export function SearchBar({ onSearch, className = "" }: SearchBarProps) {
   const [loading, setLoading] = useState(false);
   const [showSugerencias, setShowSugerencias] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  
+
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+  function resolveImageUrl(path: string | null) {
+    if (!path) return null;
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    // path tipo "/media/xxx.jpg"
+    return `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  }
+
 
   // Cerrar sugerencias al hacer click fuera
   useEffect(() => {
@@ -92,14 +103,16 @@ export function SearchBar({ onSearch, className = "" }: SearchBarProps) {
         por_pagina: "5", // Limitar a 5 sugerencias
       });
 
-      const res = await fetch(`http://localhost:8000/api/v1/catalogo?${params.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/catalogo?${params.toString()}`);
       const data = await res.json();
 
       // Transformar productos en sugerencias
       const productosSugerencias: Sugerencia[] = data.productos.map((p: any) => ({
         ...p,
+        imagen_principal: resolveImageUrl(p.imagen_principal), // ✅ aquí
         tipo: "producto" as const,
       }));
+
 
       // Extraer categorías únicas de los productos encontrados
       const categoriasUnicas = Array.from(
@@ -329,7 +342,11 @@ export function SearchBar({ onSearch, className = "" }: SearchBarProps) {
                         src={sugerencia.imagen_principal}
                         alt={sugerencia.nombre}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = "/placeholder-product.png";
+                        }}
                       />
+
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white text-xs">
                         📦

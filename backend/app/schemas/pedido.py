@@ -22,6 +22,7 @@ class PedidoCreateFromCart(BaseModel):
     direccion_envio_id: int
     metodo_pago: str
     metodo_envio: Optional[str] = None
+    puntos_a_usar: int = 0
     # Si en otra rama agregaste más campos (metodo_envio, usar_puntos, etc.)
     # se pueden sumar aquí luego.
 
@@ -80,6 +81,7 @@ class PedidoEstadoUpdate(BaseModel):
     Payload de entrada para cambiar el estado del pedido.
     """
     estado: Literal[
+        "VERIFICAR_PAGO",
         "PAGADO",
         "EN_PREPARACION",
         "ENVIADO",

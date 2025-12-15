@@ -38,6 +38,7 @@ from .pago_pos import PagoPOS
 from .comision_vendedor import ComisionVendedor
 from .configuracion_comision import ConfiguracionComision
 from .liquidacion_comision import LiquidacionComision
+from .sinpe import Sinpe
 
 __all__ = [
     "Usuario",

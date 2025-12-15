@@ -11,7 +11,7 @@ import { useNotifications } from "@/app/context/NotificationContext";
 export default function RegisterPage() {
   const router = useRouter();
   const { success, error: showError } = useNotifications();
-  
+
   const [loading, setLoading] = useState(false);
 
   // Estados para contraseñas
@@ -30,6 +30,9 @@ export default function RegisterPage() {
   });
 
   const [showValidations, setShowValidations] = useState(false);
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
 
   // Validar contraseña
   function validatePassword(pwd: string) {
@@ -60,10 +63,58 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+
+    // limpiar errores previos
+    setFieldErrors({});
+
+    // Validación manual de obligatorios
+    const requiredFields: { name: string; label: string }[] = [
+      { name: "nombre", label: "Nombre completo" },
+      { name: "correo", label: "Correo electrónico" },
+      { name: "provincia", label: "Provincia" },
+      { name: "canton", label: "Cantón" },
+      { name: "distrito", label: "Distrito" },
+      { name: "detalle", label: "Detalles de dirección" },
+    ];
+
+    const errors: Record<string, string> = {};
+
+    for (const f of requiredFields) {
+      const v = String(formData.get(f.name) ?? "").trim();
+      if (!v) errors[f.name] = `Este campo es obligatorio: ${f.label}`;
+    }
+
+    // validación extra de email (opcional pero recomendado)
+    const correo = String(formData.get("correo") ?? "").trim();
+    if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
+      errors["correo"] = "Ingresa un correo válido (ej: usuario@correo.com).";
+    }
+
+    // contraseñas (ya las tenés en real-time, pero por seguridad validamos aquí también)
+    if (!password) errors["password"] = "La contraseña es obligatoria.";
+    if (!confirmPassword) errors["confirm_password"] = "Confirma tu contraseña.";
+    if (password && confirmPassword && password !== confirmPassword) {
+      errors["confirm_password"] = "Las contraseñas no coinciden.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+
+      // toast bonito
+      showError("Faltan datos", "Revisa los campos marcados en rojo.");
+
+      // enfocar el primer campo con error
+      const firstKey = Object.keys(errors)[0];
+      const firstInput = form.querySelector(`[name="${firstKey}"]`) as HTMLElement | null;
+      firstInput?.focus();
+
+      return; // no continúa
+    }
+
+    setLoading(true);
 
     const payload = {
       nombre: formData.get("nombre") as string,
@@ -88,7 +139,7 @@ export default function RegisterPage() {
         "¡Cuenta creada exitosamente!",
         "Revisa tu correo y haz clic en el enlace de verificación para activar tu cuenta."
       );
-      
+
       // Limpiar formulario
       form.reset();
       setPassword("");
@@ -101,7 +152,7 @@ export default function RegisterPage() {
       }, 3000);
     } catch (err: any) {
       let errorMessage = err.message ?? "Error al registrarse";
-      
+
       // Parsear errores de array
       if (typeof errorMessage === "string" && errorMessage.includes("[")) {
         try {
@@ -109,9 +160,9 @@ export default function RegisterPage() {
           if (Array.isArray(errors)) {
             errorMessage = errors.join(" • ");
           }
-        } catch {}
+        } catch { }
       }
-      
+
       showError("Error al registrarse", errorMessage);
     } finally {
       setLoading(false);
@@ -141,30 +192,36 @@ export default function RegisterPage() {
             Crear cuenta
           </h1>
 
-          <form className="space-y-3 text-sm" onSubmit={handleSubmit}>
+          <form className="space-y-3 text-sm" onSubmit={handleSubmit} noValidate>
             {/* Nombre */}
             <input
               name="nombre"
               placeholder="Nombre completo"
-              className="w-full rounded-lg border px-3 py-2 outline-none 
-                         border-[#e5e7eb] focus:border-[#a855f7]
-                         text-gray-800 placeholder-gray-400"
-              required
+              className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.nombre ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
               disabled={loading}
             />
+            {fieldErrors.nombre && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.nombre}</p>
+            )}
 
             {/* Correo */}
             <input
               type="email"
               name="correo"
               placeholder="Correo electrónico"
-              className="w-full rounded-lg border px-3 py-2 outline-none 
-                         border-[#e5e7eb] focus:border-[#a855f7]
-                         text-gray-800 placeholder-gray-400"
-              required
+              className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.correo ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
               disabled={loading}
               autoComplete="email"
             />
+            {fieldErrors.correo && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.correo}</p>
+            )}
 
             {/* Teléfono */}
             <input
@@ -185,10 +242,13 @@ export default function RegisterPage() {
                   value={password}
                   onChange={handlePasswordChange}
                   placeholder="Contraseña"
-                  required
+
                   disabled={loading}
                   autoComplete="new-password"
                 />
+                {fieldErrors.password && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.password}</p>
+                )}
 
                 {/* Validaciones en tiempo real */}
                 {showValidations && (
@@ -211,10 +271,13 @@ export default function RegisterPage() {
                   value={confirmPassword}
                   onChange={handleConfirmPasswordChange}
                   placeholder="Confirmar contraseña"
-                  required
+
                   disabled={loading}
                   autoComplete="new-password"
                 />
+                {fieldErrors.confirm_password && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.confirm_password}</p>
+                )}
 
                 {confirmPassword && (
                   <div className="mt-2">
@@ -232,22 +295,28 @@ export default function RegisterPage() {
               <input
                 name="provincia"
                 placeholder="Provincia"
-                className="w-full rounded-lg border px-3 py-2 outline-none 
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-                required
+                className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.provincia ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
                 disabled={loading}
               />
+              {fieldErrors.provincia && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.provincia}</p>
+              )}
 
               <input
                 name="canton"
                 placeholder="Cantón"
-                className="w-full rounded-lg border px-3 py-2 outline-none 
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-                required
+                className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.canton ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
                 disabled={loading}
               />
+              {fieldErrors.canton && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.canton}</p>
+              )}
             </div>
 
             {/* Distrito y Teléfono dirección */}
@@ -255,12 +324,15 @@ export default function RegisterPage() {
               <input
                 name="distrito"
                 placeholder="Distrito"
-                className="w-full rounded-lg border px-3 py-2 outline-none 
-                           border-[#e5e7eb] focus:border-[#a855f7]
-                           text-gray-800 placeholder-gray-400"
-                required
+                className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.distrito ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
                 disabled={loading}
               />
+              {fieldErrors.distrito && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.distrito}</p>
+              )}
 
               <input
                 name="telefono_direccion"
@@ -277,12 +349,15 @@ export default function RegisterPage() {
               name="detalle"
               placeholder="Detalles de dirección (señas exactas)"
               rows={2}
-              className="w-full rounded-lg border px-3 py-2 outline-none 
-                         border-[#e5e7eb] focus:border-[#a855f7]
-                         text-gray-800 placeholder-gray-400 resize-none"
-              required
+              className={`w-full rounded-lg border px-3 py-2 outline-none
+                          ${fieldErrors.detalle ? "border-red-400 focus:border-red-500" : "border-[#e5e7eb] focus:border-[#a855f7]"}
+                          text-gray-800 placeholder-gray-400`}
+
               disabled={loading}
             />
+            {fieldErrors.detalle && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.detalle}</p>
+            )}
 
             {/* Botón de registro */}
             <button

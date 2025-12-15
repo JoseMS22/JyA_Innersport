@@ -14,6 +14,7 @@ from app.models.direccion import Direccion
 from app.models.sucursal import Sucursal
 from app.models.inventario import Inventario
 from app.models.usuario import Usuario
+from app.services.programa_puntos_service import obtener_config_activa, calcular_limite_redencion
 
 from app.schemas.pedido import (
     PedidoCreateFromCart,
@@ -26,6 +27,7 @@ from app.core.email import send_pedido_estado_email
 from collections import defaultdict
 
 ALLOWED_PEDIDO_ESTADOS = {
+    "VERIFICAR_PAGO",
     "PAGADO",
     "EN_PREPARACION",
     "ENVIADO",
@@ -132,32 +134,21 @@ def elegir_sucursal_para_pedido(
     return mejor_sucursal
 
 
-def obtener_sucursales_candidatas(
-    db: Session,
-    direccion: Direccion,
-) -> list[Sucursal]:
+def obtener_sucursales_candidatas(db: Session, direccion: Direccion) -> list[Sucursal]:
     """
-    Devuelve la lista de sucursales activas que se pueden usar para el pedido,
-    priorizando la misma provincia de la dirección y luego todas las demás.
+    Devuelve TODAS las sucursales activas.
+    (Se elimina la lógica por provincia)
     """
-    provincia_envio = getattr(direccion, "provincia", None)
-
-    base_q = (
+    sucursales = (
         db.query(Sucursal)
         .filter(Sucursal.activo.is_(True))
-        .filter(Sucursal.provincia.isnot(None))
+        .all()
     )
-
-    if provincia_envio:
-        sucursales = base_q.filter(Sucursal.provincia == provincia_envio).all()
-        if not sucursales:
-            sucursales = base_q.all()
-    else:
-        sucursales = base_q.all()
 
     if not sucursales:
         print("[ASIGNACIÓN SUCURSAL] No hay sucursales activas.")
     return sucursales
+
 
 
 
@@ -230,6 +221,57 @@ def asignar_items_a_sucursales(
     return asignacion
 
 
+def asignar_items_a_sucursales_sin_partir(
+    db,
+    sucursales,
+    items_carrito,
+) -> dict[int, list[tuple]]:
+    """
+    Asigna CADA item del carrito completo a UNA sucursal.
+    - No divide cantidades.
+    - Si ninguna sucursal tiene stock suficiente para un item, lanza 400.
+    - Rebaja inventario en la sesión (con with_for_update).
+    """
+    asignacion = defaultdict(list)
+
+    if not sucursales:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hay sucursales disponibles para atender el pedido.",
+        )
+
+    # Puedes ordenar por prioridad (ej: misma provincia primero ya viene así)
+    sucursales_ordenadas = sorted(sucursales, key=lambda s: s.id)
+
+    for item in items_carrito:
+        asignado = False
+
+        for suc in sucursales_ordenadas:
+            inv = (
+                db.query(Inventario)
+                .with_for_update()
+                .filter(
+                    Inventario.sucursal_id == suc.id,
+                    Inventario.variante_id == item.variante_id,
+                )
+                .first()
+            )
+
+            # Importante: aquí exigimos que una sola sucursal cubra todo el item
+            if inv and inv.cantidad >= item.cantidad:
+                asignacion[suc.id].append((item, item.cantidad))
+                inv.cantidad -= item.cantidad
+                asignado = True
+                break
+
+        if not asignado:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No hay stock suficiente para la variante {item.variante_id}.",
+            )
+
+    return asignacion
+
 
 def crear_pedido_desde_carrito(
     db: Session,
@@ -274,16 +316,13 @@ def crear_pedido_desde_carrito(
     for item in carrito.items:
         subtotal_total += item.precio_unitario * item.cantidad
 
-    # 4) Obtener sucursales candidatas
+    # 4) Obtener sucursales candidatas (misma provincia primero, si no hay entonces todas)
     sucursales = obtener_sucursales_candidatas(db, direccion)
-    if not sucursales:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No hay sucursales activas para atender el pedido.",
-        )
 
-    # 5) Repartir items entre sucursales + rebajar inventario
-    asignacion = asignar_items_a_sucursales(db, sucursales, carrito.items)
+    # 5) Asignar cada item completo a una sucursal con stock (sin partir cantidades)
+    asignacion = asignar_items_a_sucursales_sin_partir(db, sucursales, carrito.items)
+
+
     # asignacion: sucursal_id -> [(item_carrito, cantidad_asignada), ...]
 
     # 6) Costo de envío según método seleccionado (solo se cobrará en el primer pedido)
@@ -297,7 +336,45 @@ def crear_pedido_desde_carrito(
     costo_envio_total = metodos_envio.get(metodo_seleccionado, Decimal("3700.00"))
     metodo_envio = metodo_seleccionado
 
-    descuento_puntos_total = Decimal("0.00")  # TODO: lógica de puntos futura
+    puntos_a_usar = int(getattr(data, "puntos_a_usar", 0) or 0)
+    if puntos_a_usar < 0:
+        puntos_a_usar = 0
+
+    config = obtener_config_activa(db)
+    valor_por_punto = Decimal(config.valor_colon_por_punto or 0)
+
+    # Total bruto para validar límites (productos + envío una vez)
+    total_bruto = subtotal_total + costo_envio_total
+
+    descuento_puntos_total = Decimal("0.00")
+    if puntos_a_usar > 0 and config.activo and valor_por_punto > 0:
+        limite = calcular_limite_redencion(
+            db,
+            usuario_id=usuario_id,
+            total_compra_colones=total_bruto,
+        )
+
+        if limite["puede_usar_puntos"]:
+            descuento_solicitado = (Decimal(puntos_a_usar) * valor_por_punto).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            descuento_puntos_total = min(descuento_solicitado, limite["descuento_maximo_colones"])
+
+            # Ajustar puntos_a_usar a lo que realmente se aplicó
+            puntos_a_usar = int(
+                (descuento_puntos_total / valor_por_punto).to_integral_value(rounding="ROUND_FLOOR")
+            )
+
+
+    if puntos_a_usar < 0:
+        puntos_a_usar = 0
+
+    # si quieres que el descuento NO exceda el subtotal_total (recomendado)
+    if descuento_puntos_total > subtotal_total:
+        descuento_puntos_total = subtotal_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        puntos_a_usar = int((descuento_puntos_total * Decimal("100")).to_integral_value(rounding=ROUND_HALF_UP))
+
+  # TODO: lógica de puntos futura
     puntos_ganados_total = int(subtotal_total / 100)
 
     # 7) Crear uno o varios pedidos (uno por sucursal)
@@ -318,6 +395,19 @@ def crear_pedido_desde_carrito(
         for item, cantidad_asignada in items_asignados:
             subtotal_pedido += item.precio_unitario * cantidad_asignada
 
+        # ✅ Repartir el descuento por puntos proporcional al subtotal de cada pedido
+        if subtotal_total > 0:
+            descuento_puntos_pedido = (subtotal_pedido / subtotal_total) * descuento_puntos_total
+        else:
+            descuento_puntos_pedido = Decimal("0.00")
+
+        descuento_puntos_pedido = descuento_puntos_pedido.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Evitar que por redondeo se pase del subtotal del pedido
+        if descuento_puntos_pedido > subtotal_pedido:
+            descuento_puntos_pedido = subtotal_pedido.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
         # Puntos ganados proporcionales a este subtotal
         if subtotal_total > 0:
             puntos_ganados_pedido = int(
@@ -332,9 +422,11 @@ def crear_pedido_desde_carrito(
         else:
             costo_envio_pedido = Decimal("0.00")
 
-        total_pedido = subtotal_pedido + costo_envio_pedido - Decimal("0.00")
+        total_pedido = subtotal_pedido + costo_envio_pedido - descuento_puntos_pedido
 
         timestamp = int(time.time() * 1000)
+
+        estado = "VERIFICAR_PAGO" if data.metodo_pago == "SINPE" else "PAGADO"
 
         pedido = Pedido(
             cliente_id=usuario_id,
@@ -342,10 +434,10 @@ def crear_pedido_desde_carrito(
             sucursal_id=suc_id,
             subtotal=subtotal_pedido,
             costo_envio=costo_envio_pedido,
-            descuento_puntos=Decimal("0.00"),
+            descuento_puntos=descuento_puntos_pedido,
             total=total_pedido,
             puntos_ganados=puntos_ganados_pedido,
-            estado="PAGADO",
+            estado=estado,
             metodo_envio=metodo_envio,
             numero_pedido=f"ORD-{usuario_id}-{timestamp}-{suc_id}",
         )
@@ -383,13 +475,14 @@ def crear_pedido_desde_carrito(
             )
 
 
+        pago_estado = "PENDIENTE" if data.metodo_pago == "SINPE" else "APROBADO"
         # Crear pago simulado para este pedido
         pago = Pago(
             pedido_id=pedido.id,
             monto=total_pedido,
             referencia=f"SIM-{pedido.id}",
             metodo=data.metodo_pago,
-            estado="APROBADO",
+            estado=pago_estado,
         )
         db.add(pago)
 
@@ -506,3 +599,4 @@ def actualizar_estado_pedido(
             print(f"[PEDIDO] Error enviando correo de estado: {e}")
 
     return PedidoEstadoResponse.model_validate(pedido)
+
