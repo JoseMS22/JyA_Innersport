@@ -43,15 +43,38 @@ type PedidoDetalle = {
   productos: ProductoPedido[];
   puede_cancelar: boolean;
   fecha_limite_cancelacion: string | null;
+  pago_metodo?: string | null;
+  pago_estado?: string | null;
+  pago_referencia?: string | null;
+  sinpe?: SinpeInfo | null;
 };
 
+type SinpeInfo = {
+  imagen_url: string;
+  numero_destino: string;
+  referencia?: string | null;
+  fecha_creacion?: string | null;
+};
+
+
 const ESTADOS_PEDIDO = [
+  "VERIFICAR_PAGO",
   "PAGADO",
   "EN_PREPARACION",
   "ENVIADO",
   "ENTREGADO",
   "CANCELADO",
 ];
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+function buildMediaUrl(url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_BASE_URL}${url}`;
+}
+
 
 export default function PedidoDetalleAdminPage() {
   const params = useParams();
@@ -251,6 +274,43 @@ export default function PedidoDetalleAdminPage() {
           <p className="text-[11px] text-gray-500">
             Puntos ganados: {pedido.puntos_ganados}
           </p>
+          {pedido.pago_metodo === "SINPE" && pedido.sinpe?.imagen_url && (
+            <div className="mt-3 border-t border-gray-200 pt-3">
+              <p className="text-[11px] font-semibold text-gray-700 mb-2">
+                Comprobante SINPE
+              </p>
+
+              <div className="text-[11px] text-gray-600 space-y-1 mb-2">
+                <p>
+                  <span className="font-semibold">Número destino:</span>{" "}
+                  {pedido.sinpe.numero_destino}
+                </p>
+                {pedido.sinpe.referencia && (
+                  <p>
+                    <span className="font-semibold">Referencia:</span>{" "}
+                    {pedido.sinpe.referencia}
+                  </p>
+                )}
+              </div>
+
+              <a
+                href={buildMediaUrl(pedido.sinpe.imagen_url) ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="block"
+              >
+                <img
+                  src={buildMediaUrl(pedido.sinpe.imagen_url) ?? ""}
+                  alt="Comprobante SINPE"
+                  className="w-full max-h-[340px] object-contain rounded-xl border border-gray-200 bg-white"
+                />
+              </a>
+
+              <p className="mt-2 text-[10px] text-gray-500">
+                Tip: clic en la imagen para abrirla en grande.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

@@ -50,6 +50,7 @@ class LimiteRedencionOut(BaseModel):
     descuento_maximo_colones: Decimal
     puntos_necesarios_para_maximo: int
     saldo_puntos: int
+    valor_colon_por_punto: Decimal
 
 
 # ============================

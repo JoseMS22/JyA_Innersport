@@ -147,13 +147,61 @@ def get_limite_redencion(
         total_compra_colones=total_compra,
     )
 
+    config = obtener_config_activa(db)
+
     return LimiteRedencionOut(
         puede_usar_puntos=data["puede_usar_puntos"],
         motivo=data["motivo"],
         descuento_maximo_colones=data["descuento_maximo_colones"],
         puntos_necesarios_para_maximo=data["puntos_necesarios_para_maximo"],
         saldo_puntos=data["saldo_puntos"],
+        valor_colon_por_punto=config.valor_colon_por_punto,
     )
+
+@router.get(
+    "/cliente/{usuario_id}/limite-redencion",
+    response_model=LimiteRedencionOut,
+)
+def get_limite_redencion_cliente(
+    usuario_id: int,
+    total_compra: Decimal = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """
+    Devuelve cuánto puede usar ESTE cliente en puntos para una compra
+    con total 'total_compra'.
+
+    Usado por el POS (vendedor/admin) para consultar el límite de redención
+    de un cliente específico.
+    """
+
+    # Permisos:
+    # - ADMIN y VENDEDOR pueden consultar cualquier cliente
+    # - El propio CLIENTE solo puede ver su límite
+    if usuario.rol not in ("ADMIN", "VENDEDOR") and usuario.id != usuario_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver el límite de redención de este cliente.",
+        )
+
+    data = calcular_limite_redencion(
+        db,
+        usuario_id=usuario_id,
+        total_compra_colones=total_compra,
+    )
+
+    config = obtener_config_activa(db)
+
+    return LimiteRedencionOut(
+        puede_usar_puntos=data["puede_usar_puntos"],
+        motivo=data.get("motivo"),
+        descuento_maximo_colones=data["descuento_maximo_colones"],
+        puntos_necesarios_para_maximo=data["puntos_necesarios_para_maximo"],
+        saldo_puntos=data["saldo_puntos"],
+        valor_colon_por_punto=config.valor_colon_por_punto,
+    )
+
 
 
 # ============================

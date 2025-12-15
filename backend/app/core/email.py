@@ -82,6 +82,11 @@ def send_password_reset_email(to_email: str, reset_token: str):
         # Solo logueamos el error
 
 ESTADO_PEDIDO_TEXTOS = {
+    "VERIFICAR_PAGO": {
+        "titulo": "Estamos verificando tu pago SINPE",
+        "descripcion": "Recibimos tu comprobante y lo estamos validando. Te avisaremos cuando el pago sea confirmado.",
+        "mensaje_extra": "Si hay algún inconveniente con el comprobante, te contactaremos para corregirlo.",
+    },
     "PAGADO": {
         "titulo": "¡Hemos recibido tu pedido!",
         "descripcion": "Tu pedido ha sido confirmado y estamos procesándolo para enviártelo lo antes posible.",

@@ -2,12 +2,11 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SellerMenu } from "@/components/SellerMenu";
 import { useNotifications } from "../../context/NotificationContext";
-
 // ========= Tipos auxiliares =========
 
 const API_BASE_URL =
@@ -94,6 +93,16 @@ type CartItem = {
   stock: number;
 };
 
+type LimitePuntos = {
+  puede_usar_puntos: boolean;
+  motivo: string | null;
+  descuento_maximo_colones: number;
+  puntos_necesarios_para_maximo: number;
+  saldo_puntos: number;
+  valor_colon_por_punto: number;
+
+};
+
 const IVA_RATE = 0.13;
 const FACTOR_IVA = 1 + IVA_RATE;
 
@@ -104,6 +113,10 @@ function precioBaseDesdeConIVA(precioConIVA: number) {
 function precioConIVADesdeBase(base: number) {
   return Math.round(base * FACTOR_IVA * 100) / 100;
 }
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 
 const currency = new Intl.NumberFormat("es-CR", {
   style: "currency",
@@ -114,6 +127,8 @@ const currency = new Intl.NumberFormat("es-CR", {
 export default function SellerPOSPage() {
   const router = useRouter();
   const { success, error: showError, warning, info } = useNotifications();
+  // Para no disparar el warning en bucle
+  const warnedMismatchRef = useRef(false);
 
   const [config, setConfig] = useState<POSConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -170,6 +185,11 @@ export default function SellerPOSPage() {
     null
   );
 
+  const [limitePuntos, setLimitePuntos] = useState<LimitePuntos | null>(null);
+
+  const [cartSucursalId, setCartSucursalId] = useState<number | null>(null);
+
+
   const subtotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.precio * item.cantidad, 0),
     [cartItems]
@@ -189,6 +209,21 @@ export default function SellerPOSPage() {
     () => cartItems.reduce((acc, item) => acc + item.cantidad, 0),
     [cartItems]
   );
+
+  const puedeUsarPuntos =
+    !!clienteSeleccionado &&
+    !!limitePuntos &&
+    limitePuntos.puede_usar_puntos &&
+    limitePuntos.descuento_maximo_colones > 0;
+
+  const maxPuntosUsar = puedeUsarPuntos
+    ? Math.min(
+      limitePuntos!.saldo_puntos,
+      limitePuntos!.puntos_necesarios_para_maximo
+    )
+    : 0;
+
+
 
   // Cargar config POS
   useEffect(() => {
@@ -246,6 +281,52 @@ export default function SellerPOSPage() {
     }
   }
 
+  async function syncCartStockWithBackend(sucursalId: number) {
+    // Traemos stock real actual de la sucursal (sin filtro)
+    const params = new URLSearchParams({
+      sucursal_id: String(sucursalId),
+      limit: "200",
+    });
+
+    const lista = (await apiFetch(`/api/v1/pos/productos?${params.toString()}`)) as POSProducto[];
+
+    const stockMap = new Map<number, number>();
+    for (const p of lista) stockMap.set(p.variante_id, p.stock);
+
+    let huboCambios = false;
+
+    setCartItems((prev) => {
+      const updated = prev
+        .map((item) => {
+          const stockReal = stockMap.get(item.variante_id);
+
+          // Si ya no existe en esa sucursal => stock 0
+          const nuevoStock = typeof stockReal === "number" ? stockReal : 0;
+
+          if (nuevoStock !== item.stock) huboCambios = true;
+
+          // Si excede el stock real, recortamos la cantidad
+          const nuevaCantidad = Math.min(item.cantidad, nuevoStock);
+          if (nuevaCantidad !== item.cantidad) huboCambios = true;
+
+          return {
+            ...item,
+            stock: nuevoStock,
+            cantidad: nuevaCantidad,
+          };
+        })
+        .filter((i) => i.cantidad > 0);
+
+      return updated;
+    });
+
+    // también refresca la grilla para que el vendedor vea los cambios
+    setProductos(lista);
+
+    return { huboCambios };
+  }
+
+
   // Cargar productos del POS según sucursal + filtro
   useEffect(() => {
     if (!sucursalSeleccionada) {
@@ -290,8 +371,89 @@ export default function SellerPOSPage() {
     };
   }, [sucursalSeleccionada, productFilter]);
 
+  // Aviso si cambian la sucursal teniendo carrito de otra sucursal (sin bucle)
+  useEffect(() => {
+    if (!sucursalSeleccionada) return;
+
+    const mismatch =
+      cartItems.length > 0 &&
+      cartSucursalId !== null &&
+      sucursalSeleccionada !== cartSucursalId;
+
+    if (mismatch && !warnedMismatchRef.current) {
+      warnedMismatchRef.current = true;
+      warning(
+        "Carrito de otra sucursal",
+        "Tu carrito tiene productos de otra sucursal. Vacíalo para poder vender desde esta sucursal."
+      );
+    }
+
+    // Si ya no hay mismatch (vacío carrito o vuelvo a la misma sucursal),
+    // permitimos que vuelva a avisar en el futuro.
+    if (!mismatch) {
+      warnedMismatchRef.current = false;
+    }
+  }, [sucursalSeleccionada, cartItems.length, cartSucursalId]); // 👈 NO agregues warning aquí
+
+
+
+  // Calcular límite de puntos para esta venta según el total
+  useEffect(() => {
+    async function calcularLimitePuntos() {
+      // Sin cliente o venta en 0 => no hay puntos
+      if (!clienteSeleccionado || totalConImpuesto <= 0) {
+        setLimitePuntos(null);
+        setPagoPuntos("");
+        return;
+      }
+
+      try {
+        const totalCompra = totalConImpuesto;
+
+        // 👇 Ajusta la URL según tengas en el backend,
+        // la idea es igual que en checkout pero por cliente:
+        const data = (await apiFetch(
+          `/api/v1/puntos/cliente/${clienteSeleccionado.id}/limite-redencion?total_compra=${totalCompra}`
+        )) as LimitePuntos;
+
+        setLimitePuntos({
+          puede_usar_puntos: data.puede_usar_puntos,
+          motivo: data.motivo,
+          descuento_maximo_colones: Number(data.descuento_maximo_colones),
+          puntos_necesarios_para_maximo: data.puntos_necesarios_para_maximo,
+          saldo_puntos: data.saldo_puntos,
+          valor_colon_por_punto: Number((data as any).valor_colon_por_punto),
+        });
+
+        // Cuando cambia el total o el cliente, reseteamos el input
+        setPagoPuntos("");
+      } catch (error) {
+        console.error("Error calculando límite de puntos en POS", error);
+        setLimitePuntos(null);
+        setPagoPuntos("");
+      }
+    }
+
+    calcularLimitePuntos();
+  }, [clienteSeleccionado, totalConImpuesto]);
+
+
   // Carrito
   function handleAddToCart(product: POSProducto) {
+
+    if (cartSucursalId !== null && product.sucursal_id !== cartSucursalId) {
+      showError(
+        "No se pueden mezclar sucursales",
+        "Esta venta ya tiene productos de otra sucursal. Vacía el carrito para vender desde esta sucursal."
+      );
+      return;
+    }
+
+    // Si es el primer producto del carrito, fijamos sucursal del carrito
+    if (cartSucursalId === null) {
+      setCartSucursalId(product.sucursal_id);
+    }
+
     const precioConIVA = Number(product.precio);
     const precioBase = precioBaseDesdeConIVA(precioConIVA);
 
@@ -360,15 +522,22 @@ export default function SellerPOSPage() {
   }
 
   function handleRemoveItem(id: string) {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    setCartItems((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      if (updated.length === 0) setCartSucursalId(null);
+      return updated;
+    });
   }
+
 
   function handleClearCart() {
     if (cartItems.length === 0) return;
-    if (!confirm("¿Vaciar carrito?")) return;
+    
     setCartItems([]);
+    setCartSucursalId(null);
     info("Carrito vaciado", "Se eliminaron todos los productos del carrito.");
   }
+
 
   // Caja - Abrir
   async function handleAbrirCaja() {
@@ -440,11 +609,11 @@ export default function SellerPOSPage() {
 
       setCaja(cajaCerrada);
       setShowCerrarCajaModal(false);
-      
-      const diferencia = cajaCerrada.diferencia 
-        ? Number(cajaCerrada.diferencia) 
+
+      const diferencia = cajaCerrada.diferencia
+        ? Number(cajaCerrada.diferencia)
         : 0;
-      
+
       if (diferencia === 0) {
         success("Caja cerrada", "La caja se cerró correctamente sin diferencias.");
       } else if (diferencia > 0) {
@@ -571,44 +740,120 @@ export default function SellerPOSPage() {
   async function handleConfirmarPago(e: React.FormEvent) {
     e.preventDefault();
     if (cartItems.length === 0) return;
+
     if (!sucursalSeleccionada) {
-      showError("Sucursal no seleccionada", "Debes seleccionar una sucursal para registrar la venta.");
+      showError(
+        "Sucursal no seleccionada",
+        "Debes seleccionar una sucursal para registrar la venta."
+      );
       return;
     }
 
     setPagoLoading(true);
 
     try {
-      const total = totalConImpuesto;
+      // ✅ 1) Revalidar stock real justo antes de cobrar
+      const sync = await syncCartStockWithBackend(sucursalSeleccionada);
 
-      if (total <= 0) {
-        showError("Total inválido", "El total debe ser mayor a cero.");
-        setPagoLoading(false);
-        return;
-      }
+      if (sync.huboCambios) {
+        warning(
+          "Stock actualizado",
+          "Se actualizó el inventario. Revisa el carrito: algunas cantidades pueden haber cambiado."
+        );
 
-      if (pagoMetodo === "EFECTIVO" && !tieneCajaAbierta) {
-        showError("Caja cerrada", "Debes tener una caja ABIERTA para cobrar en efectivo.");
-        setPagoLoading(false);
-        return;
+        // cerramos el modal para que el usuario vea el carrito actualizado
+        setPagoModalOpen(false);
+        return; // IMPORTANTE: no crear la venta todavía
       }
 
       const puntosNumber = pagoPuntos ? parseInt(pagoPuntos, 10) : 0;
       if (Number.isNaN(puntosNumber) || puntosNumber < 0) {
         showError("Puntos inválidos", "Los puntos a usar deben ser un número válido.");
-        setPagoLoading(false);
         return;
       }
 
       const esVentaConCliente = !!clienteSeleccionado;
+
+      let total = totalConImpuesto;
+
+      // Si hay cliente y quiere usar puntos: recalcular total con descuento
+      if (esVentaConCliente && puntosNumber > 0) {
+        const valorPorPunto = limitePuntos?.valor_colon_por_punto ?? 0;
+        const descuentoMax = limitePuntos?.descuento_maximo_colones ?? 0;
+
+        if (valorPorPunto <= 0) {
+          showError("Config puntos inválida", "No hay valor_colon_por_punto.");
+          return;
+        }
+
+        const descuentoSolicitado = puntosNumber * valorPorPunto;
+        const descuentoAplicado = round2(Math.min(descuentoSolicitado, descuentoMax));
+
+        // En POS tu `subtotal` YA es base (sin IVA) porque item.precio = precioBaseDesdeConIVA(...)
+        const baseImponible = Math.max(0, round2(subtotal - descuentoAplicado));
+        const impuestoRecalc = round2(baseImponible * IVA_RATE);
+
+        total = round2(baseImponible + impuestoRecalc);
+      }
+
+      if (total <= 0) {
+        showError("Total inválido", "El total debe ser mayor a cero.");
+        return;
+      }
+
+
+      if (pagoMetodo === "EFECTIVO" && !tieneCajaAbierta) {
+        showError(
+          "Caja cerrada",
+          "Debes tener una caja ABIERTA para cobrar en efectivo."
+        );
+        return;
+      }
+
 
       if (puntosNumber > 0 && !esVentaConCliente) {
         showError(
           "Cliente requerido para puntos",
           "Para usar puntos debes seleccionar un cliente. La venta de mostrador no admite puntos."
         );
-        setPagoLoading(false);
         return;
+      }
+
+      // ❗ Validaciones puntos (sin setPagoError)
+      if (esVentaConCliente) {
+        const saldoClienteBackend =
+          limitePuntos?.saldo_puntos ?? clienteSeleccionado!.puntos_actuales ?? 0;
+
+        if (puntosNumber > saldoClienteBackend) {
+          showError(
+            "Puntos insuficientes",
+            `El cliente solo tiene ${saldoClienteBackend} puntos disponibles.`
+          );
+          return;
+        }
+
+        if (limitePuntos && limitePuntos.puede_usar_puntos) {
+          const maxPorCompra =
+            limitePuntos.puntos_necesarios_para_maximo || saldoClienteBackend;
+
+          const maxPermitidos = Math.min(saldoClienteBackend, maxPorCompra);
+
+          if (puntosNumber > maxPermitidos) {
+            showError(
+              "Límite de puntos",
+              `Para esta venta solo puedes usar hasta ${maxPermitidos} puntos.`
+            );
+            return;
+          }
+        }
+
+        if (puntosNumber > Math.floor(total)) {
+          showError(
+            "Puntos inválidos",
+            "No puedes usar más puntos que el valor total de la venta."
+          );
+          return;
+        }
       }
 
       const body = {
@@ -638,6 +883,7 @@ export default function SellerPOSPage() {
         body: JSON.stringify(body),
       });
 
+      // Reset UI
       setCartItems([]);
       setPagoNombreCliente("");
       setPagoPuntos("");
@@ -666,8 +912,9 @@ export default function SellerPOSPage() {
     }
   }
 
+
   // PARTE 2/2 - UI COMPLETA (Continúa desde la Parte 1)
-// Copia todo el código de la Parte 1 y agrega esto después de handleConfirmarPago:
+  // Copia todo el código de la Parte 1 y agrega esto después de handleConfirmarPago:
 
   if (loadingConfig) {
     return (
@@ -1036,16 +1283,23 @@ export default function SellerPOSPage() {
 
               <button
                 type="button"
-                disabled={cartItems.length === 0 || !sucursalSeleccionada}
+                disabled={cartItems.length === 0 || !sucursalSeleccionada || !tieneCajaAbierta}
                 className="w-full mt-2 rounded-lg bg-[#a855f7] hover:bg-[#7e22ce] !text-white font-semibold py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   if (cartItems.length === 0) return;
                   if (!sucursalSeleccionada) return;
+
+                  if (!tieneCajaAbierta) {
+                    showError("Caja cerrada", "Debes abrir la caja para poder cobrar.");
+                    return;
+                  }
+
                   setPagoModalOpen(true);
                 }}
               >
                 Cobrar y finalizar venta
               </button>
+
             </div>
           </div>
         </aside>
@@ -1366,26 +1620,68 @@ export default function SellerPOSPage() {
                 />
               </div>
 
-              {/* Puntos */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Puntos a usar (opcional)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-xs outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]/40"
-                  placeholder="Ej: 150"
-                  value={pagoPuntos}
-                  onChange={(e) => setPagoPuntos(e.target.value)}
-                  disabled={pagoLoading || !clienteSeleccionado}
-                />
-                {!clienteSeleccionado && (
-                  <p className="mt-1 text-[10px] text-gray-500">
-                    Para usar puntos primero selecciona o crea un cliente.
-                  </p>
-                )}
-              </div>
+              {/* Puntos: solo si el cliente tiene puntos */}
+              {/* Puntos / límites */}
+              {clienteSeleccionado && (
+                <>
+                  {/* Sin límite todavía */}
+                  {!limitePuntos && (
+                    <p className="text-[11px] text-gray-500">
+                      Calculando cuántos puntos se pueden usar para esta venta...
+                    </p>
+                  )}
+
+                  {/* Límite dice que NO se pueden usar puntos (compra mínima no alcanzada, etc.) */}
+                  {limitePuntos && !limitePuntos.puede_usar_puntos && (
+                    <p className="text-[11px] text-gray-500">
+                      No se pueden usar puntos en esta venta:{" "}
+                      <span className="font-semibold">
+                        {limitePuntos.motivo || "no cumple las condiciones mínimas."}
+                      </span>
+                    </p>
+                  )}
+
+                  {/* Se pueden usar puntos y hay límite */}
+                  {puedeUsarPuntos && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Puntos a usar (opcional)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={maxPuntosUsar}
+                          className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-xs outline-none focus:border-[#a855f7] focus:ring-1 focus:ring-[#a855f7]/40"
+                          placeholder={`Máx: ${maxPuntosUsar}`}
+                          value={pagoPuntos}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d*$/.test(val)) {
+                              setPagoPuntos(val);
+                            }
+                          }}
+                          disabled={pagoLoading}
+                        />
+                        <button
+                          type="button"
+                          className="px-2 py-1.5 rounded-lg text-[11px] bg-[#f5f3ff] text-[#6b21a8] border border-[#e9d5ff] hover:bg-[#ede9fe]"
+                          onClick={() => setPagoPuntos(String(maxPuntosUsar))}
+                          disabled={pagoLoading || maxPuntosUsar === 0}
+                        >
+                          Usar todos
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[10px] text-gray-500">
+                        Máximo para esta venta: {maxPuntosUsar} puntos (
+                        {limitePuntos?.saldo_puntos ?? 0} en saldo).
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+
 
               <div className="flex justify-end gap-2 pt-1">
                 <button

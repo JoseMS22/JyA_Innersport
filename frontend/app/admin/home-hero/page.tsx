@@ -41,11 +41,70 @@ const EMPTY_FORM: HomeHeroFormState = {
   banner2_url: "",
 };
 
+// ======================
+// Restricciones banners
+// ======================
+const BANNER_RATIO = 4 / 5; // 0.8
+const RATIO_TOLERANCE = 0.03; // 3%
+const MIN_WIDTH = 800;
+const MIN_HEIGHT = 1000;
+
+
 function buildMediaUrl(url: string | null) {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `${API_BASE_URL}${url}`;
 }
+
+function validateBannerImage(
+  file: File
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const width = img.width;
+      const height = img.height;
+      const ratio = width / height;
+
+      URL.revokeObjectURL(url);
+
+      const ratioDiff = Math.abs(ratio - BANNER_RATIO);
+
+      if (ratioDiff > RATIO_TOLERANCE) {
+        resolve({
+          ok: false,
+          message: `La imagen tiene ${width}×${height}px.
+Debe ser vertical con proporción 4:5 (ej: 800×1000, 1200×1500).`,
+        });
+        return;
+      }
+
+      if (width < MIN_WIDTH || height < MIN_HEIGHT) {
+        resolve({
+          ok: false,
+          message: `La imagen es muy pequeña (${width}×${height}px).
+Mínimo recomendado: ${MIN_WIDTH}×${MIN_HEIGHT}px.`,
+        });
+        return;
+      }
+
+      resolve({ ok: true });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({
+        ok: false,
+        message: "No se pudo leer la imagen seleccionada.",
+      });
+    };
+
+    img.src = url;
+  });
+}
+
 
 export default function AdminHomeHeroPage() {
   const router = useRouter();
@@ -152,9 +211,17 @@ export default function AdminHomeHeroPage() {
     setVideoPreviewLocal(url);
   }
 
-  function handleBanner1Change(e: ChangeEvent<HTMLInputElement>) {
+  async function handleBanner1Change(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateBannerImage(file);
+
+    if (!validation.ok) {
+      error("Imagen no válida", validation.message);
+      e.target.value = ""; // limpia el input
+      return;
+    }
 
     if (banner1PreviewLocal) URL.revokeObjectURL(banner1PreviewLocal);
 
@@ -163,9 +230,18 @@ export default function AdminHomeHeroPage() {
     setBanner1PreviewLocal(url);
   }
 
-  function handleBanner2Change(e: ChangeEvent<HTMLInputElement>) {
+
+  async function handleBanner2Change(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateBannerImage(file);
+
+    if (!validation.ok) {
+      error("Imagen no válida", validation.message);
+      e.target.value = "";
+      return;
+    }
 
     if (banner2PreviewLocal) URL.revokeObjectURL(banner2PreviewLocal);
 
@@ -173,6 +249,7 @@ export default function AdminHomeHeroPage() {
     setBanner2File(file);
     setBanner2PreviewLocal(url);
   }
+
 
   // Guardar configuración
   async function handleSubmit(e: FormEvent) {

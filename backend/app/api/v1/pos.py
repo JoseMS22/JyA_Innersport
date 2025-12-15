@@ -54,6 +54,11 @@ from app.services.programa_puntos_service import (
 from app.services.usuario_service import create_cliente_pos
 from app.services.audit_service import registrar_auditoria
 from app.core.request_utils import get_client_ip
+from app.services.comisiones_service import (
+    obtener_configuracion_activa as obtener_configuracion_comision_activa,
+)
+from app.models.comision_vendedor import ComisionVendedor
+from app.services.comisiones_service import crear_comision_pos_si_aplica
 
 
 router = APIRouter()
@@ -534,16 +539,22 @@ def crear_venta_pos(
                 Inventario.variante_id == item_in.variante_id,
             )
             .with_for_update()
-            .first()
+            .one_or_none()
         )
-        if not inv or inv.cantidad < item_in.cantidad:
+
+        disponible = int(inv.cantidad) if inv else 0
+        if disponible < item_in.cantidad:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"No hay stock suficiente de '{producto.nombre}' "
-                    f"en la sucursal seleccionada."
+                    f"Stock insuficiente. "
+                    f"Producto: '{producto.nombre}' | SKU: {variante.sku} | "
+                    f"Variante: {item_in.variante_id} | "
+                    f"Disponible: {disponible} | Solicitado: {item_in.cantidad} | "
+                    f"Sucursal: {data.sucursal_id}"
                 ),
             )
+
 
         subtotal_item = item_in.precio_unitario * item_in.cantidad
         subtotal += subtotal_item
@@ -637,6 +648,7 @@ def crear_venta_pos(
     )
     db.add(venta)
     db.flush()  # para tener venta.id
+    crear_comision_pos_si_aplica(db, venta)
 
     # 9) Crear ítems y rebajar inventario
     for item_in, subtotal_item, producto in items_info:
@@ -713,6 +725,36 @@ def crear_venta_pos(
         db.refresh(venta)
     else:
         venta = db.query(VentaPOS).filter(VentaPOS.id == venta.id).one()
+
+        # 11.5) ✅ Crear comisión automáticamente (si hay config activa)
+        config_comision_pos = obtener_configuracion_comision_activa(db, "POS")
+
+        if config_comision_pos:
+            # Evitar duplicados si por algún motivo se reintenta el request
+            existe = (
+                db.query(ComisionVendedor)
+                .filter(ComisionVendedor.venta_pos_id == venta.id)
+                .first()
+            )
+
+            if not existe:
+                # Si tienes monto_minimo y no lo cumple, no se crea
+                if (config_comision_pos.monto_minimo is None) or (venta.total >= config_comision_pos.monto_minimo):
+                    monto_comision = (venta.total * config_comision_pos.porcentaje) / Decimal("100")
+
+                    comision = ComisionVendedor(
+                        vendedor_id=venta.vendedor_id,
+                        venta_pos_id=venta.id,
+                        monto_venta=venta.total,
+                        porcentaje_aplicado=config_comision_pos.porcentaje,
+                        monto_comision=monto_comision,
+                        tipo_venta="POS",
+                        estado="PENDIENTE",
+                        fecha_venta=venta.fecha_creacion,
+                    )
+                    db.add(comision)
+                    db.commit()
+
 
     # 12) Construir respuesta con items
     venta_db = (
