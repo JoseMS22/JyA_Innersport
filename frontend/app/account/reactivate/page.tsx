@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Logo } from "@/components/Logo";
 
+export const dynamic = "force-dynamic";
+
+
 function formatRemaining(ms: number | null) {
   if (ms === null || ms <= 0)
     return "El periodo de gracia puede haber finalizado.";
