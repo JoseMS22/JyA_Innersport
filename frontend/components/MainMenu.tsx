@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useCart } from "../app/context/cartContext";
 import { useFavorites } from "../app/context/favoritesContext";
 import { SearchBar } from "./SearchBar";
@@ -26,7 +26,16 @@ type CategoriaMenu = {
   secundarias: CategoriaMenu[];
 };
 
+// ✅ Wrapper para cumplir la regla de Next con useSearchParams()
 export function MainMenu() {
+  return (
+    <Suspense fallback={null}>
+      <MainMenuInner />
+    </Suspense>
+  );
+}
+
+function MainMenuInner() {
   const [user, setUser] = useState<UserMe | null>(null);
   const [checking, setChecking] = useState(true);
   const [compact, setCompact] = useState(false);
@@ -201,8 +210,10 @@ export function MainMenu() {
     setProfileMenuOpen((prev) => !prev);
   }
 
-  function navigateFromMobile(href: string) { setMobileMenuOpen(false); router.push(href); }
-
+  function navigateFromMobile(href: string) {
+    setMobileMenuOpen(false);
+    router.push(href);
+  }
 
   function goToCategoria(slug: string) {
     router.push(categoriaUrl(slug));
@@ -235,13 +246,15 @@ export function MainMenu() {
     <>
       {/* HEADER FIJO */}
       <header
-        className={`fixed top-0 left-0 right-0 z-40 border-b border-[#e5e7eb] bg-[#fdf7ee]/90 backdrop-blur transition-shadow ${compact ? "shadow-sm" : ""
-          }`}
+        className={`fixed top-0 left-0 right-0 z-40 border-b border-[#e5e7eb] bg-[#fdf7ee]/90 backdrop-blur transition-shadow ${
+          compact ? "shadow-sm" : ""
+        }`}
       >
         {/* Franja superior: logo centrado + redes */}
         <div
-          className={`transition-all duration-300 overflow-hidden border-b border-[#e5e7eb]/60 ${compact ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-            }`}
+          className={`transition-all duration-300 overflow-hidden border-b border-[#e5e7eb]/60 ${
+            compact ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+          }`}
         >
           <div className="max-w-6xl mx-auto relative px-4 py-3 flex items-center justify-center">
             <Link href="/" className="flex items-center gap-3 mx-auto">
@@ -309,11 +322,7 @@ export function MainMenu() {
                 className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 bg-white hover:border-[#a855f7] hover:text-[#6b21a8] shadow-sm"
               >
                 {/* Icono hamburguesa igual estilo Admin */}
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M4 7h16M4 12h16M4 17h10"
                     stroke="currentColor"
@@ -387,8 +396,6 @@ export function MainMenu() {
                       {cat.nombre}
                     </button>
 
-
-
                     {cat.secundarias && cat.secundarias.length > 0 && (
                       <div className="absolute left-1/2 -translate-x-1/2 top-full hidden group-hover:block bg-white border border-gray-200 rounded-2xl shadow-lg min-w-[180px] z-50">
                         <button
@@ -403,16 +410,12 @@ export function MainMenu() {
                           <button
                             key={sub.id}
                             type="button"
-                            onClick={() =>
-                              router.push(categoriaUrl(cat.slug, sub.slug))
-                            }
-
+                            onClick={() => router.push(categoriaUrl(cat.slug, sub.slug))}
                             className="block w-full text-left px-4 py-2 text-[11px] text-gray-700 hover:bg-[#f3e8ff]"
                           >
                             {sub.nombre}
                           </button>
                         ))}
-
                       </div>
                     )}
                   </div>
@@ -553,8 +556,9 @@ export function MainMenu() {
 
           {/* Sidebar */}
           <aside
-            className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[80%] transform bg-white shadow-xl border-r border-gray-200 transition-transform duration-200 ease-out md:hidden ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-              }`}
+            className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[80%] transform bg-white shadow-xl border-r border-gray-200 transition-transform duration-200 ease-out md:hidden ${
+              mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
           >
             {/* Header del sidebar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -586,17 +590,11 @@ export function MainMenu() {
 
             {/* Navegación */}
             <nav className="px-3 py-3 space-y-1 text-sm overflow-y-auto max-h-[calc(100vh-180px)]">
-              <button
-                className={mobileItemClass}
-                onClick={() => navigateFromMobile("/nuevo")}
-              >
+              <button className={mobileItemClass} onClick={() => navigateFromMobile("/nuevo")}>
                 Lo nuevo
               </button>
 
-              <button
-                className={mobileItemClass}
-                onClick={() => navigateFromMobile("/favorites")}
-              >
+              <button className={mobileItemClass} onClick={() => navigateFromMobile("/favorites")}>
                 Favoritos
               </button>
 
@@ -604,9 +602,7 @@ export function MainMenu() {
                 <div key={cat.id} className="space-y-1">
                   <button
                     className={mobileItemClass}
-                    onClick={() =>
-                      navigateFromMobile(categoriaUrl(cat.slug))
-                    }
+                    onClick={() => navigateFromMobile(categoriaUrl(cat.slug))}
                   >
                     {cat.nombre}
                   </button>
@@ -617,11 +613,7 @@ export function MainMenu() {
                         <button
                           key={sub.id}
                           className="w-full text-left px-4 py-2 text-[13px] text-[#6b21a8] border-b border-[#f3e8ff] last:border-b-0 hover:bg-[#f3e8ff]"
-                          onClick={() =>
-                            navigateFromMobile(
-                              categoriaUrl(cat.slug, sub.slug)
-                            )
-                          }
+                          onClick={() => navigateFromMobile(categoriaUrl(cat.slug, sub.slug))}
                         >
                           {sub.nombre}
                         </button>
@@ -654,10 +646,7 @@ export function MainMenu() {
                   >
                     Mis pedidos
                   </button>
-                  <button
-                    onClick={handleLogout}
-                    className="text-left text-red-500"
-                  >
+                  <button onClick={handleLogout} className="text-left text-red-500">
                     Cerrar sesión
                   </button>
                 </div>
@@ -695,9 +684,7 @@ export function MainMenu() {
                 </Link>
               </div>
 
-              <p className="text-[10px] text-gray-400">
-                JYA Innersport · Tienda virtual
-              </p>
+              <p className="text-[10px] text-gray-400">JYA Innersport · Tienda virtual</p>
             </div>
           </aside>
         </>
